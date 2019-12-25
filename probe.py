@@ -457,6 +457,8 @@ def initialize(
         log_level=log_level,
     )
 
+    get_logger().debug("Configuration initialized. [%s]" % (_config))
+
 
 def is_enabled():
     return profiler.is_running()
@@ -510,11 +512,17 @@ def enable(end_at_exit=False):
     builtins = not bool(int(_config.args.get('flag_no_builtins', '0')))
     profile_cpu = bool(int(_config.args.get('flag_cpu', '1')))
     profile_memory = bool(int(_config.args.get('flag_memory', '1')))
-    instrument_func_args = bool(int(_config.args.get('flag_fn_args', '0')))
+    fn_args_enabled = bool(int(_config.args.get('flag_fn_args', '0')))
+    timespan_enabled = bool(int(_config.args.get('flag_timespan', '0')))
+
+    # timespan_selectors is a list of selectors [selector1, .., selectorN]
+    timespan_selectors = []
+    if timespan_enabled:
+        pass
 
     # instrumented_funcs is a dict of {func_name:[list of argument IDs]}
     instrumented_funcs = {}
-    if instrument_func_args:
+    if fn_args_enabled:
         # convert the fn-args string to dict for faster lookups on C side
         fn_args = _agent_conn.agent_response.args.get('Blackfire-Fn-Args', [])
         for fn_arg in fn_args:

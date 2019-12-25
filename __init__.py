@@ -110,6 +110,10 @@ class BlackfireConfiguration(object):
 
         self.args = dict(parse_qsl(self.args_raw))
 
+    def __repr__(self):
+        import json
+        return json.dumps(self.__dict__, indent=4)
+
     def __getattribute__(self, name):
         value = None
         try:
