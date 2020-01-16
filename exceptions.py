@@ -1,0 +1,2 @@
+class BlackfireApiException(Exception):
+    pass
