@@ -3,9 +3,8 @@
 import io
 import os
 import sys
+import glob
 from setuptools import setup
-from distutils.core import Extension
-from distutils.ccompiler import new_compiler
 
 with io.open('README.md', encoding='UTF-8') as f:
     long_description = f.read()
@@ -39,10 +38,10 @@ setup(
     author="Blackfire.io",
     author_email="support@blackfire.io",
     install_requires=['psutil>=5.6.3'],
-    packages=[
-        'blackfire',
+    py_modules=[os.path.splitext(f)[0] for f in glob.glob("*.py")],
+    data_files=[
+        ('', ['VERSION']),
     ],
-    package_data={'': ['VERSION']},
     description="Blackfire Python SDK",
     long_description=long_description,
     long_description_content_type='text/markdown',
