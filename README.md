@@ -90,7 +90,7 @@ Read the [Django Integration documentation](https://blackfire.io/docs/integratio
     ]
     ```
 
-4. Follow these [steps](https://blackfire.io/docs/cookbooks/profiling-http-via-browser) to profile via Browser.
+3. Follow these [steps](https://blackfire.io/docs/cookbooks/profiling-http-via-browser) to profile via Browser.
 
 Resources
 ---------
