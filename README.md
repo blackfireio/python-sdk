@@ -81,6 +81,7 @@ Read the [Django Integration documentation](https://blackfire.io/docs/integratio
 
 1. Install the [Blackfire Browser Extension](https://blackfire.io/docs/integrations/browsers/chrome).
 2. Add Blackfire middleware in your Django `settings.py` as following:
+
    ```python
    MIDDLEWARE = [
        ...
@@ -88,6 +89,7 @@ Read the [Django Integration documentation](https://blackfire.io/docs/integratio
        'blackfire.middleware.DjangoMiddleware',
    ]
    ```
+
 3. Follow these [steps](https://blackfire.io/docs/cookbooks/profiling-http-via-browser) to
    profile via Browser.
 
