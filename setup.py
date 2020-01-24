@@ -6,7 +6,7 @@ import sys
 import glob
 from setuptools import setup
 
-with io.open('README.md', encoding='UTF-8') as f:
+with io.open('README.rst', encoding='UTF-8') as f:
     long_description = f.read()
 
 with io.open('VERSION', encoding='UTF-8') as f:
@@ -40,7 +40,7 @@ setup(
     install_requires=['psutil>=5.6.3'],
     py_modules=[os.path.splitext(f)[0] for f in glob.glob("*.py")],
     data_files=[
-        ('', ['VERSION']),
+        ('', ['VERSION', 'LICENSE']),
     ],
     description="Blackfire Python SDK",
     long_description=long_description,
