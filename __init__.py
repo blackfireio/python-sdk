@@ -1,6 +1,7 @@
 import re
 import io
 import os
+import sys
 import traceback
 from blackfire.utils import *
 from distutils.sysconfig import get_python_lib
@@ -64,8 +65,9 @@ def _install_bootstrap():
 
         print(
             "The pre-interpreter hook files has been installed. These files can "
-            "be removed by running `python -m uninstall-bootstrap`. You can try "
-            "blackfire by running `blackfire run python -m blackfire hello-world`"
+            "be removed by running `python -m uninstall-bootstrap`.\n\nYou can try "
+            "blackfire by running `blackfire run %s -m blackfire hello-world`" %
+            (os.path.basename(sys.executable).strip())
         )
 
     except Exception as e:
