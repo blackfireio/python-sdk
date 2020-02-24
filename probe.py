@@ -5,7 +5,6 @@ import time
 import atexit
 import socket
 import platform
-import warnings
 import traceback
 import base64
 import logging
@@ -14,7 +13,7 @@ from contextlib import contextmanager
 from collections import defaultdict
 from blackfire import profiler, VERSION
 from blackfire.utils import SysHooks, IS_PY3, get_home_dir, ConfigParser, \
-    urlparse, urljoin, urlencode, get_load_avg, get_logger, init_logger
+    urlparse, urljoin, urlencode, get_load_avg, get_logger, init_logger, quote
 from blackfire.exceptions import *
 from blackfire import BlackfireConfiguration
 
@@ -123,7 +122,7 @@ class _AgentConnection(object):
         try:
             self._socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         except Exception as e:
-            warnings.warn(
+            get_logger().warning(
                 "Error happened while disabling NODELAY option. [%s]" % (e),
                 RuntimeWarning
             )
@@ -258,6 +257,7 @@ class BlackfireRequest(BlackfireMessage):
         dsp = data.split(
             _AGENT_PROTOCOL_MARKER.decode(_AGENT_PROTOCOL_ENCODING)
         )
+        print(len(dsp), "khkkkkkkk")
         header_lines = []
         if len(dsp) == 2:
             header_lines, self.data = dsp
@@ -514,11 +514,25 @@ def enable(end_at_exit=False):
     profile_memory = bool(int(_config.args.get('flag_memory', '1')))
     fn_args_enabled = bool(int(_config.args.get('flag_fn_args', '0')))
     timespan_enabled = bool(int(_config.args.get('flag_timespan', '0')))
+    # TODO: What should be the default or do we even have a default?
+    timespan_threshold = int(_config.args.get('timespan_threshold', 10)) * 1000
 
-    # timespan_selectors is a list of selectors [selector1, .., selectorN]
-    timespan_selectors = []
+    # timespan_selectors is a dict of set of prefix/equal regex selectors.
+    timespan_selectors = {'^': set(), '=': set()}
     if timespan_enabled:
-        pass
+        ts_selectors = _agent_conn.agent_response.args.get(
+            'Blackfire-Timespan', []
+        )
+
+        for ts_sel in ts_selectors:
+            if ts_sel[0] not in ['^', '=']:
+                get_logger().warning(
+                    "Ingoring invalid timespan selector '%s'." % (ts_sel),
+                    RuntimeWarning
+                )
+                continue
+
+            timespan_selectors[ts_sel[0]].add(ts_sel[1:])
 
     # instrumented_funcs is a dict of {func_name:[list of argument IDs]}
     instrumented_funcs = {}
@@ -531,10 +545,11 @@ def enable(end_at_exit=False):
             arg_ids = [int(arg_id) for arg_id in arg_ids.strip().split(',')]
 
             if fn_name in instrumented_funcs:
-                warnings.warn(
+                get_logger().warning(
                     "Function '%s' is already instrumented. Ignoring fn-args directive %s."
                     % (fn_name, fn_arg), RuntimeWarning
                 )
+                continue
 
             instrumented_funcs[fn_name] = arg_ids
 
@@ -546,6 +561,8 @@ def enable(end_at_exit=False):
         profile_cpu=profile_cpu,
         profile_memory=profile_memory,
         instrumented_funcs=instrumented_funcs,
+        timespan_selectors=timespan_selectors,
+        timespan_threshold=timespan_threshold,
     )
 
     _enabled = True
@@ -595,13 +612,6 @@ def end(headers={}, omit_sys_path_dirs=_DEFAULT_OMIT_SYS_PATH):
     if 'Context' in end_headers:
         context_dict.update(end_headers['Context'])
     end_headers['Context'] = urlencode(context_dict, doseq=True)
-
-    # # add for testing
-    # my_traces = str(traces)
-    # my_traces += 'Threshold-0-start: //1\n'
-    # my_traces += 'Threshold-0-end: main()==>example-timespan.a//240\n'
-    # print(my_traces)
-    # # TMP
 
     profile_data_req = BlackfireRequest(headers=end_headers, data=traces)
     _agent_conn.send(profile_data_req.to_bytes())

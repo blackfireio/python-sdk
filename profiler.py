@@ -114,62 +114,70 @@ class BlackfireTrace(Counter):
         return json.dumps(self, indent=4)
 
 
+def _generate_trace_key(omit_sys_path_dirs, trace):
+
+    def _format_name(module, name, name_formatted, fn_args, rec_level):
+
+        if omit_sys_path_dirs and name_formatted:
+            module = ''
+            name = name_formatted
+
+        if module:
+            module = os.path.splitext(module)[0] + '.'
+
+        if fn_args:
+            fn_args = '?' + urlencode(fn_args)
+            fn_args = fn_args.replace('+', ' ')
+
+        rec_level_suffix = ''
+        if rec_level > 1:
+            rec_level_suffix = '@%d' % (rec_level - 1)
+
+        return ''.join([module, name, fn_args, rec_level_suffix])
+
+    caller_formatted = _format_name(
+        trace.caller_module,
+        trace.caller_name,
+        trace.caller_name_formatted,
+        trace.caller_fn_args,
+        trace.caller_rec_level,
+    )
+    if not caller_formatted:  # main function?
+        _trace_key = trace.callee_name
+    else:
+        _trace_key = '%s==>%s' % (
+            caller_formatted,
+            _format_name(
+                trace.callee_module,
+                trace.callee_name,
+                trace.callee_name_formatted,
+                trace.callee_fn_args,
+                trace.callee_rec_level,
+            )
+        )
+    return _trace_key
+
+
 class BlackfireTraces(dict):
 
     def __init__(self, omit_sys_path_dirs):
         self._omit_sys_path_dirs = omit_sys_path_dirs
-
-    def _generate_trace_key(self, trace):
-
-        def _format_name(module, name, name_formatted, fn_args, rec_level):
-
-            if self._omit_sys_path_dirs and name_formatted:
-                module = ''
-                name = name_formatted
-
-            if module:
-                module = os.path.splitext(module)[0] + '.'
-
-            if fn_args:
-                fn_args = '?' + urlencode(fn_args)
-                fn_args = fn_args.replace('+', ' ')
-
-            rec_level_suffix = ''
-            if rec_level > 1:
-                rec_level_suffix = '@%d' % (rec_level - 1)
-
-            return ''.join([module, name, fn_args, rec_level_suffix])
-
-        caller_formatted = _format_name(
-            trace.caller_module,
-            trace.caller_name,
-            trace.caller_name_formatted,
-            trace.caller_fn_args,
-            trace.caller_rec_level,
-        )
-        if not caller_formatted:  # main function?
-            _trace_key = trace.callee_name
-        else:
-            _trace_key = '%s==>%s' % (
-                caller_formatted,
-                _format_name(
-                    trace.callee_module,
-                    trace.callee_name,
-                    trace.callee_name_formatted,
-                    trace.callee_fn_args,
-                    trace.callee_rec_level,
-                )
-            )
-        return _trace_key
+        self._timeline = {}
 
     def add(self, **kwargs):
         trace = BlackfireTrace(kwargs)
-        _trace_key = self._generate_trace_key(trace)
+        _trace_key = _generate_trace_key(self._omit_sys_path_dirs, trace)
 
         # TODO: Some builtin functions have same name but different index
         #assert _trace_key not in self
 
         self[_trace_key] = trace
+
+    def add_timeline(self, **kwargs):
+        trace = BlackfireTrace(kwargs)
+        _trace_key = _generate_trace_key(self._omit_sys_path_dirs, trace)
+
+        self._timeline[_trace_key] = trace
 
     def __str__(self):
         result = ''
@@ -181,6 +189,24 @@ class BlackfireTraces(dict):
                         trace.cpu_time,
                         trace.mem_usage,
                         trace.peak_mem_usage,)
+
+        # add timeline entries
+        if len(self._timeline):
+            result += '\n'
+        for trace_key, trace in self._timeline.items():
+            result += 'Threshold-%d-start: //%d %d %d %d\n' % ( \
+                        trace.timeline_index,
+                        trace.start_wall,
+                        trace.start_cpu,
+                        trace.start_mu,
+                        trace.start_pmu,)
+            result += 'Threshold-%d-end: %s//%d %d %d %d\n' % ( \
+                        trace.timeline_index,
+                        trace_key,
+                        trace.end_wall,
+                        trace.end_cpu,
+                        trace.end_mu,
+                        trace.end_pmu,)
         return result
 
     def to_bytes(self):
@@ -212,8 +238,9 @@ class _TraceEnumerator(dict):
 
     def __init__(self, omit_sys_path_dirs):
         self._omit_sys_path_dirs = omit_sys_path_dirs
+        self._timeline_traces = []
 
-    def _enum_callback(self, stat):
+    def _enum_func_cbk(self, stat):
         fname, fmodule, fname_formatted, flineno, fncall, fnactualcall, fbuiltin, \
             fttot_wall, ftsub_wall, fttot_cpu, ftsub_cpu, findex, fchildren, fctxid, \
             fmem_usage, fpeak_mem_usage, ffn_args, frec_level = stat
@@ -253,6 +280,9 @@ class _TraceEnumerator(dict):
             "fn_args": ffn_args or '',
             "rec_level": frec_level,
         }
+
+    def _enum_timeline_cbk(self, stat):
+        self._timeline_traces.append(stat)
 
     def to_traceformat(self):
         """
@@ -308,6 +338,38 @@ class _TraceEnumerator(dict):
                         rec_level=callee["rec_level"],
                     )
 
+        # add timeline traces
+        for i, te in enumerate(self._timeline_traces):
+            # we check this as we might have prevented some functions to be
+            # shown in the output
+            if not te[0] in self or not te[1] in self:
+                return
+
+            caller = self[te[0]]
+            callee = self[te[1]]
+
+            result.add_timeline(
+                caller_module=caller['module'],
+                caller_name=caller['name'],
+                caller_fn_args=caller["fn_args"],
+                caller_rec_level=caller["rec_level"],
+                caller_name_formatted=caller["name_formatted"],
+                callee_module=callee["module"],
+                callee_name=callee["name"],
+                callee_fn_args=callee["fn_args"],
+                callee_name_formatted=callee["name_formatted"],
+                callee_rec_level=callee["rec_level"],
+                start_wall=te[2] * 1000000,
+                start_cpu=te[3] * 1000000,
+                end_wall=te[4] * 1000000,
+                end_cpu=te[5] * 1000000,
+                start_mu=te[6],
+                start_pmu=te[7],
+                end_mu=te[8],
+                end_pmu=te[9],
+                timeline_index=i,
+            )
+
         return result
 
 
@@ -315,7 +377,9 @@ def start(
     builtins=True,
     profile_cpu=True,
     profile_memory=True,
-    instrumented_funcs={}
+    instrumented_funcs={},
+    timespan_selectors={},
+    timespan_threshold=0,  # usec
 ):
     global _max_prefix_cache
 
@@ -340,8 +404,13 @@ def start(
     if profile_memory:
         _bfext.set_memory_usage_callback(_get_memory_usage)
     _bfext.start(
-        builtins, profile_threads, profile_cpu, profile_memory,
-        instrumented_funcs
+        builtins,
+        profile_threads,
+        profile_cpu,
+        profile_memory,
+        instrumented_funcs,
+        timespan_selectors,
+        timespan_threshold,
     )
 
 
@@ -363,7 +432,8 @@ def get_traces(omit_sys_path_dirs=True):
     _bfext._pause()
     try:
         traces = _TraceEnumerator(omit_sys_path_dirs)
-        _bfext.enum_func_stats(traces._enum_callback)
+        _bfext.enum_func_stats(traces._enum_func_cbk)
+        _bfext.enum_timeline_stats(traces._enum_timeline_cbk)
         return traces.to_traceformat()
     finally:
         _bfext._resume()
