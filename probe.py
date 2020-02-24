@@ -596,7 +596,14 @@ def end(headers={}, omit_sys_path_dirs=_DEFAULT_OMIT_SYS_PATH):
         context_dict.update(end_headers['Context'])
     end_headers['Context'] = urlencode(context_dict, doseq=True)
 
-    profile_data_req = BlackfireRequest(headers=end_headers, data=str(traces))
+    # # add for testing
+    # my_traces = str(traces)
+    # my_traces += 'Threshold-0-start: //1\n'
+    # my_traces += 'Threshold-0-end: main()==>example-timespan.a//240\n'
+    # print(my_traces)
+    # # TMP
+
+    profile_data_req = BlackfireRequest(headers=end_headers, data=traces)
     _agent_conn.send(profile_data_req.to_bytes())
 
     _agent_conn.close()
