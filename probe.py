@@ -13,7 +13,8 @@ from contextlib import contextmanager
 from collections import defaultdict
 from blackfire import profiler, VERSION
 from blackfire.utils import SysHooks, IS_PY3, get_home_dir, ConfigParser, \
-    urlparse, urljoin, urlencode, get_load_avg, get_logger, init_logger, quote
+    urlparse, urljoin, urlencode, get_load_avg, get_logger, init_logger, quote, \
+    parse_qsl
 from blackfire.exceptions import *
 from blackfire import BlackfireConfiguration
 
@@ -257,7 +258,6 @@ class BlackfireRequest(BlackfireMessage):
         dsp = data.split(
             _AGENT_PROTOCOL_MARKER.decode(_AGENT_PROTOCOL_ENCODING)
         )
-        print(len(dsp), "khkkkkkkk")
         header_lines = []
         if len(dsp) == 2:
             header_lines, self.data = dsp
@@ -308,6 +308,7 @@ class BlackfireResponse(BlackfireMessage):
         resp_type, resp_val = lines[0].split(':')
         resp_type = resp_type.strip()
         self.status_val = resp_val.strip()
+        self.status_val_dict = dict(parse_qsl(self.status_val))
         if resp_type == 'Blackfire-Error':
             self.status_code = BlackfireResponse.StatusCode.ERR
 
@@ -612,6 +613,14 @@ def end(headers={}, omit_sys_path_dirs=_DEFAULT_OMIT_SYS_PATH):
     if 'Context' in end_headers:
         context_dict.update(end_headers['Context'])
     end_headers['Context'] = urlencode(context_dict, doseq=True)
+
+    #get_logger().warning(
+    #    "ssss val========= %s" % _agent_conn.agent_response.status_val_dict
+    #)
+    # I received:
+    # 2020-03-02 18:48:10,228 - python-probe - WARNING - probe.py:618 - ssss val========= {'continue': 'true', 'progress': '33', 'wait': '0', 'first_sample': 'true'}
+    # 2020-03-02 18:48:10,472 - python-probe - WARNING - probe.py:618 - ssss val========= {'continue': 'true', 'progress': '66', 'wait': '0'}
+    # 2020-03-02 18:48:10,744 - python-probe - WARNING - probe.py:618 - ssss val========= {'continue': 'false'}
 
     profile_data_req = BlackfireRequest(headers=end_headers, data=traces)
     _agent_conn.send(profile_data_req.to_bytes())

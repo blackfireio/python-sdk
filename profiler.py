@@ -162,7 +162,7 @@ class BlackfireTraces(dict):
 
     def __init__(self, omit_sys_path_dirs):
         self._omit_sys_path_dirs = omit_sys_path_dirs
-        self._timeline = {}
+        self._timeline = []
 
     def add(self, **kwargs):
         trace = BlackfireTrace(kwargs)
@@ -177,7 +177,7 @@ class BlackfireTraces(dict):
         trace = BlackfireTrace(kwargs)
         _trace_key = _generate_trace_key(self._omit_sys_path_dirs, trace)
 
-        self._timeline[_trace_key] = trace
+        self._timeline.append((_trace_key, trace))
 
     def __str__(self):
         result = ''
@@ -193,7 +193,7 @@ class BlackfireTraces(dict):
         # add timeline entries
         if len(self._timeline):
             result += '\n'
-        for trace_key, trace in self._timeline.items():
+        for trace_key, trace in self._timeline:
             result += 'Threshold-%d-start: //%d %d %d %d\n' % ( \
                         trace.timeline_index,
                         trace.start_wall,
@@ -282,7 +282,10 @@ class _TraceEnumerator(dict):
         }
 
     def _enum_timeline_cbk(self, stat):
-        self._timeline_traces.append(stat)
+        try:
+            self._timeline_traces.append(stat)
+        except Exception as e:
+            print(e)
 
     def to_traceformat(self):
         """
@@ -291,7 +294,6 @@ class _TraceEnumerator(dict):
         """
         result = BlackfireTraces(self._omit_sys_path_dirs)
         for _, stat in self.items():
-
             # is root function?
             if stat["name"] == 'main()' and stat["module"] == '':
                 result.add(
@@ -339,11 +341,12 @@ class _TraceEnumerator(dict):
                     )
 
         # add timeline traces
-        for i, te in enumerate(self._timeline_traces):
+        i = 0
+        for te in self._timeline_traces:
             # we check this as we might have prevented some functions to be
             # shown in the output
             if not te[0] in self or not te[1] in self:
-                return
+                continue
 
             caller = self[te[0]]
             callee = self[te[1]]
@@ -369,6 +372,8 @@ class _TraceEnumerator(dict):
                 end_pmu=te[9],
                 timeline_index=i,
             )
+
+            i += 1
 
         return result
 
