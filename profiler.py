@@ -282,10 +282,7 @@ class _TraceEnumerator(dict):
         }
 
     def _enum_timeline_cbk(self, stat):
-        try:
-            self._timeline_traces.append(stat)
-        except Exception as e:
-            print(e)
+        self._timeline_traces.append(stat)
 
     def to_traceformat(self):
         """

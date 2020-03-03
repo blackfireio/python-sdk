@@ -259,7 +259,10 @@ class BlackfireRequest(BlackfireMessage):
             _AGENT_PROTOCOL_MARKER.decode(_AGENT_PROTOCOL_ENCODING)
         )
         header_lines = []
-        if len(dsp) == 2:
+        if len(dsp) == 3:
+            header_lines = dsp[0]
+            self.data = dsp[1] + '\n' + dsp[2]  # timespan + trace?
+        elif len(dsp) == 2:
             header_lines, self.data = dsp
         elif len(dsp) == 1:
             header_lines = dsp[0]
@@ -514,9 +517,17 @@ def enable(end_at_exit=False):
     profile_cpu = bool(int(_config.args.get('flag_cpu', '1')))
     profile_memory = bool(int(_config.args.get('flag_memory', '1')))
     fn_args_enabled = bool(int(_config.args.get('flag_fn_args', '0')))
-    timespan_enabled = bool(int(_config.args.get('flag_timespan', '0')))
-    # TODO: What should be the default or do we even have a default?
-    timespan_threshold = int(_config.args.get('timespan_threshold', 10)) * 1000
+
+    # only enable timespan if this is the last profile of multiple sample profiles.
+    # we look at 'continue': 'false' from the agent response
+    timespan_enabled = False
+    timespan_threshold = 10000000000  # not probable number
+    if _agent_conn.agent_response.status_val_dict.get('continue') == 'false':
+        timespan_enabled = bool(int(_config.args.get('flag_timespan', '0')))
+        # TODO: What should be the default or do we even have a default?
+        timespan_threshold = int(
+            _config.args.get('timespan_threshold', 10)
+        ) * 1000
 
     # timespan_selectors is a dict of set of prefix/equal regex selectors.
     timespan_selectors = {'^': set(), '=': set()}
@@ -613,14 +624,6 @@ def end(headers={}, omit_sys_path_dirs=_DEFAULT_OMIT_SYS_PATH):
     if 'Context' in end_headers:
         context_dict.update(end_headers['Context'])
     end_headers['Context'] = urlencode(context_dict, doseq=True)
-
-    #get_logger().warning(
-    #    "ssss val========= %s" % _agent_conn.agent_response.status_val_dict
-    #)
-    # I received:
-    # 2020-03-02 18:48:10,228 - python-probe - WARNING - probe.py:618 - ssss val========= {'continue': 'true', 'progress': '33', 'wait': '0', 'first_sample': 'true'}
-    # 2020-03-02 18:48:10,472 - python-probe - WARNING - probe.py:618 - ssss val========= {'continue': 'true', 'progress': '66', 'wait': '0'}
-    # 2020-03-02 18:48:10,744 - python-probe - WARNING - probe.py:618 - ssss val========= {'continue': 'false'}
 
     profile_data_req = BlackfireRequest(headers=end_headers, data=traces)
     _agent_conn.send(profile_data_req.to_bytes())
