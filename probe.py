@@ -520,18 +520,16 @@ def enable(end_at_exit=False):
 
     # only enable timespan if this is the last profile of multiple sample profiles.
     # we look at 'continue': 'false' from the agent response
-    timespan_enabled = False
-    timespan_threshold = 10000000000  # not probable number
+    profile_timespan = False
+    timespan_threshold = profiler.MAX_TIMESPAN_THRESHOLD  # not probable number
     if _agent_conn.agent_response.status_val_dict.get('continue') == 'false':
-        timespan_enabled = bool(int(_config.args.get('flag_timespan', '0')))
+        profile_timespan = bool(int(_config.args.get('flag_timespan', '0')))
         # TODO: What should be the default or do we even have a default?
-        timespan_threshold = int(
-            _config.args.get('timespan_threshold', 10)
-        ) * 1000
+        timespan_threshold = int(_config.args.get('timespan_threshold', 10))
 
     # timespan_selectors is a dict of set of prefix/equal regex selectors.
     timespan_selectors = {'^': set(), '=': set()}
-    if timespan_enabled:
+    if profile_timespan:
         ts_selectors = _agent_conn.agent_response.args.get(
             'Blackfire-Timespan', []
         )
@@ -572,6 +570,7 @@ def enable(end_at_exit=False):
         builtins=builtins,
         profile_cpu=profile_cpu,
         profile_memory=profile_memory,
+        profile_timespan=profile_timespan,
         instrumented_funcs=instrumented_funcs,
         timespan_selectors=timespan_selectors,
         timespan_threshold=timespan_threshold,

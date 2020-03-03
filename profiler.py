@@ -6,6 +6,7 @@ import _blackfire_profiler as _bfext
 from contextlib import contextmanager
 from collections import Counter
 from blackfire.utils import PSUTIL_AVAIL, get_mem_info, urlencode, IS_PY3, get_logger
+from blackfire.exceptions import *
 
 TRACEMALLOC_AVAIL = True
 try:
@@ -47,6 +48,9 @@ def _get_memory_usage():
 
     usage = peak_usage = 0
 
+    if not sys or not len(sys.modules):
+        return (0, 0)
+
     try:
         if TRACEMALLOC_AVAIL:
             usage, peak_usage = tracemalloc.get_traced_memory()
@@ -62,6 +66,39 @@ def _get_memory_usage():
 
 
 _max_prefix_cache = {}
+_timespan_selectors = {}
+MAX_TIMESPAN_THRESHOLD = 1000000000
+
+
+def _fn_matches_timespan_selector(name, name_formatted):
+    '''
+    TODO: Comment
+    '''
+    global _timespan_selectors
+
+    if not sys or not len(sys.modules):
+        return 0
+
+    eq_set = _timespan_selectors.get('=', set())
+    if name in eq_set or name_formatted in eq_set:
+        return 1
+
+    prefix_set = _timespan_selectors.get('^', set())
+
+    # search in prefix by name
+    prefix = ''
+    for c in name:
+        prefix += c
+        if prefix in prefix_set:
+            return 1
+    # search in prefix by name_formatted
+    prefix = ''
+    for c in name_formatted:
+        prefix += c
+        if prefix in prefix_set:
+            return 1
+
+    return 0
 
 
 def _format_func_name(module, name):
@@ -69,7 +106,7 @@ def _format_func_name(module, name):
 
     # sys.modules becomes empty on interpreter shutdown and this func. might
     # still be called
-    if not len(sys.modules):
+    if not sys or not len(sys.modules):
         return ''
 
     # called internally each time a _pit is generated to set the .formatted_name
@@ -390,14 +427,20 @@ def start(
     builtins=True,
     profile_cpu=True,
     profile_memory=True,
+    profile_timespan=False,
     instrumented_funcs={},
     timespan_selectors={},
-    timespan_threshold=0,  # usec
+    timespan_threshold=MAX_TIMESPAN_THRESHOLD,  # msec
 ):
-    global _max_prefix_cache
+    global _max_prefix_cache, _timespan_selectors
 
     if is_running():
         return
+
+    if not isinstance(timespan_selectors, dict):
+        raise BlackfireProfilerException(
+            "timespan_selectors shall be an instance of 'dict'"
+        )
 
     if profile_memory and TRACEMALLOC_AVAIL:
         if tracemalloc.is_tracing():
@@ -413,17 +456,22 @@ def start(
     # start/stop pair.
     _max_prefix_cache = {}
 
+    _timespan_selectors = {}
+
     profile_threads = False
     if profile_memory:
         _bfext.set_memory_usage_callback(_get_memory_usage)
+    if profile_timespan:
+        _timespan_selectors = timespan_selectors
+        _bfext.set_timespan_selector_callback(_fn_matches_timespan_selector)
     _bfext.start(
         builtins,
         profile_threads,
         profile_cpu,
         profile_memory,
+        profile_timespan,
         instrumented_funcs,
-        timespan_selectors,
-        timespan_threshold,
+        timespan_threshold * 1000,  # convert usec
     )
 
 
