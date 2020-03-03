@@ -162,7 +162,7 @@ class BlackfireTraces(dict):
 
     def __init__(self, omit_sys_path_dirs):
         self._omit_sys_path_dirs = omit_sys_path_dirs
-        self._timeline = []
+        self.timeline_traces = {}
 
     def add(self, **kwargs):
         trace = BlackfireTrace(kwargs)
@@ -177,7 +177,12 @@ class BlackfireTraces(dict):
         trace = BlackfireTrace(kwargs)
         _trace_key = _generate_trace_key(self._omit_sys_path_dirs, trace)
 
-        self._timeline.append((_trace_key, trace))
+        if len(self.timeline_traces) % 2 == 0:
+            key = 'Threshold-%d-start: ' % trace.timeline_index
+        else:
+            key = 'Threshold-%d-end: %s' % (trace.timeline_index, _trace_key)
+
+        self.timeline_traces[key] = trace
 
     def __str__(self):
         result = ''
@@ -191,22 +196,15 @@ class BlackfireTraces(dict):
                         trace.peak_mem_usage,)
 
         # add timeline entries
-        if len(self._timeline):
+        if len(self.timeline_traces):
             result += '\n'
-        for trace_key, trace in self._timeline:
-            result += 'Threshold-%d-start: //%d %d %d %d\n' % ( \
-                        trace.timeline_index,
-                        trace.start_wall,
-                        trace.start_cpu,
-                        trace.start_mu,
-                        trace.start_pmu,)
-            result += 'Threshold-%d-end: %s//%d %d %d %d\n' % ( \
-                        trace.timeline_index,
+        for trace_key, trace in self.timeline_traces.items():
+            result += '%s//%d %d %d %d\n' % ( \
                         trace_key,
-                        trace.end_wall,
-                        trace.end_cpu,
-                        trace.end_mu,
-                        trace.end_pmu,)
+                        trace.wall,
+                        trace.cpu,
+                        trace.mu,
+                        trace.pmu)
         return result
 
     def to_bytes(self):
@@ -359,14 +357,27 @@ class _TraceEnumerator(dict):
                 callee_fn_args=callee["fn_args"],
                 callee_name_formatted=callee["name_formatted"],
                 callee_rec_level=callee["rec_level"],
-                start_wall=te[2] * 1000000,
-                start_cpu=te[3] * 1000000,
-                end_wall=te[4] * 1000000,
-                end_cpu=te[5] * 1000000,
-                start_mu=te[6],
-                start_pmu=te[7],
-                end_mu=te[8],
-                end_pmu=te[9],
+                wall=te[2] * 1000000,
+                cpu=te[3] * 1000000,
+                mu=te[6],
+                pmu=te[7],
+                timeline_index=i,
+            )
+            result.add_timeline(
+                caller_module=caller['module'],
+                caller_name=caller['name'],
+                caller_fn_args=caller["fn_args"],
+                caller_rec_level=caller["rec_level"],
+                caller_name_formatted=caller["name_formatted"],
+                callee_module=callee["module"],
+                callee_name=callee["name"],
+                callee_fn_args=callee["fn_args"],
+                callee_name_formatted=callee["name_formatted"],
+                callee_rec_level=callee["rec_level"],
+                wall=te[4] * 1000000,
+                cpu=te[5] * 1000000,
+                mu=te[8],
+                pmu=te[9],
                 timeline_index=i,
             )
 
