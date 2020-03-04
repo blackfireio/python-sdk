@@ -430,7 +430,7 @@ def start(
     profile_timespan=False,
     instrumented_funcs={},
     timespan_selectors={},
-    timespan_threshold=MAX_TIMESPAN_THRESHOLD,  # msec
+    timespan_threshold=MAX_TIMESPAN_THRESHOLD,  # ms
 ):
     global _max_prefix_cache, _timespan_selectors
 
@@ -471,7 +471,7 @@ def start(
         profile_memory,
         profile_timespan,
         instrumented_funcs,
-        timespan_threshold * 1000,  # convert usec
+        timespan_threshold,
     )
 
 
