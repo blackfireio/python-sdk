@@ -522,9 +522,8 @@ def enable(end_at_exit=False):
     # we look at 'continue': 'false' from the agent response
     profile_timespan = False
     timespan_threshold = profiler.MAX_TIMESPAN_THRESHOLD  # not probable number
-    if _agent_conn.agent_response.status_val_dict.get('continue') == 'false':
+    if _agent_conn.agent_response.status_val_dict.get('first_sample') == 'true':
         profile_timespan = bool(int(_config.args.get('flag_timespan', '0')))
-        # TODO: What should be the default or do we even have a default?
         timespan_threshold = int(_config.args.get('timespan_threshold', 10))
 
     # timespan_selectors is a dict of set of prefix/equal regex selectors.
