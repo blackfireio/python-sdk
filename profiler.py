@@ -48,6 +48,7 @@ def _get_memory_usage():
 
     usage = peak_usage = 0
 
+    # interpreter shutdown?
     if not sys or not len(sys.modules):
         return (0, 0)
 
@@ -78,6 +79,7 @@ def _fn_matches_timespan_selector(name, name_formatted):
     '''
     global _timespan_selectors
 
+    # interpreter shutdown?
     if not sys or not len(sys.modules):
         return 0
 
@@ -106,8 +108,7 @@ def _fn_matches_timespan_selector(name, name_formatted):
 def _format_func_name(module, name):
     global _max_prefix_cache
 
-    # sys.modules becomes empty on interpreter shutdown and this func. might
-    # still be called
+    # interpreter shutdown?
     if not sys or not len(sys.modules):
         return ''
 
