@@ -72,7 +72,9 @@ MAX_TIMESPAN_THRESHOLD = 1000000000
 
 def _fn_matches_timespan_selector(name, name_formatted):
     '''
-    TODO: Comment
+    This function is called from the C extension to match the timespan_selectors
+    with the fn. name of the pit. It is called one per-pit and cached on the C 
+    extension.
     '''
     global _timespan_selectors
 
