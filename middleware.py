@@ -3,7 +3,6 @@ import sys
 import traceback
 from blackfire import probe
 from blackfire.utils import quote, get_logger
-from django.db import connections
 
 
 class _DjangoCursorWrapper:
@@ -56,49 +55,6 @@ class _DjangoCursorWrapper:
         self.close()
 
 
-def enable_sql_instrumentation():
-
-    def wrap_cursor(connection):
-        if not hasattr(connection, "_blackfire_cursor"):
-            connection._blackfire_cursor = connection.cursor
-            connection._blackfire_chunked_cursor = connection.chunked_cursor
-
-            def cursor(*args, **kwargs):
-                return _DjangoCursorWrapper(
-                    connection._blackfire_cursor(*args, **kwargs)
-                )
-
-            def chunked_cursor(*args, **kwargs):
-                return _DjangoCursorWrapper(
-                    connection._blackfire_chunked_cursor(*args, **kwargs)
-                )
-
-            connection.cursor = cursor
-            connection.chunked_cursor = chunked_cursor
-            return cursor
-
-    try:
-        for connection in connections.all():
-            wrap_cursor(connection)
-    except Exception as e:
-        get_logger().exception(e)
-
-
-def disable_sql_instrumentation():
-
-    def unwrap_cursor(connection):
-        if hasattr(connection, "_blackfire_cursor"):
-            del connection._blackfire_cursor
-            del connection.cursor
-            del connection.chunked_cursor
-
-    try:
-        for connection in connections.all():
-            unwrap_cursor(connection)
-    except Exception as e:
-        get_logger().exception(e)
-
-
 # class _BaseMiddleware(object):
 #     def __call__(self, request):
 #         if self.is_profile_req(self, request):
@@ -148,73 +104,96 @@ def try_end_probe(response_status_code, response_len, **kwargs):
         return ('X-Blackfire-Error', '101 ' + format_exc_for_display())
 
 
-def _add_probe_response(http_response, probe_response):
+def _add_probe_response_header(http_response, probe_response):
     http_response[probe_response[0]] = probe_response[1]
-    return http_response
 
 
 class FlaskMiddleware(object):
 
     def __init__(self, app):
         self.app = app
-        self._profile_req_environ = None
+
+        # TODO: Comment
+        self._profile_req = None
+
+        # TODO: Comment
+        self._probe_err = None
 
     def __call__(self, environ, start_response):
-        if 'HTTP_X_BLACKFIRE_QUERY' not in environ:
+        if 'HTTP_X_BLACKFIRE_QUERY' in environ:
             return self._profiled_request(
                 environ=environ, start_response=start_response
             )
         return self.app(environ, start_response)
 
     def _process_profiled_response(self, sender, response, **extra):
-        print("resp -> ", response, response.headers, dir(response))
-        print("sender -> ", sender)
-        print("extra -> ", self._profile_req_environ)
+        print("prprpppppppp")
+        try:
+            assert self._profile_req, "profile_req_environ not set?"
 
-        if probe_err:
-            return _add_probe_response(response, probe_err)
+            if self._probe_err:
+                _add_probe_response_header(response.headers, probe_err)
+                print("err headers -> ", response.headers)
+                return
 
-        probe_resp = try_end_probe(
-            response_status_code=response.status_code,
-            response_len=len(response.content),
-            http_method=request.method,
-            http_uri=request.path,
-            https='1' if request.is_secure() else '',
-            http_server_addr=request.META.get('SERVER_NAME'),
-            http_server_software=request.META.get('SERVER_SOFTWARE'),
-            http_server_port=request.META.get('SERVER_PORT'),
-            http_header_host=request.META.get('HTTP_HOST'),
-            http_header_user_agent=request.META.get('HTTP_USER_AGENT'),
-            http_header_x_forwarded_host=request.META
-            .get('HTTP_X_FORWARDED_HOST'),
-            http_header_x_forwarded_proto=request.META
-            .get('HTTP_X_FORWARDED_PROTO'),
-            http_header_x_forwarded_port=request.META
-            .get('HTTP_X_FORWARDED_PORT'),
-            http_header_forwarded=request.META.get('HTTP_FORWARDED'),
-        )
+            request = self._profile_req
+
+            probe_resp = try_end_probe(
+                response_status_code=response.status_code,
+                response_len=response.headers['Content-Length'],
+                http_method=request.method,
+                http_uri=request.path,
+                https='1' if request.is_secure else '',
+                http_server_addr=request.environ.get('SERVER_NAME'),
+                http_server_software=request.environ.get('SERVER_SOFTWARE'),
+                http_server_port=request.environ.get('SERVER_PORT'),
+                http_header_host=request.environ.get('HTTP_HOST'),
+                http_header_user_agent=request.environ.get('HTTP_USER_AGENT'),
+                http_header_x_forwarded_host=request.environ
+                .get('HTTP_X_FORWARDED_HOST'),
+                http_header_x_forwarded_proto=request.environ
+                .get('HTTP_X_FORWARDED_PROTO'),
+                http_header_x_forwarded_port=request.environ
+                .get('HTTP_X_FORWARDED_PORT'),
+                http_header_forwarded=request.environ.get('HTTP_FORWARDED'),
+            )
+
+            _add_probe_response_header(response.headers, probe_resp)
+        except Exception as e:
+            # signals run in the context of app. Do not fail app code on any error
+            get_logger().exception(e)
 
     def _profiled_request(self, environ, start_response):
         try:
-            probe_err = try_enable_probe(environ['HTTP_X_BLACKFIRE_QUERY'])
+            self._probe_err = try_enable_probe(
+                environ['HTTP_X_BLACKFIRE_QUERY']
+            )
 
-            if not probe_err:
-                # TODO: Wrap this code safely
+            # TODO: Wrap this code safely
 
-                # we are using request_finished because if we use start_response callback
-                # to modify response headers, because end() shall be called when view has been called.
-                # TODO: More comment
-                from flask import request_finished
-                self._profile_req_environ = environ
-                request_finished.connect(
-                    self._process_profiled_response, sender=app
-                )
+            # we are using request_finished because if we use start_response callback
+            # to modify response headers, because end() shall be called when view has been called.
+            # TODO: More comment
+            from flask import request_finished
+            from werkzeug.wrappers import Request
+            self._profile_req = Request(environ, shallow=True)
+            request_finished.connect(
+                self._process_profiled_response, sender=self.app
+            )
 
+            print("reposeee")
             resp = self.app(environ, start_response)
             return resp
 
         finally:
-            self._profile_req_environ = None
+            # TODO; Wrap safe
+            from flask import request_finished
+            request_finished.disconnect(
+                self._process_profiled_response, self.app
+            )
+
+            self._profile_req = None
+            self._probe_err = None
 
             probe.disable()
             probe.clear_traces()
@@ -233,18 +212,62 @@ class DjangoMiddleware(object):
         response = self.get_response(request)
         return response
 
+    def _enable_sql_instrumentation(self):
+
+        def wrap_cursor(connection):
+            if not hasattr(connection, "_blackfire_cursor"):
+                connection._blackfire_cursor = connection.cursor
+                connection._blackfire_chunked_cursor = connection.chunked_cursor
+
+                def cursor(*args, **kwargs):
+                    return _DjangoCursorWrapper(
+                        connection._blackfire_cursor(*args, **kwargs)
+                    )
+
+                def chunked_cursor(*args, **kwargs):
+                    return _DjangoCursorWrapper(
+                        connection._blackfire_chunked_cursor(*args, **kwargs)
+                    )
+
+                connection.cursor = cursor
+                connection.chunked_cursor = chunked_cursor
+                return cursor
+
+        from django.db import connections
+        try:
+            for connection in connections.all():
+                wrap_cursor(connection)
+        except Exception as e:
+            get_logger().exception(e)
+
+    def _disable_sql_instrumentation(self):
+
+        def unwrap_cursor(connection):
+            if hasattr(connection, "_blackfire_cursor"):
+                del connection._blackfire_cursor
+                del connection.cursor
+                del connection.chunked_cursor
+
+        from django.db import connections
+        try:
+            for connection in connections.all():
+                unwrap_cursor(connection)
+        except Exception as e:
+            get_logger().exception(e)
+
     def _profiled_request(self, request):
         try:
             probe_err = try_enable_probe(request.META['HTTP_X_BLACKFIRE_QUERY'])
 
             if not probe_err:
-                enable_sql_instrumentation()
+                self._enable_sql_instrumentation()
 
             # let user/django exceptions propagate through
             response = self.get_response(request)
 
             if probe_err:
-                return _add_probe_response(response, probe_err)
+                _add_probe_response_header(response, probe_err)
+                return response
 
             probe_resp = try_end_probe(
                 response_status_code=response.status_code,
@@ -266,11 +289,12 @@ class DjangoMiddleware(object):
                 http_header_forwarded=request.META.get('HTTP_FORWARDED'),
             )
 
-            return _add_probe_response(response, probe_resp)
+            _add_probe_response_header(response, probe_resp)
+            return response
 
         finally:
             # code that will be run no matter what happened above
-            disable_sql_instrumentation()
+            self._disable_sql_instrumentation()
 
             probe.disable()
             probe.clear_traces()
