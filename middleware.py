@@ -2,7 +2,7 @@ import os
 import sys
 import traceback
 from blackfire import probe
-from blackfire.utils import quote
+from blackfire.utils import quote, get_logger
 from django.db import connections
 
 
@@ -77,8 +77,11 @@ def enable_sql_instrumentation():
             connection.chunked_cursor = chunked_cursor
             return cursor
 
-    for connection in connections.all():
-        wrap_cursor(connection)
+    try:
+        for connection in connections.all():
+            wrap_cursor(connection)
+    except Exception as e:
+        get_logger().exception(e)
 
 
 def disable_sql_instrumentation():
@@ -89,8 +92,65 @@ def disable_sql_instrumentation():
             del connection.cursor
             del connection.chunked_cursor
 
-    for connection in connections.all():
-        unwrap_cursor(connection)
+    try:
+        for connection in connections.all():
+            unwrap_cursor(connection)
+    except Exception as e:
+        get_logger().exception(e)
+
+
+# class _BaseMiddleware(object):
+#     def __call__(self, request):
+#         if self.is_profile_req(self, request):
+#             return self._profiled_response(request)
+
+#         response = self.get_response(request)
+#         return response
+
+
+def format_exc_for_display():
+    # filename:lineno and exception message
+    _, exc_obj, exc_tb = sys.exc_info()
+    fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+    return "%s:%s %s" % (fname, exc_tb.tb_lineno, exc_obj)
+
+
+def try_enable_probe(query):
+    probe_err = None
+    try:
+        probe.initialize(query=query)
+
+        probe.enable()
+    except:
+        # TODO: Is this really quote or urlencode?
+        probe_err = ('X-Blackfire-Error', '101 ' + format_exc_for_display())
+    return probe_err
+
+
+def try_end_probe(response_status_code, response_len, **kwargs):
+    try:
+        headers = {}
+        headers['Response-Code'] = response_status_code
+        headers['Response-Bytes'] = response_len
+
+        context_dict = {}
+        for k, v in kwargs.items():
+            if v:
+                context_dict[k] = v
+        headers['Context'] = context_dict
+
+        agent_status_val = probe._agent_conn.agent_response.status_val
+
+        probe.end(headers=headers)
+
+        return ('X-Blackfire-Response', agent_status_val)
+    except:
+        return ('X-Blackfire-Error', '101 ' + format_exc_for_display())
+
+
+def _add_probe_response(http_response, probe_response):
+    http_response[probe_response[0]] = probe_response[1]
+    return http_response
 
 
 class DjangoMiddleware(object):
@@ -101,84 +161,46 @@ class DjangoMiddleware(object):
 
     def __call__(self, request):
         if 'HTTP_X_BLACKFIRE_QUERY' in request.META:
-            return self._profiled_response(request)
+            return self._profiled_request(request)
 
         response = self.get_response(request)
         return response
 
-    def _profiled_response(self, request):
-
-        def format_exc_for_display():
-            # filename:lineno and exception message
-            _, exc_obj, exc_tb = sys.exc_info()
-            fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-            return "%s:%s %s" % (fname, exc_tb.tb_lineno, exc_obj)
-
-        probe_response = None
+    def _profiled_request(self, request):
         try:
-            try:
-                query = request.META['HTTP_X_BLACKFIRE_QUERY']
+            probe_err = try_enable_probe(request.META['HTTP_X_BLACKFIRE_QUERY'])
 
-                probe.initialize(query=query)
-
-                probe.enable()
-            except:
-                # TODO: Is this really quote or urlencode?
-                probe_response = (
-                    'X-Blackfire-Error', '101 ' + format_exc_for_display()
-                )
+            if not probe_err:
+                enable_sql_instrumentation()
 
             # let user/django exceptions propagate through
-            enable_sql_instrumentation()
-
             response = self.get_response(request)
 
-            try:
-                if not probe_response:
-                    headers = {}
-                    headers['Response-Code'] = response.status_code
-                    headers['Response-Bytes'] = len(response.content)
+            if probe_err:
+                return _add_probe_response(response, probe_err)
 
-                    context_dict = {
-                        'http_method': request.method,
-                        'http_uri': request.path,
-                        'https': '1' if request.is_secure() else '',
-                    }
+            probe_resp = try_end_probe(
+                response_status_code=response.status_code,
+                response_len=len(response.content),
+                http_method=request.method,
+                http_uri=request.path,
+                https='1' if request.is_secure() else '',
+                http_server_addr=request.META.get('SERVER_NAME'),
+                http_server_software=request.META.get('SERVER_SOFTWARE'),
+                http_server_port=request.META.get('SERVER_PORT'),
+                http_header_host=request.META.get('HTTP_HOST'),
+                http_header_user_agent=request.META.get('HTTP_USER_AGENT'),
+                http_header_x_forwarded_host=request.META
+                .get('HTTP_X_FORWARDED_HOST'),
+                http_header_x_forwarded_proto=request.META
+                .get('HTTP_X_FORWARDED_PROTO'),
+                http_header_x_forwarded_port=request.META
+                .get('HTTP_X_FORWARDED_PORT'),
+                http_header_forwarded=request.META.get('HTTP_FORWARDED'),
+            )
 
-                    # populate the context dict remaining items from META attr
-                    meta_args = {
-                        'SERVER_NAME': 'http_server_addr',
-                        'SERVER_SOFTWARE': 'http_server_software',
-                        'SERVER_PORT': 'http_server_port',
-                        'HTTP_HOST': 'http_header_host',
-                        'HTTP_USER_AGENT': 'http_header_user_agent',
-                        'HTTP_X_FORWARDED_HOST': 'http_header_x_forwarded_host',
-                        'HTTP_X_FORWARDED_PROTO':
-                        'http_header_x_forwarded_proto',
-                        'HTTP_X_FORWARDED_PORT': 'http_header_x_forwarded_port',
-                        'HTTP_FORWARDED': 'http_header_forwarded',
-                    }
-                    for arg, key in meta_args.items():
-                        value = request.META.get(arg)
-                        if value:
-                            context_dict[key] = value
+            return _add_probe_response(response, probe_resp)
 
-                    headers['Context'] = context_dict
-                    probe_response = (
-                        'X-Blackfire-Response',
-                        probe._agent_conn.agent_response.status_val
-                    )
-
-                    probe.end(headers=headers)
-            except:
-                probe_response = (
-                    'X-Blackfire-Error', '101 ' + format_exc_for_display()
-                )
-
-            if probe_response:  # defensive
-                response[probe_response[0]] = probe_response[1]
-
-            return response
         finally:
             # code that will be run no matter what happened above
             disable_sql_instrumentation()

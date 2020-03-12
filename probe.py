@@ -542,6 +542,9 @@ def enable(end_at_exit=False):
                 continue
 
             timespan_selectors[ts_sel[0]].add(ts_sel[1:])
+    # timespan_selectors["="].add(
+    #     "blackfire.middleware._DjangoCursorWrapper.on_query"
+    # )
 
     # instrumented_funcs is a dict of {func_name:[list of argument IDs]}
     instrumented_funcs = {}
