@@ -153,6 +153,73 @@ def _add_probe_response(http_response, probe_response):
     return http_response
 
 
+class FlaskMiddleware(object):
+
+    def __init__(self, app):
+        self.app = app
+        self._profile_req_environ = None
+
+    def __call__(self, environ, start_response):
+        if 'HTTP_X_BLACKFIRE_QUERY' not in environ:
+            return self._profiled_request(
+                environ=environ, start_response=start_response
+            )
+        return self.app(environ, start_response)
+
+    def _process_profiled_response(self, sender, response, **extra):
+        print("resp -> ", response, response.headers, dir(response))
+        print("sender -> ", sender)
+        print("extra -> ", self._profile_req_environ)
+
+        if probe_err:
+            return _add_probe_response(response, probe_err)
+
+        probe_resp = try_end_probe(
+            response_status_code=response.status_code,
+            response_len=len(response.content),
+            http_method=request.method,
+            http_uri=request.path,
+            https='1' if request.is_secure() else '',
+            http_server_addr=request.META.get('SERVER_NAME'),
+            http_server_software=request.META.get('SERVER_SOFTWARE'),
+            http_server_port=request.META.get('SERVER_PORT'),
+            http_header_host=request.META.get('HTTP_HOST'),
+            http_header_user_agent=request.META.get('HTTP_USER_AGENT'),
+            http_header_x_forwarded_host=request.META
+            .get('HTTP_X_FORWARDED_HOST'),
+            http_header_x_forwarded_proto=request.META
+            .get('HTTP_X_FORWARDED_PROTO'),
+            http_header_x_forwarded_port=request.META
+            .get('HTTP_X_FORWARDED_PORT'),
+            http_header_forwarded=request.META.get('HTTP_FORWARDED'),
+        )
+
+    def _profiled_request(self, environ, start_response):
+        try:
+            probe_err = try_enable_probe(environ['HTTP_X_BLACKFIRE_QUERY'])
+
+            if not probe_err:
+                # TODO: Wrap this code safely
+
+                # we are using request_finished because if we use start_response callback
+                # to modify response headers, because end() shall be called when view has been called.
+                # TODO: More comment
+                from flask import request_finished
+                self._profile_req_environ = environ
+                request_finished.connect(
+                    self._process_profiled_response, sender=app
+                )
+
+            resp = self.app(environ, start_response)
+            return resp
+
+        finally:
+            self._profile_req_environ = None
+
+            probe.disable()
+            probe.clear_traces()
+
+
 class DjangoMiddleware(object):
 
     def __init__(self, get_response):
