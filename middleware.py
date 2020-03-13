@@ -55,15 +55,6 @@ class _DjangoCursorWrapper:
         self.close()
 
 
-# class _BaseMiddleware(object):
-#     def __call__(self, request):
-#         if self.is_profile_req(self, request):
-#             return self._profiled_response(request)
-
-#         response = self.get_response(request)
-#         return response
-
-
 def format_exc_for_display():
     # filename:lineno and exception message
     _, exc_obj, exc_tb = sys.exc_info()
@@ -77,9 +68,10 @@ def try_enable_probe(query):
         probe.initialize(query=query)
 
         probe.enable()
-    except:
+    except Exception as e:
         # TODO: Is this really quote or urlencode?
         probe_err = ('X-Blackfire-Error', '101 ' + format_exc_for_display())
+        get_logger().exception(e)
     return probe_err
 
 
@@ -88,6 +80,7 @@ def try_end_probe(response_status_code, response_len, **kwargs):
         headers = {}
         headers['Response-Code'] = response_status_code
         headers['Response-Bytes'] = response_len
+        _agent_status_val = probe._agent_conn.agent_response.status_val
 
         context_dict = {}
         for k, v in kwargs.items():
@@ -95,11 +88,9 @@ def try_end_probe(response_status_code, response_len, **kwargs):
                 context_dict[k] = v
         headers['Context'] = context_dict
 
-        agent_status_val = probe._agent_conn.agent_response.status_val
-
         probe.end(headers=headers)
 
-        return ('X-Blackfire-Response', agent_status_val)
+        return ('X-Blackfire-Response', _agent_status_val)
     except:
         return ('X-Blackfire-Error', '101 ' + format_exc_for_display())
 
@@ -110,11 +101,11 @@ def _add_probe_response_header(http_response, probe_response):
 
 class FlaskMiddleware(object):
 
+    from flask import request_finished
+
     def __init__(self, app):
         self.app = app
-
-        # TODO: Comment
-        self._profile_req = None
+        self.wsgi_app = app.wsgi_app
 
         # TODO: Comment
         self._probe_err = None
@@ -124,19 +115,24 @@ class FlaskMiddleware(object):
             return self._profiled_request(
                 environ=environ, start_response=start_response
             )
-        return self.app(environ, start_response)
+        return self.wsgi_app(environ, start_response)
 
     def _process_profiled_response(self, sender, response, **extra):
-        print("prprpppppppp")
+        get_logger().debug("FlaskMiddleware.finish_response signal called.")
+
+        import flask
+        request = flask.request
+
+        # When signal is registered we might received other events from other
+        # requests. Look at the request object of the current response to determine
+        # for finishing the profile session
+        if 'HTTP_X_BLACKFIRE_QUERY' not in request.environ:
+            return
+
         try:
-            assert self._profile_req, "profile_req_environ not set?"
-
             if self._probe_err:
-                _add_probe_response_header(response.headers, probe_err)
-                print("err headers -> ", response.headers)
+                _add_probe_response_header(response.headers, self._probe_err)
                 return
-
-            request = self._profile_req
 
             probe_resp = try_end_probe(
                 response_status_code=response.status_code,
@@ -163,36 +159,44 @@ class FlaskMiddleware(object):
             # signals run in the context of app. Do not fail app code on any error
             get_logger().exception(e)
 
-    def _profiled_request(self, environ, start_response):
+    def _connect_req_finished_signal(self):
+        # we are using request_finished because if we use start_response callback
+        # to modify response headers, because end() shall be called when view has been called.
+        # TODO: More comment
         try:
-            self._probe_err = try_enable_probe(
-                environ['HTTP_X_BLACKFIRE_QUERY']
-            )
-
-            # TODO: Wrap this code safely
-
-            # we are using request_finished because if we use start_response callback
-            # to modify response headers, because end() shall be called when view has been called.
-            # TODO: More comment
             from flask import request_finished
-            from werkzeug.wrappers import Request
-            self._profile_req = Request(environ, shallow=True)
             request_finished.connect(
                 self._process_profiled_response, sender=self.app
             )
+        except Exception as e:
+            get_logger().exception(e)
 
-            print("reposeee")
-            resp = self.app(environ, start_response)
-            return resp
-
-        finally:
-            # TODO; Wrap safe
+    def _disconnect_req_finished_signal(self):
+        try:
             from flask import request_finished
             request_finished.disconnect(
                 self._process_profiled_response, self.app
             )
+        except Exception as e:
+            get_logger().exception(e)
 
-            self._profile_req = None
+    def _profiled_request(self, environ, start_response):
+        get_logger().debug("FlaskMiddleware._profiled_request called.")
+        try:
+            self._probe_err = try_enable_probe(
+                environ['HTTP_X_BLACKFIRE_QUERY']
+            )
+            if not self._probe_err:
+                self._connect_req_finished_signal()
+
+            resp = self.wsgi_app(environ, start_response)
+            return resp
+
+        finally:
+            get_logger().debug("FlaskMiddleware._profiled_request ended.")
+
+            self._disconnect_req_finished_signal()
+
             self._probe_err = None
 
             probe.disable()
@@ -256,6 +260,7 @@ class DjangoMiddleware(object):
             get_logger().exception(e)
 
     def _profiled_request(self, request):
+        get_logger().debug("DjangoMiddleware._profiled_request called.")
         try:
             probe_err = try_enable_probe(request.META['HTTP_X_BLACKFIRE_QUERY'])
 
@@ -293,6 +298,8 @@ class DjangoMiddleware(object):
             return response
 
         finally:
+            get_logger().debug("DjangoMiddleware._profiled_request ended.")
+
             # code that will be run no matter what happened above
             self._disable_sql_instrumentation()
 

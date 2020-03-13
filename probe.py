@@ -93,6 +93,7 @@ def _get_signing_response(signing_endpoint, client_id, client_token):
 class _AgentConnection(object):
 
     def __init__(self, config):
+
         self.config = config
         self._closed = False
         self.agent_response = None
@@ -124,8 +125,7 @@ class _AgentConnection(object):
             self._socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         except Exception as e:
             get_logger().warning(
-                "Error happened while disabling NODELAY option. [%s]" % (e),
-                RuntimeWarning
+                "Error happened while disabling NODELAY option. [%s]" % (e)
             )
 
     def __del__(self):
@@ -536,15 +536,12 @@ def enable(end_at_exit=False):
         for ts_sel in ts_selectors:
             if ts_sel[0] not in ['^', '=']:
                 get_logger().warning(
-                    "Ingoring invalid timespan selector '%s'." % (ts_sel),
+                    "Ignoring invalid timespan selector '%s'." % (ts_sel),
                     RuntimeWarning
                 )
                 continue
 
             timespan_selectors[ts_sel[0]].add(ts_sel[1:])
-    # timespan_selectors["="].add(
-    #     "blackfire.middleware._DjangoCursorWrapper.on_query"
-    # )
 
     # instrumented_funcs is a dict of {func_name:[list of argument IDs]}
     instrumented_funcs = {}
@@ -578,12 +575,13 @@ def enable(end_at_exit=False):
         timespan_threshold=timespan_threshold,
     )
 
-    _enabled = True
-
     # TODO: 'Blackfire-Error: 103 Samples quota is out'
+
+    _enabled = True
 
 
 def disable():
+    global _enabled
     profiler.stop()
 
     _enabled = False
