@@ -485,13 +485,13 @@ def enable(end_at_exit=False):
         # install a exitcode hook to get the exit code by hooking into sys.exit
         # and sys.excepthook, this is not called if application killed by a signal
         sys_hooks = SysHooks()
-        sys_hooks.hook()
+        sys_hooks.register()
 
         def _deinitialize():
             headers = {}
             headers['Response-Code'] = sys_hooks.exit_code
-            headers['Response-Bytes'] = sys_hooks.stdout_len
-
+            headers['Response-Bytes'
+                    ] = sys_hooks.stdout_len + sys_hooks.stderr_len
             try:
                 end(headers=headers)
             except:

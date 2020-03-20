@@ -33,6 +33,7 @@ class SysHooks(object):
     def __init__(self):
         self.exit_code = 0  # if nothing happens, exit_code should be zero 0
         self.stdout_len = 0
+        self.stderr_len = 0
 
     def _sys_exit(self, code):
         self.exit_code = code
@@ -46,20 +47,33 @@ class SysHooks(object):
         self.stdout_len += len(s)
         self._orig_stdout_write(s)
 
-    def hook(self):
+    def _sys_stderr_write(self, s):
+        self.stderr_len += len(s)
+        self._orig_stderr_write(s)
+
+    def unregister(self):
+        sys.stdout.write = self._orig_stdout_write
+        sys.stderr.write = self._orig_stderr_write
+        sys.exit = self._orig_exit
+
+    def register(self):
         self._orig_exit = sys.exit
         self._orig_stdout_write = sys.stdout.write
+        self._orig_stderr_write = sys.stderr.write
         sys.exit = self._sys_exit
         sys.excepthook = self._sys_excepthook
 
         try:
             sys.stdout.write = self._sys_stdout_write
+            sys.stderr.write = self._sys_stderr_write
         except AttributeError:
             # in Py2, stdout.write is a read-only attribute. To overcome this,
             # we need to change stdout to StringIO and then monkey patch.
             from StringIO import StringIO
             sys.stdout = StringIO()
             sys.stdout.write = self._sys_stdout_write
+            sys.stderr = StringIO()
+            sys.stderr.write = self._sys_stderr_write
 
 
 def get_mem_info():
