@@ -21,12 +21,12 @@ from blackfire import BlackfireConfiguration
 
 def _get_default_agent_socket():
     plat = platform.system()
-    if plat == 'Linux':
-        return 'unix:///var/run/blackfire/agent.sock'
+    if plat == 'Windows':
+        return 'tcp://127.0.0.1:8307'
     elif plat == 'Darwin':
         return 'unix:///usr/local/var/run/blackfire-agent.sock'
-    elif plat == 'Windows':
-        return None
+    else:
+        return 'unix:///var/run/blackfire/agent.sock'
 
 
 # globals
