@@ -488,6 +488,9 @@ def enable(end_at_exit=False):
         sys_hooks.register()
 
         def _deinitialize():
+
+            sys_hooks.unregister()
+
             headers = {}
             headers['Response-Code'] = sys_hooks.exit_code
             headers['Response-Bytes'
