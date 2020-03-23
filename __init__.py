@@ -81,6 +81,7 @@ def _install_bootstrap():
 def process_bootstrap():
     query = os.environ.get('BLACKFIRE_QUERY', None)
     if query:
+        del os.environ['BLACKFIRE_QUERY']
         try:
             from blackfire.probe import initialize, enable
             initialize(query=query)
