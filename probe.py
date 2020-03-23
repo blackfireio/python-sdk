@@ -370,6 +370,10 @@ def reset():
     _req_start = None
 
 
+def add_marker(label=''):
+    pass
+
+
 def initialize(
     query=None,
     client_id=None,

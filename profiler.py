@@ -279,6 +279,19 @@ class _TraceEnumerator(dict):
         self._timeline_traces = []
 
     def _enum_func_cbk(self, stat):
+
+        def _is_special_function(fname_formatted):
+            SPECIAL_FUNCS = [
+                'blackfire.middleware._DjangoCursorWrapper',
+                'blackfire.probe.add_marker',
+            ]
+
+            for sfn in SPECIAL_FUNCS:
+                if sfn in fname_formatted:
+                    return True
+
+            return False
+
         fname, fmodule, fname_formatted, flineno, fncall, fnactualcall, fbuiltin, \
             fttot_wall, ftsub_wall, fttot_cpu, ftsub_cpu, findex, fchildren, fctxid, \
             fmem_usage, fpeak_mem_usage, ffn_args, frec_level = stat
@@ -291,9 +304,7 @@ class _TraceEnumerator(dict):
         # Filter out profile specific modules like our profiler extension related
         # call stack
         if last_dir in ["blackfire"] or fmodule == '_blackfire_profiler':
-            # We include some wrapper functions for easier instrumentation
-            if fname_formatted and \
-                'blackfire.middleware._DjangoCursorWrapper' not in fname_formatted:
+            if fname_formatted and not _is_special_function(fname_formatted):
                 return
 
         # we do not generate the traceformat directly as for each children,
