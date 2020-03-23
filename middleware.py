@@ -101,8 +101,6 @@ def _add_probe_response_header(http_response, probe_response):
 
 class FlaskMiddleware(object):
 
-    from flask import request_finished
-
     def __init__(self, app):
         self.app = app
         self.wsgi_app = app.wsgi_app
