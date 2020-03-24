@@ -9,6 +9,7 @@ import traceback
 import base64
 import logging
 import json
+import random
 from contextlib import contextmanager
 from collections import defaultdict
 from blackfire import profiler, VERSION
@@ -189,14 +190,19 @@ class _AgentConnection(object):
         return result
 
     def _write_prolog(self):
+        aggreg_samples_s = ''
+        if 'aggreg_samples' in self.config.args:
+            aggreg_samples_s = '&aggreg_samples=%s' % (
+                self.config.args['aggreg_samples']
+            )
         headers = {
             #'Blackfire-Auth':
             #'%s:%s' % (self.config.env_id, self.config.env_token),
             'Blackfire-Query':
-            '%s&signature=%s&aggreg_samples=%s' % (
+            '%s&signature=%s&%s' % (
                 self.config.challenge,
                 self.config.signature,
-                self.config.args['aggreg_samples'],
+                aggreg_samples_s,
             ),
             'Blackfire-Probe':
             'python-%s' % (sys.hexversion),
@@ -372,6 +378,35 @@ def reset():
 
 def add_marker(label=''):
     pass
+
+
+def generate_subprofile_query():
+    global _config
+
+    if not _config:
+        raise BlackfireApiException('No BLACKFIRE_QUERY is provided.')
+
+    args_copy = _config.args.copy()
+
+    parent_sid = ''
+    if 'sub_profile' in args_copy:
+        parent_sid = args_copy['sub_profile'].split(':')[1]
+    args_copy.pop('aggreg_samples')
+
+    s = ''.join(chr(random.randint(0, 255)) for _ in range(7))
+    s = bytes(s, _AGENT_PROTOCOL_ENCODING)
+    sid = base64.b64encode(s)
+    sid = sid.decode("ascii")
+    sid = sid.rstrip('=')
+    sid = sid.replace('+', 'A')
+    sid = sid.replace('/', 'B')
+    sid = sid[:9]
+    args_copy['sub_profile'] = '%s:%s' % (parent_sid, sid)
+
+    result = "%s&signature=%s&%s" % (
+        _config.challenge, _config.signature, urlencode(args_copy)
+    )
+    return result
 
 
 def initialize(
