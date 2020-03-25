@@ -37,7 +37,7 @@ setup(
     version=VERSION,
     author="Blackfire.io",
     author_email="support@blackfire.io",
-    install_requires=['psutil>=5.6.3'],
+    install_requires=['psutil==5.6.5'],
     py_modules=[os.path.splitext(f)[0] for f in glob.glob("*.py")],
     data_files=[
         ('', ['VERSION', 'LICENSE']),
