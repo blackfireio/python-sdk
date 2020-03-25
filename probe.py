@@ -384,7 +384,9 @@ def generate_subprofile_query():
     global _config
 
     if not _config:
-        raise BlackfireApiException('No BLACKFIRE_QUERY is provided.')
+        raise BlackfireApiException(
+            'Unable to create a subprofile query as profiling is not enabled.'
+        )
 
     args_copy = _config.args.copy()
 
