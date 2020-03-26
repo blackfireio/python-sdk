@@ -191,8 +191,6 @@ class _AgentConnection(object):
 
     def _write_prolog(self):
         headers = {
-            #'Blackfire-Auth':
-            #'%s:%s' % (self.config.env_id, self.config.env_token),
             'Blackfire-Query':
             '%s&signature=%s&%s' % (
                 self.config.challenge,
@@ -398,11 +396,12 @@ def generate_subprofile_query():
     sid = sid.replace('+', 'A')
     sid = sid.replace('/', 'B')
     sid = sid[:9]
-    #args_copy['sub_profile'] = '%s:%s' % (parent_sid, sid)
+    args_copy['sub_profile'] = '%s:%s' % (parent_sid, sid)
 
-    result = "%s&signature=%s&%s&%s" % (
-        _config.challenge, _config.signature, urlencode(args_copy),
-        "sub_profile=%s:%s" % (parent_sid, sid)
+    result = "%s&signature=%s&%s" % (
+        _config.challenge,
+        _config.signature,
+        urlencode(args_copy),
     )
     return result
 
