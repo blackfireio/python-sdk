@@ -190,11 +190,6 @@ class _AgentConnection(object):
         return result
 
     def _write_prolog(self):
-        aggreg_samples_s = ''
-        if 'aggreg_samples' in self.config.args:
-            aggreg_samples_s = '&aggreg_samples=%s' % (
-                self.config.args['aggreg_samples']
-            )
         headers = {
             #'Blackfire-Auth':
             #'%s:%s' % (self.config.env_id, self.config.env_token),
@@ -202,7 +197,7 @@ class _AgentConnection(object):
             '%s&signature=%s&%s' % (
                 self.config.challenge,
                 self.config.signature,
-                aggreg_samples_s,
+                self.config.args_raw,
             ),
             'Blackfire-Probe':
             'python-%s' % (sys.hexversion),
@@ -403,10 +398,11 @@ def generate_subprofile_query():
     sid = sid.replace('+', 'A')
     sid = sid.replace('/', 'B')
     sid = sid[:9]
-    args_copy['sub_profile'] = '%s:%s' % (parent_sid, sid)
+    #args_copy['sub_profile'] = '%s:%s' % (parent_sid, sid)
 
-    result = "%s&signature=%s&%s" % (
-        _config.challenge, _config.signature, urlencode(args_copy)
+    result = "%s&signature=%s&%s&%s" % (
+        _config.challenge, _config.signature, urlencode(args_copy),
+        "sub_profile=%s:%s" % (parent_sid, sid)
     )
     return result
 
