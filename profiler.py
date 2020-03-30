@@ -456,14 +456,14 @@ def start(
             "timespan_selectors shall be an instance of 'dict'"
         )
 
-    if profile_memory and TRACEMALLOC_AVAIL:
-        if tracemalloc.is_tracing():
-            get_logger().warn(
-                "tracemalloc is already tracing. This could affect the accuracy "
-                "of the results of Blackfire. Please disable tracemalloc"
-                " tracing first."
-            )
-        tracemalloc.start()
+    # if profile_memory and TRACEMALLOC_AVAIL:
+    #     if tracemalloc.is_tracing():
+    #         get_logger().warn(
+    #             "tracemalloc is already tracing. This could affect the accuracy "
+    #             "of the results of Blackfire. Please disable tracemalloc"
+    #             " tracing first."
+    #         )
+    #     tracemalloc.start()
 
     # in fact we can use this cache this forever but the idea is maybe the sys.path
     # changes in some way and it would be nice to see the effect between every
@@ -492,8 +492,8 @@ def start(
 def stop():
     _bfext.stop()
 
-    if TRACEMALLOC_AVAIL:
-        tracemalloc.stop()
+    #if TRACEMALLOC_AVAIL:
+    #    tracemalloc.stop()
 
 
 def get_traces(omit_sys_path_dirs=True):
