@@ -8,63 +8,7 @@ from collections import Counter
 from blackfire.utils import PSUTIL_AVAIL, get_mem_info, urlencode, IS_PY3, get_logger
 from blackfire.exceptions import *
 
-TRACEMALLOC_AVAIL = True
-try:
-    import tracemalloc
-except:
-    TRACEMALLOC_AVAIL = False
-    # warnings.warn(
-    #     "tracemalloc module could not be imported. When tracemalloc "
-    #     "is not available, memory results will be less accurate."
-    # )
-
-if not PSUTIL_AVAIL and not TRACEMALLOC_AVAIL:
-    pass
-    # warnings.warn(
-    #     "tracemalloc or psutil modules could not be imported. Memory profiling "
-    #     "results will not be available. Please contact support."
-    # )
-
 __all__ = ['start', 'stop', 'get_traces', 'clear_traces', 'run', 'is_running']
-
-
-def _get_memory_usage():
-    '''
-    This function will be called from profiler upon exit/entry of functions
-    to retrieve mem. related information for the current process.
-
-    Most of the times reading memory usage of the system requires reading it
-    from a special system file (e.x: Linux) which means we will make an I/O call.
-    That means we might sometimes read non-current data as writes to the file
-    might be delayed. So, before going to these OS dependent functionality we
-    should try tracemalloc first which calculates mem. usage directly in Python
-    C API. There is a backport of tracemalloc lib to other Python versions
-    smaller than Py3.4 but the problem is this implementation requires a new
-    interpreter API to be in place, so it requires re-compile of a new Python
-    interpreter, which will not be trivial.
-
-    Return values are in bytes.
-    '''
-
-    usage = peak_usage = 0
-
-    # interpreter shutdown?
-    if not sys or not len(sys.modules):
-        return (0, 0)
-
-    try:
-        if TRACEMALLOC_AVAIL:
-            usage, peak_usage = tracemalloc.get_traced_memory()
-            tm_mem = tracemalloc.get_tracemalloc_memory()
-            usage = max(usage - tm_mem, 0)
-            peak_usage = max(peak_usage - tm_mem, 0)
-        else:
-            usage, peak_usage = get_mem_info()
-    except Exception as e:
-        get_logger().exception(e)
-
-    return (usage, peak_usage)
-
 
 _max_prefix_cache = {}
 _timespan_selectors = {}
@@ -456,15 +400,6 @@ def start(
             "timespan_selectors shall be an instance of 'dict'"
         )
 
-    # if profile_memory and TRACEMALLOC_AVAIL:
-    #     if tracemalloc.is_tracing():
-    #         get_logger().warn(
-    #             "tracemalloc is already tracing. This could affect the accuracy "
-    #             "of the results of Blackfire. Please disable tracemalloc"
-    #             " tracing first."
-    #         )
-    #     tracemalloc.start()
-
     # in fact we can use this cache this forever but the idea is maybe the sys.path
     # changes in some way and it would be nice to see the effect between every
     # start/stop pair.
@@ -473,11 +408,10 @@ def start(
     _timespan_selectors = {}
 
     profile_threads = False
-    if profile_memory:
-        _bfext.set_memory_usage_callback(_get_memory_usage)
     if profile_timespan:
         _timespan_selectors = timespan_selectors
         _bfext.set_timespan_selector_callback(_fn_matches_timespan_selector)
+
     _bfext.start(
         builtins,
         profile_threads,
@@ -491,9 +425,6 @@ def start(
 
 def stop():
     _bfext.stop()
-
-    #if TRACEMALLOC_AVAIL:
-    #    tracemalloc.stop()
 
 
 def get_traces(omit_sys_path_dirs=True):

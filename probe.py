@@ -601,9 +601,6 @@ def enable(end_at_exit=False):
 
             instrumented_funcs[fn_name] = arg_ids
 
-    # no memory profiling in first release
-    profile_memory = False
-
     profiler.start(
         builtins=builtins,
         profile_cpu=profile_cpu,
