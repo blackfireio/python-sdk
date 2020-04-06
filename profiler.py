@@ -464,3 +464,7 @@ def clear_traces():
         _bfext.clear_stats()
     finally:
         _bfext._resume()
+
+
+def get_traced_memory():
+    return _bfext.get_traced_memory()
