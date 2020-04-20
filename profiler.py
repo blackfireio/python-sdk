@@ -23,10 +23,6 @@ def _fn_matches_timespan_selector(name, name_formatted):
     '''
     global _timespan_selectors
 
-    # interpreter shutdown?
-    if not sys or not len(sys.modules):
-        return 0
-
     eq_set = _timespan_selectors.get('=', set())
     if name in eq_set or name_formatted in eq_set:
         return 1
@@ -51,10 +47,6 @@ def _fn_matches_timespan_selector(name, name_formatted):
 
 def _format_func_name(module, name):
     global _max_prefix_cache
-
-    # interpreter shutdown?
-    if not sys or not len(sys.modules):
-        return ''
 
     # called internally each time a _pit is generated to set the .formatted_name
     # member. This formatted name is used internally to lookup instrumented functions
