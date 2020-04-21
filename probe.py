@@ -49,11 +49,13 @@ _DEFAULT_LOG_FILE = 'python-probe.log'
 _DEFAULT_AGENT_TIMEOUT = 0.25
 _DEFAULT_AGENT_SOCKET = _get_default_agent_socket()
 
+_AGENT_HEADER_MARKER = '\n'
 _AGENT_PROTOCOL_MARKER = '\n\n'
 if IS_PY3:
     _AGENT_PROTOCOL_MARKER = bytes(
         _AGENT_PROTOCOL_MARKER, _AGENT_PROTOCOL_ENCODING
     )
+    _AGENT_HEADER_MARKER = bytes(_AGENT_HEADER_MARKER, _AGENT_PROTOCOL_ENCODING)
 
 __all__ = [
     'BlackfireRequest', 'BlackfireResponse', 'get_traces', 'clear_traces',
@@ -167,7 +169,7 @@ class _AgentConnection(object):
                 'Agent send data failed.[%s][%s]' % (e, data)
             )
 
-    def recv(self):
+    def recv(self, header_only=False):
         global _AGENT_PROTOCOL_MARKER
 
         result = ''
@@ -181,6 +183,9 @@ class _AgentConnection(object):
                     # other side indicated no more data will be sent
                     raise Exception('Agent closed the connection.')
 
+                if header_only and result.endswith(_AGENT_HEADER_MARKER):
+                    break
+
                 if result.endswith(_AGENT_PROTOCOL_MARKER):
                     break
 
@@ -190,6 +195,22 @@ class _AgentConnection(object):
         return result
 
     def _write_prolog(self):
+        blackfire_yml = bool(int(_config.args.get('flag_yml', '1')))
+        blackfire_yml_contents = None
+        if blackfire_yml:
+            bf_yaml_files = [".blackfire.yml", ".blackfire.yaml"]
+            for fpath in bf_yaml_files:
+                if os.path.exists(fpath):
+                    with open(fpath, "r") as f:
+                        blackfire_yml_contents = f.read()
+                        break
+
+        bf_probe_header = 'python-%s' % (sys.hexversion)
+        # it is an expected situation to not have the bf_yaml file in place
+        # even it is defined as a flag
+        if blackfire_yml_contents:
+            bf_probe_header += ', blackfire_yml'
+
         headers = {
             'Blackfire-Query':
             '%s&signature=%s&%s' % (
@@ -198,13 +219,13 @@ class _AgentConnection(object):
                 self.config.args_raw,
             ),
             'Blackfire-Probe':
-            'python-%s' % (sys.hexversion),
+            bf_probe_header,
         }
 
         hello_req = BlackfireRequest(headers=headers)
         self.send(hello_req.to_bytes())
 
-        response_raw = self.recv()
+        response_raw = self.recv(header_only=True)
         self.agent_response = BlackfireResponse().from_bytes(response_raw)
         if self.agent_response.status_code != BlackfireResponse.StatusCode.OK:
             raise BlackfireApiException(
@@ -217,10 +238,26 @@ class _AgentConnection(object):
             (self.agent_response)
         )
 
-        # TODO: response.args holds some features that might need to be implemented
-        # blackfire-yaml, composer-lock(probably not needed), firstsample
+        if self.agent_response.status_val_dict.get('blackfire_yml') == 'true':
+            blackfire_yml_req = BlackfireRequest(
+                headers={'Blackfire-Yaml-Size': len(blackfire_yml_contents)},
+                data=blackfire_yml_contents,
+            )
+            self.send(blackfire_yml_req.to_bytes())
 
-        print(">>>>", self.agent_response.args)
+            # as we send blackfire_yml back, the first agent_response should include
+            # some extra params that might be changed with blackfire_yml file.
+            # e.x: fn-args, timespan entries, metric defs.
+            response_raw = self.recv()
+            blackfire_yml_response = BlackfireResponse(
+            ).from_bytes(response_raw)
+            if blackfire_yml_response.status_code != BlackfireResponse.StatusCode.OK:
+                raise BlackfireApiException(
+                    'Invalid response received from Agent to blackfire_yml request. [%s]'
+                    % (blackfire_yml_response)
+                )
+            # TODO: Can there be more data to merge other than args?
+            self.agent_response.args.update(blackfire_yml_response.args)
 
 
 class BlackfireMessage(object):
