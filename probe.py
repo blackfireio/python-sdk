@@ -225,7 +225,7 @@ class _AgentConnection(object):
         hello_req = BlackfireRequest(headers=headers)
         self.send(hello_req.to_bytes())
 
-        response_raw = self.recv(header_only=True)
+        response_raw = self.recv(header_only=bool(blackfire_yml_contents))
         self.agent_response = BlackfireResponse().from_bytes(response_raw)
         if self.agent_response.status_code != BlackfireResponse.StatusCode.OK:
             raise BlackfireApiException(
@@ -256,6 +256,7 @@ class _AgentConnection(object):
                     'Invalid response received from Agent to blackfire_yml request. [%s]'
                     % (blackfire_yml_response)
                 )
+
             # TODO: Can there be more data to merge other than args?
             self.agent_response.args.update(blackfire_yml_response.args)
 
@@ -274,7 +275,9 @@ class BlackfireRequest(BlackfireMessage):
 
     __slots__ = 'headers', 'data'
 
-    def __init__(self, headers={}, data=None):
+    def __init__(self, headers=None, data=None):
+        if not headers:
+            headers = {}
         self.headers = headers
         self.data = data
 
