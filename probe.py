@@ -580,6 +580,8 @@ def enable(end_at_exit=False):
                 # but it would be nice to see the traceback
                 get_logger().warn(traceback.format_exc())
 
+            logging.shutdown()
+
         # Note: The functions registered via this module are not called when the
         # program is killed by a signal not handled by Python, when a Python fatal
         # internal error is detected, or when os._exit() is called.
@@ -588,6 +590,7 @@ def enable(end_at_exit=False):
 
         def _stop_at_exit():
             profiler.stop()
+            logging.shutdown()
 
         atexit.register(_stop_at_exit)
 
