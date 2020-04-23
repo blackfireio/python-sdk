@@ -79,7 +79,7 @@ def _install_bootstrap():
 
 
 def process_bootstrap():
-    query = os.environ.get('BLACKFIRE_QUERY', None)
+    query = os.environ.get('BLACKFIRE_QUERY')
     if query:
         del os.environ['BLACKFIRE_QUERY']
         try:

@@ -222,6 +222,14 @@ class _AgentConnection(object):
             bf_probe_header,
         }
 
+        # add Blackfire-Auth header if server_id/server_token are defined as
+        # env. vars
+        bf_server_id = os.environ.get('BLACKFIRE_SERVER_ID')
+        bf_server_token = os.environ.get('BLACKFIRE_SERVER_TOKEN')
+        if bf_server_id and bf_server_token:
+            headers['Blackfire-Auth'
+                    ] = '%s:%s' % (bf_server_id, bf_server_token)
+
         hello_req = BlackfireRequest(headers=headers)
         self.send(hello_req.to_bytes())
 
