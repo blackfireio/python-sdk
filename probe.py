@@ -198,7 +198,7 @@ class _AgentConnection(object):
         blackfire_yml = bool(int(_config.args.get('flag_yml', '1')))
         blackfire_yml_contents = None
         if blackfire_yml:
-            bf_yaml_files = [".blackfire.yml", ".blackfire.yaml"]
+            bf_yaml_files = [".blackfire.yaml", ".blackfire.yml"]
             for fpath in bf_yaml_files:
                 if os.path.exists(fpath):
                     with open(fpath, "r") as f:
