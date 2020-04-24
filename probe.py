@@ -233,6 +233,10 @@ class _AgentConnection(object):
         hello_req = BlackfireRequest(headers=headers)
         self.send(hello_req.to_bytes())
 
+        get_logger().debug(
+            "Sending hello req. to Agent. ('%s')" % (hello_req.to_bytes())
+        )
+
         response_raw = self.recv(header_only=bool(blackfire_yml_contents))
         self.agent_response = BlackfireResponse().from_bytes(response_raw)
         if self.agent_response.status_code != BlackfireResponse.StatusCode.OK:
@@ -439,7 +443,8 @@ def generate_subprofile_query():
     args_copy.pop('aggreg_samples')
 
     s = ''.join(chr(random.randint(0, 255)) for _ in range(7))
-    s = bytes(s, _AGENT_PROTOCOL_ENCODING)
+    if IS_PY3:
+        s = bytes(s, _AGENT_PROTOCOL_ENCODING)
     sid = base64.b64encode(s)
     sid = sid.decode("ascii")
     sid = sid.rstrip('=')
