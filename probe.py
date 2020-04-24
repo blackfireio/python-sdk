@@ -206,6 +206,12 @@ class _AgentConnection(object):
                         break
 
         bf_probe_header = 'python-%s' % (sys.hexversion)
+
+        # recv timespan entries if timespan enabled
+        recv_timespan = bool(int(_config.args.get('flag_timespan', '0')))
+        if recv_timespan:
+            bf_probe_header += ', timespan'
+
         # it is an expected situation to not have the bf_yaml file in place
         # even it is defined as a flag
         if blackfire_yml_contents:
@@ -612,8 +618,8 @@ def enable(end_at_exit=False):
 
     # pass start options from _config.args, set defaults as necessary
     builtins = not bool(int(_config.args.get('flag_no_builtins', '0')))
-    profile_cpu = bool(int(_config.args.get('flag_cpu', '1')))
-    profile_memory = bool(int(_config.args.get('flag_memory', '1')))
+    profile_cpu = bool(int(_config.args.get('flag_cpu', '0')))
+    profile_memory = bool(int(_config.args.get('flag_memory', '0')))
     fn_args_enabled = bool(int(_config.args.get('flag_fn_args', '0')))
 
     # only enable timespan if this is the last profile of multiple sample profiles.
