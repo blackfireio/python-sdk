@@ -605,13 +605,6 @@ def enable(end_at_exit=False):
         # program is killed by a signal not handled by Python, when a Python fatal
         # internal error is detected, or when os._exit() is called.
         atexit.register(_deinitialize)
-    else:
-
-        def _stop_at_exit():
-            profiler.stop()
-            logging.shutdown()
-
-        atexit.register(_stop_at_exit)
 
     if not _agent_conn:
         try:

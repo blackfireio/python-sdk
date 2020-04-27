@@ -3,7 +3,10 @@ import io
 import os
 import sys
 import traceback
+import logging
+import atexit
 from blackfire.utils import *
+from blackfire import profiler
 from distutils.sysconfig import get_python_lib
 
 __all__ = ['BlackfireConfiguration', 'VERSION', 'process_bootstrap']
@@ -11,6 +14,17 @@ __all__ = ['BlackfireConfiguration', 'VERSION', 'process_bootstrap']
 ext_dir = os.path.dirname(os.path.abspath(__file__))
 with io.open(os.path.join(ext_dir, 'VERSION')) as f:
     VERSION = f.read().strip()
+
+
+def _stop_at_exit():
+    profiler.stop()
+    logging.shutdown()
+
+
+# Note: The functions registered via this module are not called when the
+# program is killed by a signal not handled by Python, when a Python fatal
+# internal error is detected, or when os._exit() is called.
+atexit.register(_stop_at_exit)
 
 
 def _uninstall_bootstrap():
