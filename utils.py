@@ -21,11 +21,13 @@ if IS_PY3:
     from urllib.parse import parse_qsl, quote, urlparse, urlencode, urljoin
     from configparser import ConfigParser
     console_input = input
+    from urllib.request import Request, urlopen
 else:
     from urlparse import parse_qsl, urlparse, urljoin
     from urllib import quote, urlencode
     from ConfigParser import ConfigParser
     console_input = raw_input
+    from urllib2 import Request, urlopen
 
 
 class SysHooks(object):

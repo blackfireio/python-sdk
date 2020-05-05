@@ -15,7 +15,7 @@ from collections import defaultdict
 from blackfire import profiler, VERSION
 from blackfire.utils import SysHooks, IS_PY3, get_home_dir, ConfigParser, \
     urlparse, urljoin, urlencode, get_load_avg, get_logger, init_logger, quote, \
-    parse_qsl
+    parse_qsl, Request, urlopen
 from blackfire.exceptions import *
 from blackfire import BlackfireConfiguration
 
@@ -70,13 +70,10 @@ def _get_probed_runtime():
     )
 
 
-def _get_signing_response(signing_endpoint, client_id, client_token):
-    if IS_PY3:
-        import urllib.request as urllib
-    else:
-        import urllib2 as urllib
-
-    request = urllib.Request(signing_endpoint)
+def _get_signing_response(
+    signing_endpoint, client_id, client_token, urlopen=urlopen
+):
+    request = Request(signing_endpoint)
     auth_hdr = '%s:%s' % (client_id, client_token)
     if IS_PY3:
         auth_hdr = bytes(auth_hdr, 'ascii')
@@ -84,13 +81,17 @@ def _get_signing_response(signing_endpoint, client_id, client_token):
     if IS_PY3:
         base64string = base64string.decode("ascii")
     request.add_header("Authorization", "Basic %s" % base64string)
-    result = urllib.urlopen(request, timeout=_API_TIMEOUT)
+    result = urlopen(request, timeout=_API_TIMEOUT)
     if not (200 <= result.code < 400):
         raise BlackfireApiException(
             'Signing request failed for manual profiling. [%s]' % (result.code)
         )
-
-    return json.loads(result.read())
+    result = result.read()
+    # python 3.5 does not accept bytes for json loads so always convert
+    # response to string
+    if isinstance(result, bytes):
+        result = result.decode("ascii")
+    return json.loads(result)
 
 
 class _AgentConnection(object):
