@@ -497,6 +497,7 @@ def initialize(
         'BLACKFIRE_LOG_LEVEL', _DEFAULT_LOG_LEVEL
     )
     log_level = int(log_level)  # make sure it is int
+    agent_timeout = float(agent_timeout)
 
     init_logger(log_file=log_file, log_level=log_level)
 
