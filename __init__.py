@@ -98,7 +98,7 @@ def process_bootstrap():
         del os.environ['BLACKFIRE_QUERY']
         try:
             from blackfire.probe import initialize, enable
-            initialize(query=query)
+            initialize(query=query, _method="bootstrap")
             enable(end_at_exit=True)
         except:
             # As this is called in import time, tracebacks cannot be seen

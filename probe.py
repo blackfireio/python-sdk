@@ -478,6 +478,7 @@ def initialize(
     log_file=None,
     log_level=None,
     config_file=_DEFAULT_CONFIG_FILE,
+    _method="manual",
 ):
     global _config
 
@@ -500,6 +501,8 @@ def initialize(
     agent_timeout = float(agent_timeout)
 
     init_logger(log_file=log_file, log_level=log_level)
+
+    get_logger().debug("probe.initialize called. [method:'%s']" % (_method))
 
     # manual profiling?
     if query is None:

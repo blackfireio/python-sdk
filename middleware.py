@@ -65,7 +65,7 @@ def format_exc_for_display():
 def try_enable_probe(query):
     probe_err = None
     try:
-        probe.initialize(query=query)
+        probe.initialize(query=query, _method="middleware")
 
         probe.enable()
     except Exception as e:
