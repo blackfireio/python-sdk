@@ -240,9 +240,7 @@ class _AgentConnection(object):
         hello_req = BlackfireRequest(headers=headers)
         self.send(hello_req.to_bytes())
 
-        get_logger().debug(
-            "Sending hello req. to Agent. ('%s')" % (hello_req.to_bytes())
-        )
+        get_logger().debug("SEND hello_req ('%s')" % (hello_req.to_bytes()))
 
         response_raw = self.recv(header_only=bool(blackfire_yml_contents))
         self.agent_response = BlackfireResponse().from_bytes(response_raw)
@@ -253,8 +251,7 @@ class _AgentConnection(object):
             )
 
         get_logger().debug(
-            "Response received from Agent. (response='%s')" %
-            (self.agent_response)
+            "RECV hello_req response. ('%s')" % (self.agent_response)
         )
 
         if self.agent_response.status_val_dict.get('blackfire_yml') == 'true':
@@ -263,6 +260,11 @@ class _AgentConnection(object):
                 data=blackfire_yml_contents,
             )
             self.send(blackfire_yml_req.to_bytes())
+
+            get_logger().debug(
+                "SEND blackfire_yml_req ('%s')" %
+                (blackfire_yml_req.to_bytes())
+            )
 
             # as we send blackfire_yml back, the first agent_response should include
             # some extra params that might be changed with blackfire_yml file.
@@ -278,6 +280,11 @@ class _AgentConnection(object):
 
             # TODO: Can there be more data to merge other than args?
             self.agent_response.args.update(blackfire_yml_response.args)
+
+            get_logger().debug(
+                "RECV blackfire_yml_req response. ('%s')" %
+                (blackfire_yml_response.to_bytes())
+            )
 
 
 class BlackfireMessage(object):
@@ -339,7 +346,6 @@ class BlackfireRequest(BlackfireMessage):
         return self
 
     def pretty_print(self):
-        import json
         container_dict = {"headers": self.headers, "data": self.data}
         print(json.dumps(container_dict, indent=4))
 
@@ -682,6 +688,8 @@ def enable(end_at_exit=False):
     # TODO: 'Blackfire-Error: 103 Samples quota is out'
 
     _enabled = True
+
+    # TODO: Log.debug here.
 
 
 def disable():
