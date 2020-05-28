@@ -5,7 +5,7 @@ import warnings
 import _blackfire_profiler as _bfext
 from contextlib import contextmanager
 from collections import Counter
-from blackfire.utils import PSUTIL_AVAIL, get_mem_info, urlencode, IS_PY3, get_logger
+from blackfire.utils import urlencode, IS_PY3, get_logger
 from blackfire.exceptions import *
 
 __all__ = ['start', 'stop', 'get_traces', 'clear_traces', 'run', 'is_running']

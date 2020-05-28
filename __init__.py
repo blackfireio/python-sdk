@@ -15,6 +15,9 @@ ext_dir = os.path.dirname(os.path.abspath(__file__))
 with io.open(os.path.join(ext_dir, 'VERSION')) as f:
     VERSION = f.read().strip()
 
+# conform with optional pep: PEP396
+__version__ = VERSION
+
 
 def _stop_at_exit():
     profiler.stop()

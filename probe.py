@@ -711,12 +711,15 @@ def end(headers={}, omit_sys_path_dirs=_DEFAULT_OMIT_SYS_PATH):
         'Probed-Language': 'python',
         'Probed-Os': platform.platform(),
         'Probe-version': VERSION,
-        'Request-Sys-Load-Avg': get_load_avg(),
         'Probed-Features': _config.args_raw,
         'Request-Start': _req_start,
         'Request-End': time.time(),
         'Profile-Title': profile_title,
     }
+    load_avg = get_load_avg()
+    if load_avg:
+        end_headers['Request-Sys-Load-Avg'] = load_avg
+
     end_headers.update(headers)
 
     context_dict = {'script': sys.executable, 'argv[]': sys.argv}
