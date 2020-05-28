@@ -3,18 +3,6 @@ import sys
 import traceback
 import logging
 
-PSUTIL_AVAIL = True
-try:
-    import psutil
-except:
-    PSUTIL_AVAIL = False
-
-RESOURCE_AVAIL = True
-try:
-    import resource
-except:
-    RESOURCE_AVAIL = False
-
 IS_PY3 = sys.version_info > (3, 0)
 
 if IS_PY3:
@@ -78,38 +66,12 @@ class SysHooks(object):
             sys.stderr.write = self._sys_stderr_write
 
 
-def get_mem_info():
-    usage = peak_usage = 0
-
-    if PSUTIL_AVAIL:
-        mem_info = psutil.Process().memory_info()
-        usage = mem_info.rss  # this is platform independent
-        if os.name == 'nt':
-            # psutil uses GetProcessMemoryInfo API to get PeakWorkingSet
-            # counter. It is in bytes.
-            peak_usage = mem_info.peak_wset
-        else:
-            # TODO: Note: Current process is also important in this regard because
-            # if process forks child processes, they will not be returned.
-            # we might want to change this behavior in future.
-
-            # TODO: Docs say this is in KB but I say opposite in my tests.. look in detail
-            if RESOURCE_AVAIL:
-                peak_usage = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
-
-    return (usage, peak_usage)
-
-
 def get_load_avg():
-    load_avg = (0, 0, 0)
     try:
-        if PSUTIL_AVAIL:
-            load_avg = psutil.getloadavg()
-        else:
-            load_avg = os.getloadavg()
+        load_avg = os.getloadavg()
+        return " ".join([str(x) for x in load_avg])
     except:
-        traceback.print_exc()
-    return " ".join([str(x) for x in load_avg])
+        pass  # os.getloadavg not available in Windows
 
 
 def init_logger(log_file, log_level, name="python-probe"):
