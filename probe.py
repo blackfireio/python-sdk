@@ -662,9 +662,8 @@ def enable(end_at_exit=False):
         # convert the fn-args string to dict for faster lookups on C side
         fn_args = _agent_conn.agent_response.args.get('Blackfire-Fn-Args', [])
         for fn_arg in fn_args:
-            fn_name, arg_ids = fn_arg.split()
+            fn_name, arg_ids_s = fn_arg.split()
             fn_name = fn_name.strip()
-            arg_ids = [int(arg_id) for arg_id in arg_ids.strip().split(',')]
 
             if fn_name in instrumented_funcs:
                 get_logger().warning(
@@ -672,6 +671,13 @@ def enable(end_at_exit=False):
                     fn_name, fn_arg
                 )
                 continue
+
+            arg_ids = []
+            for arg_id in arg_ids_s.strip().split(','):
+                if arg_id.isdigit():
+                    arg_ids.append(int(arg_id))
+                else:
+                    arg_ids.append(arg_id)
 
             instrumented_funcs[fn_name] = arg_ids
 
