@@ -129,7 +129,7 @@ class _AgentConnection(object):
             self._socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         except Exception as e:
             get_logger().warning(
-                "Error happened while disabling NODELAY option. [%s]" % (e)
+                "Error happened while disabling NODELAY option. [%s]", e
             )
 
     def __del__(self):
@@ -240,7 +240,7 @@ class _AgentConnection(object):
         hello_req = BlackfireRequest(headers=headers)
         self.send(hello_req.to_bytes())
 
-        get_logger().debug("SEND hello_req ('%s')" % (hello_req.to_bytes()))
+        get_logger().debug("SEND hello_req ('%s')", hello_req.to_bytes())
 
         response_raw = self.recv(header_only=bool(blackfire_yml_contents))
         self.agent_response = BlackfireResponse().from_bytes(response_raw)
@@ -251,7 +251,7 @@ class _AgentConnection(object):
             )
 
         get_logger().debug(
-            "RECV hello_req response. ('%s')" % (self.agent_response)
+            "RECV hello_req response. ('%s')", self.agent_response
         )
 
         if self.agent_response.status_val_dict.get('blackfire_yml') == 'true':
@@ -262,8 +262,7 @@ class _AgentConnection(object):
             self.send(blackfire_yml_req.to_bytes())
 
             get_logger().debug(
-                "SEND blackfire_yml_req ('%s')" %
-                (blackfire_yml_req.to_bytes())
+                "SEND blackfire_yml_req ('%s')", blackfire_yml_req.to_bytes()
             )
 
             # as we send blackfire_yml back, the first agent_response should include
@@ -282,8 +281,8 @@ class _AgentConnection(object):
             self.agent_response.args.update(blackfire_yml_response.args)
 
             get_logger().debug(
-                "RECV blackfire_yml_req response. ('%s')" %
-                (blackfire_yml_response.to_bytes())
+                "RECV blackfire_yml_req response. ('%s')",
+                blackfire_yml_response.to_bytes()
             )
 
 
@@ -508,7 +507,7 @@ def initialize(
 
     init_logger(log_file=log_file, log_level=log_level)
 
-    get_logger().debug("probe.initialize called. [method:'%s']" % (_method))
+    get_logger().debug("probe.initialize called. [method:'%s']", _method)
 
     # manual profiling?
     if query is None:
@@ -569,7 +568,7 @@ def initialize(
         log_level=log_level,
     )
 
-    get_logger().debug("Configuration initialized. [%s]" % (_config))
+    get_logger().debug("Configuration initialized. [%s]", _config)
 
 
 def is_enabled():
@@ -586,6 +585,8 @@ def enable(end_at_exit=False):
 
     if is_enabled():
         raise BlackfireApiException('An other probe is already profiling')
+
+    get_logger().debug("probe.enable() called.")
 
     _req_start = time.time()
 
@@ -649,8 +650,7 @@ def enable(end_at_exit=False):
         for ts_sel in ts_selectors:
             if ts_sel[0] not in ['^', '=']:
                 get_logger().warning(
-                    "Ignoring invalid timespan selector '%s'." % (ts_sel),
-                    RuntimeWarning
+                    "Ignoring invalid timespan selector '%s'.", ts_sel
                 )
                 continue
 
@@ -668,8 +668,8 @@ def enable(end_at_exit=False):
 
             if fn_name in instrumented_funcs:
                 get_logger().warning(
-                    "Function '%s' is already instrumented. Ignoring fn-args directive %s."
-                    % (fn_name, fn_arg), RuntimeWarning
+                    "Function '%s' is already instrumented. Ignoring fn-args directive %s.",
+                    fn_name, fn_arg
                 )
                 continue
 
@@ -689,7 +689,10 @@ def enable(end_at_exit=False):
 
     _enabled = True
 
-    # TODO: Log.debug here.
+    get_logger().debug(
+        "profiler started. [instrumented_funcs:%s, timespan_selectors:%s]",
+        instrumented_funcs, timespan_selectors
+    )
 
 
 def disable():
@@ -697,6 +700,8 @@ def disable():
     profiler.stop()
 
     _enabled = False
+
+    get_logger().debug("probe.disable() called.")
 
 
 def end(headers={}, omit_sys_path_dirs=_DEFAULT_OMIT_SYS_PATH):
@@ -708,7 +713,7 @@ def end(headers={}, omit_sys_path_dirs=_DEFAULT_OMIT_SYS_PATH):
     if not _agent_conn:
         return
 
-    get_logger().debug("Profile session ended.")
+    get_logger().debug("probe.end() called.")
 
     disable()
     traces = get_traces(omit_sys_path_dirs=omit_sys_path_dirs)
