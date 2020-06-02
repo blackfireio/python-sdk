@@ -5,6 +5,7 @@ import sys
 import traceback
 import logging
 import atexit
+import importlib
 from blackfire.utils import *
 from blackfire import profiler
 from distutils.sysconfig import get_python_lib
@@ -22,12 +23,9 @@ __version__ = VERSION
 
 
 # This code monkey patches Django and Flask frameworks if installed.
-# This code should be the first to run before any import is made. Otherwise
-# from django import xxx will hold a local reference and we have no way of
-# patching those.
+# This code should be the first to run before any import is made.
 def patch_all():
-    import importlib
-    PATCH_MODULES = ['django']
+    PATCH_MODULES = ['django', 'flask']
     for mod in PATCH_MODULES:
         mod = importlib.import_module('blackfire.hooks.%s' % (mod))
         _ = mod.patch()
