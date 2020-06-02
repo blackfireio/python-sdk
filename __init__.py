@@ -9,7 +9,9 @@ from blackfire.utils import *
 from blackfire import profiler
 from distutils.sysconfig import get_python_lib
 
-__all__ = ['BlackfireConfiguration', 'VERSION', 'process_bootstrap']
+__all__ = [
+    'BlackfireConfiguration', 'VERSION', 'process_bootstrap', 'patch_all'
+]
 
 ext_dir = os.path.dirname(os.path.abspath(__file__))
 with io.open(os.path.join(ext_dir, 'VERSION')) as f:
@@ -17,6 +19,19 @@ with io.open(os.path.join(ext_dir, 'VERSION')) as f:
 
 # conform with optional pep: PEP396
 __version__ = VERSION
+
+
+# This code monkey patches Django and Flask frameworks if installed.
+# This code should be the first to run before any import is made. Otherwise
+# from django import xxx will hold a local reference and we have no way of
+# patching those.
+def patch_all():
+    import importlib
+    PATCH_MODULES = ['django']
+    for mod in PATCH_MODULES:
+        mod = importlib.import_module('blackfire.hooks.%s' % (mod))
+        _ = mod.patch()
+        # TODO: log result
 
 
 def _stop_at_exit():

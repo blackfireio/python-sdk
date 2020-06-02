@@ -18,6 +18,21 @@ else:
     from urllib2 import Request, urlopen
 
 
+def function_wrapper(f, pre_func=None, post_func=None):
+
+    def wrapper(*args, **kwargs):
+        if pre_func:
+            pre_func()
+        f(*args, **kwargs)
+        if post_func:
+            post_func()
+
+    return wrapper
+
+
+# TODO: Use function_wrapper for SysHooks
+
+
 class SysHooks(object):
 
     def __init__(self):
