@@ -26,10 +26,16 @@ __version__ = VERSION
 # This code should be the first to run before any import is made.
 def patch_all():
     PATCH_MODULES = ['django', 'flask']
-    for mod in PATCH_MODULES:
-        mod = importlib.import_module('blackfire.hooks.%s' % (mod))
-        _ = mod.patch()
-        # TODO: log result
+
+    patched_modules = []
+    for mod_name in PATCH_MODULES:
+        module = importlib.import_module('blackfire.hooks.%s' % (mod_name))
+        r = module.patch()
+        if r:
+            patched_modules.append(mod_name)
+
+    # TODO: log
+    print("Patched modules: %s" % (patched_modules))
 
 
 def _stop_at_exit():
