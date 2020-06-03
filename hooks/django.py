@@ -3,7 +3,7 @@ import traceback
 from blackfire.utils import function_wrapper
 
 
-def _insert_leading_middleware():
+def _insert_leading_middleware(*args, **kwargs):
     try:
         from django.conf import settings
 
@@ -29,7 +29,7 @@ def _insert_leading_middleware():
         setattr(settings, settings_key, middlewares)
 
         # TODO: log
-        print("Blackfire Django middleware inserted.")
+        print("Blackfire Django middleware enabled.")
 
     except:
         # TODO: log

@@ -2,6 +2,7 @@ import os
 import sys
 import traceback
 import logging
+import importlib
 
 IS_PY3 = sys.version_info > (3, 0)
 
@@ -18,14 +19,23 @@ else:
     from urllib2 import Request, urlopen
 
 
+def import_module(mod_name):
+    try:
+        return importlib.import_module(mod_name)
+    except ImportError:
+        pass
+
+
 def function_wrapper(f, pre_func=None, post_func=None):
 
     def wrapper(*args, **kwargs):
         if pre_func:
-            pre_func()
-        f(*args, **kwargs)
-        if post_func:
-            post_func()
+            pre_func(*args, **kwargs)
+        try:
+            return f(*args, **kwargs)
+        finally:
+            if post_func:
+                post_func(*args, **kwargs)
 
     return wrapper
 

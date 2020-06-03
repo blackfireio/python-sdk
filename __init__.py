@@ -35,7 +35,7 @@ def patch_all():
             patched_modules.append(mod_name)
 
     # TODO: log
-    print("Patched modules: %s" % (patched_modules))
+    print("Blackfire patched_modules=%s" % (patched_modules))
 
 
 def _stop_at_exit():
