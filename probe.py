@@ -14,10 +14,12 @@ from contextlib import contextmanager
 from collections import defaultdict
 from blackfire import profiler, VERSION
 from blackfire.utils import SysHooks, IS_PY3, get_home_dir, ConfigParser, \
-    urlparse, urljoin, urlencode, get_load_avg, get_logger, init_logger, quote, \
+    urlparse, urljoin, urlencode, get_load_avg, get_logger, quote, \
     parse_qsl, Request, urlopen
 from blackfire.exceptions import *
 from blackfire import BlackfireConfiguration
+
+log = get_logger(__name__)
 
 
 def _get_default_agent_socket():
@@ -44,8 +46,6 @@ _DEFAULT_ENDPOINT = 'https://blackfire.io/'
 _DEFAULT_CONFIG_FILE = os.path.join(get_home_dir(), '.blackfire.ini')
 _API_TIMEOUT = 5.0
 _DEFAULT_PROFILE_TITLE = 'unnamed profile'
-_DEFAULT_LOG_LEVEL = 1
-_DEFAULT_LOG_FILE = 'python-probe.log'
 _DEFAULT_AGENT_TIMEOUT = 0.25
 _DEFAULT_AGENT_SOCKET = _get_default_agent_socket()
 
@@ -128,7 +128,7 @@ class _AgentConnection(object):
         try:
             self._socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         except Exception as e:
-            get_logger().warning(
+            log.warning(
                 "Error happened while disabling NODELAY option. [%s]", e
             )
 
@@ -139,7 +139,7 @@ class _AgentConnection(object):
             pass
 
     def connect(self):
-        get_logger().debug("Connecting to agent at %s." % str(self._sock_addr))
+        log.debug("Connecting to agent at %s." % str(self._sock_addr))
         try:
             self._socket.connect(self._sock_addr)
         except Exception as e:
@@ -157,7 +157,7 @@ class _AgentConnection(object):
         self._socket.close()
         self._closed = True
 
-        get_logger().debug("Agent connection closed.")
+        log.debug("Agent connection closed.")
 
     def send(self, data):
         # Agent expects data is written in chunks
@@ -240,7 +240,7 @@ class _AgentConnection(object):
         hello_req = BlackfireRequest(headers=headers)
         self.send(hello_req.to_bytes())
 
-        get_logger().debug("SEND hello_req ('%s')", hello_req.to_bytes())
+        log.debug("SEND hello_req ('%s')", hello_req.to_bytes())
 
         response_raw = self.recv(header_only=bool(blackfire_yml_contents))
         self.agent_response = BlackfireResponse().from_bytes(response_raw)
@@ -250,9 +250,7 @@ class _AgentConnection(object):
                 (self.agent_response)
             )
 
-        get_logger().debug(
-            "RECV hello_req response. ('%s')", self.agent_response
-        )
+        log.debug("RECV hello_req response. ('%s')", self.agent_response)
 
         if self.agent_response.status_val_dict.get('blackfire_yml') == 'true':
             blackfire_yml_req = BlackfireRequest(
@@ -261,7 +259,7 @@ class _AgentConnection(object):
             )
             self.send(blackfire_yml_req.to_bytes())
 
-            get_logger().debug(
+            log.debug(
                 "SEND blackfire_yml_req ('%s')", blackfire_yml_req.to_bytes()
             )
 
@@ -280,7 +278,7 @@ class _AgentConnection(object):
             # TODO: Can there be more data to merge other than args?
             self.agent_response.args.update(blackfire_yml_response.args)
 
-            get_logger().debug(
+            log.debug(
                 "RECV blackfire_yml_req response. ('%s')",
                 blackfire_yml_response.to_bytes()
             )
@@ -487,6 +485,11 @@ def initialize(
 ):
     global _config
 
+    if log_file or log_level:
+        log.warning(
+            "DeprecationWarning: 'LOG_FILE' and 'LOG_LEVEL' params are no longer used from 'probe.initialize' API. Please use 'BLACKFIRE_LOG_FILE'/'BLACKFIRE_LOG_LEVEL' environment variables."
+        )
+
     agent_socket = agent_socket or os.environ.get(
         'BLACKFIRE_AGENT_SOCKET', _DEFAULT_AGENT_SOCKET
     )
@@ -496,18 +499,9 @@ def initialize(
     endpoint = endpoint or os.environ.get(
         'BLACKFIRE_ENDPOINT', _DEFAULT_ENDPOINT
     )
-    log_file = log_file or os.environ.get(
-        'BLACKFIRE_LOG_FILE', _DEFAULT_LOG_FILE
-    )
-    log_level = log_level or os.environ.get(
-        'BLACKFIRE_LOG_LEVEL', _DEFAULT_LOG_LEVEL
-    )
-    log_level = int(log_level)  # make sure it is int
     agent_timeout = float(agent_timeout)
 
-    init_logger(log_file=log_file, log_level=log_level)
-
-    get_logger().debug("probe.initialize called. [method:'%s']", _method)
+    log.debug("probe.initialize called. [method:'%s']", _method)
 
     # manual profiling?
     if query is None:
@@ -568,7 +562,7 @@ def initialize(
         log_level=log_level,
     )
 
-    get_logger().debug("Configuration initialized. [%s]", _config)
+    log.debug("Configuration initialized. [%s]", _config)
 
 
 def is_enabled():
@@ -586,7 +580,7 @@ def enable(end_at_exit=False):
     if is_enabled():
         raise BlackfireApiException('Another probe is already profiling')
 
-    get_logger().debug("probe.enable() called.")
+    log.debug("probe.enable() called.")
 
     _req_start = time.time()
 
@@ -609,7 +603,7 @@ def enable(end_at_exit=False):
             except:
                 # we do not need to return if any error happens inside end()
                 # but it would be nice to see the traceback
-                get_logger().warn(traceback.format_exc())
+                log.warn(traceback.format_exc())
 
             logging.shutdown()
 
@@ -649,9 +643,7 @@ def enable(end_at_exit=False):
 
         for ts_sel in ts_selectors:
             if ts_sel[0] not in ['^', '=']:
-                get_logger().warning(
-                    "Ignoring invalid timespan selector '%s'.", ts_sel
-                )
+                log.warning("Ignoring invalid timespan selector '%s'.", ts_sel)
                 continue
 
             timespan_selectors[ts_sel[0]].add(ts_sel[1:])
@@ -666,7 +658,7 @@ def enable(end_at_exit=False):
             fn_name = fn_name.strip()
 
             if fn_name in instrumented_funcs:
-                get_logger().warning(
+                log.warning(
                     "Function '%s' is already instrumented. Ignoring fn-args directive %s.",
                     fn_name, fn_arg
                 )
@@ -695,7 +687,7 @@ def enable(end_at_exit=False):
 
     _enabled = True
 
-    get_logger().debug(
+    log.debug(
         "profiler started. [instrumented_funcs:%s, timespan_selectors:%s]",
         instrumented_funcs, timespan_selectors
     )
@@ -707,7 +699,7 @@ def disable():
 
     _enabled = False
 
-    get_logger().debug("probe.disable() called.")
+    log.debug("probe.disable() called.")
 
 
 def end(headers={}, omit_sys_path_dirs=_DEFAULT_OMIT_SYS_PATH):
@@ -719,7 +711,7 @@ def end(headers={}, omit_sys_path_dirs=_DEFAULT_OMIT_SYS_PATH):
     if not _agent_conn:
         return
 
-    get_logger().debug("probe.end() called.")
+    log.debug("probe.end() called.")
 
     disable()
     traces = get_traces(omit_sys_path_dirs=omit_sys_path_dirs)

@@ -21,6 +21,8 @@ with io.open(os.path.join(ext_dir, 'VERSION')) as f:
 # conform with optional pep: PEP396
 __version__ = VERSION
 
+log = get_logger("blackfire.init")
+
 
 # This code monkey patches Django and Flask frameworks if installed.
 # This code should be the first to run before any import is made.
@@ -34,8 +36,7 @@ def patch_all():
         if r:
             patched_modules.append(mod_name)
 
-    # TODO: log
-    print("Blackfire patched_modules=%s" % (patched_modules))
+    log.info("Blackfire patched_modules=%s" % (patched_modules))
 
 
 def _stop_at_exit():

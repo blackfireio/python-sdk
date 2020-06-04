@@ -4,6 +4,8 @@ import traceback
 from blackfire import probe
 from blackfire.utils import quote, get_logger
 
+log = get_logger(__name__)
+
 
 class _DjangoCursorWrapper:
 
@@ -71,7 +73,7 @@ def try_enable_probe(query):
     except Exception as e:
         # TODO: Is this really quote or urlencode?
         probe_err = ('X-Blackfire-Error', '101 ' + format_exc_for_display())
-        get_logger().exception(e)
+        log.exception(e)
     return probe_err
 
 
@@ -116,7 +118,7 @@ class FlaskMiddleware(object):
         return self.wsgi_app(environ, start_response)
 
     def _process_profiled_response(self, sender, response, **extra):
-        get_logger().debug("FlaskMiddleware.finish_response signal called.")
+        log.debug("FlaskMiddleware.finish_response signal called.")
 
         import flask
         request = flask.request
@@ -155,7 +157,7 @@ class FlaskMiddleware(object):
             _add_probe_response_header(response.headers, probe_resp)
         except Exception as e:
             # signals run in the context of app. Do not fail app code on any error
-            get_logger().exception(e)
+            log.exception(e)
 
     def _connect_req_finished_signal(self):
         # we are using request_finished because if we use start_response callback
@@ -167,7 +169,7 @@ class FlaskMiddleware(object):
                 self._process_profiled_response, sender=self.app
             )
         except Exception as e:
-            get_logger().exception(e)
+            log.exception(e)
 
     def _disconnect_req_finished_signal(self):
         try:
@@ -176,10 +178,10 @@ class FlaskMiddleware(object):
                 self._process_profiled_response, self.app
             )
         except Exception as e:
-            get_logger().exception(e)
+            log.exception(e)
 
     def _profiled_request(self, environ, start_response):
-        get_logger().debug("FlaskMiddleware._profiled_request called.")
+        log.debug("FlaskMiddleware._profiled_request called.")
         try:
             self._probe_err = try_enable_probe(
                 environ['HTTP_X_BLACKFIRE_QUERY']
@@ -191,7 +193,7 @@ class FlaskMiddleware(object):
             return resp
 
         finally:
-            get_logger().debug("FlaskMiddleware._profiled_request ended.")
+            log.debug("FlaskMiddleware._profiled_request ended.")
 
             self._disconnect_req_finished_signal()
 
@@ -240,7 +242,7 @@ class DjangoMiddleware(object):
             for connection in connections.all():
                 wrap_cursor(connection)
         except Exception as e:
-            get_logger().exception(e)
+            log.exception(e)
 
     def _disable_sql_instrumentation(self):
 
@@ -255,10 +257,10 @@ class DjangoMiddleware(object):
             for connection in connections.all():
                 unwrap_cursor(connection)
         except Exception as e:
-            get_logger().exception(e)
+            log.exception(e)
 
     def _profiled_request(self, request):
-        get_logger().debug("DjangoMiddleware._profiled_request called.")
+        log.debug("DjangoMiddleware._profiled_request called.")
         try:
             probe_err = try_enable_probe(request.META['HTTP_X_BLACKFIRE_QUERY'])
 
@@ -296,7 +298,7 @@ class DjangoMiddleware(object):
             return response
 
         finally:
-            get_logger().debug("DjangoMiddleware._profiled_request ended.")
+            log.debug("DjangoMiddleware._profiled_request ended.")
 
             # code that will be run no matter what happened above
             self._disable_sql_instrumentation()
