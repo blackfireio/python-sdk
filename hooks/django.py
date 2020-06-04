@@ -1,6 +1,8 @@
 import importlib
 import traceback
-from blackfire.utils import function_wrapper, import_module
+from blackfire.utils import function_wrapper, import_module, get_logger
+
+log = get_logger(__name__)
 
 
 def _insert_leading_middleware(*args, **kwargs):
@@ -30,15 +32,15 @@ def _insert_leading_middleware(*args, **kwargs):
 
         setattr(settings, settings_key, middlewares)
 
-        # TODO: log
-        print("Django settings.MIDDLEWARE patched.")
+        log.debug("Django settings.MIDDLEWARE patched.")
 
-    except:
-        # TODO: log
-        traceback.print_exc()
+    except Exception as e:
+        log.exception(e)
 
 
 def patch():
+    # TODO: if already imported print warning? I did not see anyone has done
+    # similar thing?
     module = import_module('django.core.handlers.base')
     if not module:
         return False
@@ -54,8 +56,7 @@ def patch():
             pre_func=_insert_leading_middleware
         )
         return True
-    except:
-        # TODO: log
-        traceback.print_exc()
+    except Exception as e:
+        log.exception(e)
 
     return False

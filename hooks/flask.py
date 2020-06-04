@@ -1,7 +1,8 @@
 
 import traceback
-from blackfire.utils import function_wrapper, import_module
+from blackfire.utils import function_wrapper, import_module, get_logger
 
+log = get_logger(__name__)
 
 def _wrap_app(instance, *args, **kwargs):
     try:
@@ -9,11 +10,9 @@ def _wrap_app(instance, *args, **kwargs):
 
         instance.wsgi_app = FlaskMiddleware(instance)
 
-        # TODO: log
-        print("Blackfire Flask middleware enabled.")
-    except:
-        # TODO: log
-        traceback.print_exc()
+        log.debug("Blackfire Flask middleware enabled.")
+    except Exception as e:
+        log.exception(e)
 
 def patch():
     # TODO: if already imported print warning? I did not see anyone has done
@@ -32,8 +31,7 @@ def patch():
             module.Flask.__init__, post_func=_wrap_app
         )
         return True
-    except:
-        # TODO: log
-        traceback.print_exc()
+    except Exception as e:
+        log.exception(e)
 
     return False
