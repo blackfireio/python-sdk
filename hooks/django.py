@@ -31,7 +31,7 @@ def _insert_leading_middleware(*args, **kwargs):
         setattr(settings, settings_key, middlewares)
 
         # TODO: log
-        print("Blackfire Django middleware enabled.")
+        print("Django settings.MIDDLEWARE patched.")
 
     except:
         # TODO: log
