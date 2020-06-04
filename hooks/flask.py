@@ -15,8 +15,6 @@ def _wrap_app(instance, *args, **kwargs):
         log.exception(e)
 
 def patch():
-    # TODO: if already imported print warning? I did not see anyone has done
-    # similar thing?
     module = import_module('flask')
     if not module:
         return False

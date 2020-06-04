@@ -1,5 +1,3 @@
-import importlib
-import traceback
 from blackfire.utils import function_wrapper, import_module, get_logger
 
 log = get_logger(__name__)
@@ -39,8 +37,6 @@ def _insert_leading_middleware(*args, **kwargs):
 
 
 def patch():
-    # TODO: if already imported print warning? I did not see anyone has done
-    # similar thing?
     module = import_module('django.core.handlers.base')
     if not module:
         return False
