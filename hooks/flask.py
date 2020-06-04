@@ -21,6 +21,11 @@ def patch():
     module = import_module('flask')
     if not module:
         return False
+    
+    # already patched?
+    if getattr(module, '_blackfire_patch', False):
+        return
+    setattr(module, '_blackfire_patch', True)
 
     try:
         module.Flask.__init__ = function_wrapper(

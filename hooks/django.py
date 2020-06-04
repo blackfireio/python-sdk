@@ -1,11 +1,12 @@
 import importlib
 import traceback
-from blackfire.utils import function_wrapper
+from blackfire.utils import function_wrapper, import_module
 
 
 def _insert_leading_middleware(*args, **kwargs):
     try:
         from django.conf import settings
+        blackfire_middleware_path = 'blackfire.middleware.DjangoMiddleware'
 
         settings_key = None
         if hasattr(settings, 'MIDDLEWARE'):
@@ -17,14 +18,15 @@ def _insert_leading_middleware(*args, **kwargs):
             raise Exception('No MIDDLEWARE definition found in settings')
 
         middlewares = getattr(settings, settings_key)
+
+        # middleware is already enabled?
+        if blackfire_middleware_path in middlewares:
+            return
+
         if isinstance(middlewares, list):
-            middlewares = [
-                'blackfire.middleware.DjangoMiddleware'
-            ] + middlewares
+            middlewares = [blackfire_middleware_path] + middlewares
         elif isinstance(middlewares, tuple):
-            middlewares = (
-                'blackfire.middleware.DjangoMiddleware',
-            ) + middlewares
+            middlewares = (blackfire_middleware_path, ) + middlewares
 
         setattr(settings, settings_key, middlewares)
 
@@ -37,15 +39,14 @@ def _insert_leading_middleware(*args, **kwargs):
 
 
 def patch():
-    # TODO: if already imported print warning? I did not see anyone has done
-    # similar thing?
-
-    try:
-        module = importlib.import_module('django.core.handlers.base')
-    except ImportError:
-        # This is an expected situation where patch_all() is called. User does not
-        # have to have all libraries available
+    module = import_module('django.core.handlers.base')
+    if not module:
         return False
+
+    # already patched?
+    if getattr(module, '_blackfire_patch', False):
+        return
+    setattr(module, '_blackfire_patch', True)
 
     try:
         module.BaseHandler.load_middleware = function_wrapper(
