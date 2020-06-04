@@ -584,7 +584,7 @@ def enable(end_at_exit=False):
         )
 
     if is_enabled():
-        raise BlackfireApiException('An other probe is already profiling')
+        raise BlackfireApiException('Another probe is already profiling')
 
     get_logger().debug("probe.enable() called.")
 
