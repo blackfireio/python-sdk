@@ -483,11 +483,14 @@ def initialize(
     config_file=_DEFAULT_CONFIG_FILE,
     _method="manual",
 ):
-    global _config
+    global _config, log
 
     if log_file or log_level:
+        log = get_logger(__name__, log_file=log_file, log_level=log_level)
         log.warning(
-            "DeprecationWarning: 'LOG_FILE' and 'LOG_LEVEL' params are no longer used from 'probe.initialize' API. Please use 'BLACKFIRE_LOG_FILE'/'BLACKFIRE_LOG_LEVEL' environment variables."
+            "DeprecationWarning: 'LOG_FILE' and 'LOG_LEVEL' params are no longer used from 'probe.initialize' API. "
+            "Please use 'BLACKFIRE_LOG_FILE'/'BLACKFIRE_LOG_LEVEL' environment variables."
+            "These settings will be removed in the next version."
         )
 
     agent_socket = agent_socket or os.environ.get(

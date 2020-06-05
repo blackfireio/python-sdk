@@ -102,12 +102,16 @@ def get_load_avg():
         pass  # os.getloadavg not available in Windows
 
 
-def get_logger(name):
+def get_logger(name, log_file=None, log_level=None):
     # Normally basicConfig initialized the root logger but we need to support PY2/PY3
     # in same code base, so we use a flag to determine if logger is initialized or not
 
-    log_file = os.environ.get('BLACKFIRE_LOG_FILE', _DEFAULT_LOG_FILE)
-    log_level = os.environ.get('BLACKFIRE_LOG_LEVEL', _DEFAULT_LOG_LEVEL)
+    log_file = log_file or os.environ.get(
+        'BLACKFIRE_LOG_FILE', _DEFAULT_LOG_FILE
+    )
+    log_level = log_level or os.environ.get(
+        'BLACKFIRE_LOG_LEVEL', _DEFAULT_LOG_LEVEL
+    )
     log_level = int(log_level)  # make sure it is int
 
     _LOG_LEVELS = {
