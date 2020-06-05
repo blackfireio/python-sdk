@@ -26,6 +26,7 @@ CLASSIFIERS = [
     'Programming Language :: Python :: 3.5',
     'Programming Language :: Python :: 3.6',
     'Programming Language :: Python :: 3.7',
+    'Programming Language :: Python :: 3.8',
     'Programming Language :: Python :: Implementation :: CPython',
     'Operating System :: OS Independent',
     'Topic :: Software Development :: Libraries',
@@ -37,8 +38,7 @@ setup(
     version=VERSION,
     author="Blackfire.io",
     author_email="support@blackfire.io",
-    # TODO: Add files in hooks/
-    py_modules=[os.path.splitext(f)[0] for f in glob.glob("*.py")],
+    packages=['', 'hooks'],
     data_files=[
         ('', ['VERSION', 'LICENSE']),
     ],
