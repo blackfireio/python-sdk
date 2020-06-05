@@ -120,6 +120,13 @@ class FlaskMiddleware(object):
     def _process_profiled_response(self, sender, response, **extra):
         log.debug("FlaskMiddleware.finish_response signal called.")
 
+        # From Flask docs:
+        # When the Flask application handles a request, it creates a Request
+        # object based on the environment it received from the WSGI server.
+        # Because a worker (thread, process, or coroutine depending on the server)
+        # handles only one request at a time, the request data can be considered
+        # global to that worker during that request. Flask uses the term context
+        # local for this.
         import flask
         request = flask.request
 
