@@ -6,9 +6,9 @@ log = get_logger(__name__)
 
 def _wrap_app(instance, *args, **kwargs):
     try:
-        from blackfire.middleware import FlaskMiddleware
+        from blackfire.hooks.flask.middleware import BlackfireFlaskMiddleware
 
-        _ = FlaskMiddleware(instance)
+        _ = BlackfireFlaskMiddleware(instance)
 
         log.debug("Blackfire Flask middleware enabled.")
     except Exception as e:

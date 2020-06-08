@@ -6,7 +6,7 @@ log = get_logger(__name__)
 def _insert_leading_middleware(*args, **kwargs):
     try:
         from django.conf import settings
-        blackfire_middleware_path = 'blackfire.middleware.DjangoMiddleware'
+        blackfire_middleware_path = 'blackfire.hooks.django.middleware.BlackfireDjangoMiddleware'
 
         settings_key = None
         if hasattr(settings, 'MIDDLEWARE'):
