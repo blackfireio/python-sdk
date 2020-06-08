@@ -471,6 +471,10 @@ def generate_subprofile_query():
     return result
 
 
+def log_me(msg):
+    log.debug(msg)
+
+
 def initialize(
     query=None,
     client_id=None,
