@@ -179,10 +179,11 @@ class _AgentConnection(object):
 
         try:
             while (True):
-                result += self._socket.recv(_AGENT_PROTOCOL_MAX_RECV_SIZE)
-                if not len(result):
+                data = self._socket.recv(_AGENT_PROTOCOL_MAX_RECV_SIZE)
+                if not len(data):
                     # other side indicated no more data will be sent
                     raise Exception('Agent closed the connection.')
+                result += data
 
                 if header_only and result.endswith(_AGENT_HEADER_MARKER):
                     break
