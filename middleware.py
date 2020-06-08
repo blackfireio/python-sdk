@@ -110,15 +110,22 @@ class FlaskMiddleware(object):
         # TODO: Comment
         self._probe_err = None
 
+        # we use before/after request hooks instead of __call__ directly because
+        # these functions are called in registered order: meaning that the first function
+        # registered will be called last. This means, assuming blackfire.patch_all()
+        # is called very early, we will have chance to catch all other middleware
+        # profiling data.
+        self.app.before_request(self._before_request)
+        self.app.after_request(self._after_request)
+        self.app.teardown_request(self._teardown_request)
+
     def __call__(self, environ, start_response):
-        if 'HTTP_X_BLACKFIRE_QUERY' in environ:
-            return self._profiled_request(
-                environ=environ, start_response=start_response
-            )
+        # this stays here for Backward compat.
+        # TODO: Remove after deprecation period
         return self.wsgi_app(environ, start_response)
 
-    def _process_profiled_response(self, sender, response, **extra):
-        log.debug("FlaskMiddleware.finish_response signal called.")
+    def _before_request(self):
+        log.debug("FlaskMiddleware._before_request called.")
 
         # From Flask docs:
         # When the Flask application handles a request, it creates a Request
@@ -135,6 +142,16 @@ class FlaskMiddleware(object):
         # for finishing the profile session
         if 'HTTP_X_BLACKFIRE_QUERY' not in request.environ:
             return
+
+        self._probe_err = try_enable_probe(
+            request.environ['HTTP_X_BLACKFIRE_QUERY']
+        )
+
+    def _after_request(self, response):
+        log.debug("FlaskMiddleware._after_request called.")
+
+        import flask
+        request = flask.request
 
         try:
             if self._probe_err:
@@ -166,48 +183,15 @@ class FlaskMiddleware(object):
             # signals run in the context of app. Do not fail app code on any error
             log.exception(e)
 
-    def _connect_req_finished_signal(self):
-        # we are using request_finished because if we use start_response callback
-        # to modify response headers, because end() shall be called when view has been called.
-        # TODO: More comment
-        try:
-            from flask import request_finished
-            request_finished.connect(
-                self._process_profiled_response, sender=self.app
-            )
-        except Exception as e:
-            log.exception(e)
+        return response
 
-    def _disconnect_req_finished_signal(self):
-        try:
-            from flask import request_finished
-            request_finished.disconnect(
-                self._process_profiled_response, self.app
-            )
-        except Exception as e:
-            log.exception(e)
+    def _teardown_request(self, exception):
+        log.debug("FlaskMiddleware._teardown_request called.")
 
-    def _profiled_request(self, environ, start_response):
-        log.debug("FlaskMiddleware._profiled_request called.")
-        try:
-            self._probe_err = try_enable_probe(
-                environ['HTTP_X_BLACKFIRE_QUERY']
-            )
-            if not self._probe_err:
-                self._connect_req_finished_signal()
+        self._probe_err = None
 
-            resp = self.wsgi_app(environ, start_response)
-            return resp
-
-        finally:
-            log.debug("FlaskMiddleware._profiled_request ended.")
-
-            self._disconnect_req_finished_signal()
-
-            self._probe_err = None
-
-            probe.disable()
-            probe.clear_traces()
+        probe.disable()
+        probe.clear_traces()
 
 
 class DjangoMiddleware(object):

@@ -8,7 +8,7 @@ def _wrap_app(instance, *args, **kwargs):
     try:
         from blackfire.middleware import FlaskMiddleware
 
-        instance.wsgi_app = FlaskMiddleware(instance)
+        _ = FlaskMiddleware(instance)
 
         log.debug("Blackfire Flask middleware enabled.")
     except Exception as e:
