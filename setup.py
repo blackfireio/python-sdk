@@ -4,7 +4,7 @@ import io
 import os
 import sys
 import glob
-from setuptools import setup
+from setuptools import setup, find_packages
 
 with io.open('README.rst', encoding='UTF-8') as f:
     long_description = f.read()
@@ -38,7 +38,8 @@ setup(
     version=VERSION,
     author="Blackfire.io",
     author_email="support@blackfire.io",
-    packages=['', 'hooks'],
+    py_modules=[os.path.splitext(f)[0] for f in glob.glob("*.py")],
+    packages=find_packages(),
     data_files=[
         ('', ['VERSION', 'LICENSE']),
     ],

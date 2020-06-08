@@ -31,7 +31,9 @@ def patch_all():
 
     patched_modules = []
     for mod_name in PATCH_MODULES:
-        module = importlib.import_module('blackfire.hooks.%s' % (mod_name))
+        module = importlib.import_module(
+            'blackfire.hooks.%s.patch' % (mod_name)
+        )
         r = module.patch()
         if r:
             patched_modules.append(mod_name)
