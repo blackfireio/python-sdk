@@ -4,6 +4,18 @@ from blackfire.hooks.utils import try_enable_probe, try_end_probe, reset_probe, 
 log = get_logger(__name__)
 
 
+def get_current_request():
+    # From Flask docs:
+    # When the Flask application handles a request, it creates a Request
+    # object based on the environment it received from the WSGI server.
+    # Because a worker (thread, process, or coroutine depending on the server)
+    # handles only one request at a time, the request data can be considered
+    # global to that worker during that request. Flask uses the term context
+    # local for this.
+    import flask
+    return flask.request
+
+
 class BlackfireFlaskMiddleware(object):
 
     def __init__(self, app):
@@ -30,15 +42,7 @@ class BlackfireFlaskMiddleware(object):
     def _before_request(self):
         log.debug("FlaskMiddleware._before_request called.")
 
-        # From Flask docs:
-        # When the Flask application handles a request, it creates a Request
-        # object based on the environment it received from the WSGI server.
-        # Because a worker (thread, process, or coroutine depending on the server)
-        # handles only one request at a time, the request data can be considered
-        # global to that worker during that request. Flask uses the term context
-        # local for this.
-        import flask
-        request = flask.request
+        request = get_current_request()
 
         # When signal is registered we might received other events from other
         # requests. Look at the request object of the current response to determine
@@ -53,8 +57,7 @@ class BlackfireFlaskMiddleware(object):
     def _after_request(self, response):
         log.debug("FlaskMiddleware._after_request called.")
 
-        import flask
-        request = flask.request
+        request = get_current_request()
 
         try:
             if self._probe_err:
