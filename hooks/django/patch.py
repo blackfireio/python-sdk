@@ -51,6 +51,11 @@ def patch():
             module.BaseHandler.load_middleware,
             pre_func=_insert_leading_middleware
         )
+
+        import django
+        django_version = getattr(django, '__version__', None)
+        log.debug('Django version %s patched.', (django_version))
+
         return True
     except Exception as e:
         log.exception(e)

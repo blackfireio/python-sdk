@@ -10,7 +10,7 @@ def _wrap_app(instance, *args, **kwargs):
 
         _ = BlackfireFlaskMiddleware(instance)
 
-        log.debug("Blackfire Flask middleware enabled.")
+        log.debug("Flask middleware enabled.")
     except Exception as e:
         log.exception(e)
 
@@ -28,6 +28,10 @@ def patch():
         module.Flask.__init__ = function_wrapper(
             module.Flask.__init__, post_func=_wrap_app
         )
+
+        flask_version = getattr(module, '__version__', None)
+        log.debug('Flask version %s patched.', (flask_version))
+
         return True
     except Exception as e:
         log.exception(e)
