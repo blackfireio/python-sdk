@@ -15,8 +15,8 @@ class DjangoMiddleware(BlackfireDjangoMiddleware):
 
 log = get_logger(__name__)
 
-# TODO: Add URL for blackfire run --xyz
+# TODO: Change blackfire run --xyz
 log.warning(
     "DeprecationWarning: FlaskMiddleware/DjangoMiddleware will be deprecated. Please use 'blackfire.patch_all' "
-    "method or run your server as defined in here: URL"
+    "or run your server via 'blackfire run --xyz'."
 )
