@@ -24,16 +24,6 @@ class _DjangoCursorWrapper:
         sql_formatted = sql_formatted.replace('\'', '')
         self.on_query(method, sql, params, sql_formatted)
 
-        # TODO: We would like to see non-anonymized SQL?
-        # query = str(sql)
-        # if params:
-        #     try:
-        #         query = sql % params
-        #     except:
-        #         query = 'SQL formatting failed. [%s:%s]' % (sql, params)
-        # query = query.replace('"', '')
-        # query = query.replace('\'', '')
-
     def callproc(self, procname, params=None):
         return self._on_pre_query(self.cursor.callproc, procname, params)
 
