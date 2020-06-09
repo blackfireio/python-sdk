@@ -121,8 +121,8 @@ def get_logger(name, log_file=None, log_level=None):
         1: logging.ERROR
     }
 
-    _logger = logging.getLogger(name)
-    _logger.setLevel(_LOG_LEVELS[log_level])
+    logger = logging.getLogger(name)
+    logger.setLevel(_LOG_LEVELS[log_level])
     formatter = logging.Formatter(
         "%(asctime)s - %(name)s - %(levelname)s - %(filename)s:%(lineno)d - "
         "%(message).8192s"
@@ -132,12 +132,12 @@ def get_logger(name, log_file=None, log_level=None):
     file_handler = logging.FileHandler(log_file, 'a')
     file_handler.setFormatter(formatter)
 
-    _logger.handlers = [
+    logger.handlers = [
         console_handler,
         file_handler,
     ]
 
-    return _logger
+    return logger
 
 
 def get_home_dir():

@@ -12,6 +12,8 @@ def get_current_request():
     # handles only one request at a time, the request data can be considered
     # global to that worker during that request. Flask uses the term context
     # local for this.
+    # TODO: Remove this lazy imports after explicit middleware usage is deprecated
+    # then this file can only be imported through patch_all() which will be safe
     import flask
     return flask.request
 
