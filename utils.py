@@ -1,5 +1,6 @@
 import os
 import sys
+import json
 import traceback
 import logging
 import importlib
@@ -144,3 +145,24 @@ def get_home_dir():
     # This function is cross platform way to retrieve HOME dir.
     # See: https://docs.python.org/3/library/os.path.html#os.path.expanduser
     return os.path.expanduser("~")
+
+
+# used for logging dictionaries in indented json format which can contain sets
+class _JsonSetEncoder(json.JSONEncoder):
+
+    def default(self, obj):
+        if isinstance(obj, set):
+            return list(obj)
+
+        return json.JSONEncoder.default(self, obj)
+
+
+# this function take an object and run json.dumps on it with indentation enabled.
+# It also does this safely, no exceptions will be thrown for this on error as this
+# will usually be called from log APIs. Supports objects containing Set() objects
+# as well.
+def json_prettify(obj):
+    try:
+        return json.dumps(obj, indent=4, cls=_JsonSetEncoder)
+    except:
+        return str(obj)

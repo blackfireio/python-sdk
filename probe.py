@@ -15,7 +15,7 @@ from collections import defaultdict
 from blackfire import profiler, VERSION
 from blackfire.utils import SysHooks, IS_PY3, get_home_dir, ConfigParser, \
     urlparse, urljoin, urlencode, get_load_avg, get_logger, quote, \
-    parse_qsl, Request, urlopen
+    parse_qsl, Request, urlopen, json_prettify
 from blackfire.exceptions import *
 from blackfire import BlackfireConfiguration
 
@@ -693,7 +693,8 @@ def enable(end_at_exit=False):
 
     log.debug(
         "profiler started. [instrumented_funcs:%s, timespan_selectors:%s]",
-        instrumented_funcs, timespan_selectors
+        json_prettify(instrumented_funcs),
+        json_prettify(timespan_selectors),
     )
 
 
