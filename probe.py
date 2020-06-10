@@ -566,7 +566,9 @@ def initialize(
         log_level=log_level,
     )
 
-    log.debug("Configuration initialized. [%s]", _config)
+    log.debug(
+        "Configuration initialized. [%s]", json_prettify(_config.__dict__)
+    )
 
 
 def is_enabled():
