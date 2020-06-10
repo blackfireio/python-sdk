@@ -1,6 +1,9 @@
 import os
 import sys
 from blackfire import probe
+from blackfire.utils import get_logger
+
+log = get_logger(__name__)
 
 
 def format_exc_for_display():
