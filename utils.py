@@ -103,7 +103,7 @@ def get_load_avg():
         pass  # os.getloadavg not available in Windows
 
 
-def get_logger(name, log_file=None, log_level=None):
+def get_logger(name, log_file=None, log_level=None, include_line_info=True):
     # Normally basicConfig initialized the root logger but we need to support PY2/PY3
     # in same code base, so we use a flag to determine if logger is initialized or not
 
@@ -124,10 +124,17 @@ def get_logger(name, log_file=None, log_level=None):
 
     logger = logging.getLogger(name)
     logger.setLevel(_LOG_LEVELS[log_level])
-    formatter = logging.Formatter(
-        "%(asctime)s - %(name)s - %(levelname)s - %(filename)s:%(lineno)d - "
-        "%(message).8192s"
-    )
+
+    formatter_info = "%(asctime)s - %(name)s - %(levelname)s - "
+
+    # line info becomes irrelevant when logging is made from the C extension, thus
+    # this is configurable.
+    if include_line_info:
+        formatter_info += "%(filename)s:%(lineno)d - "
+    formatter_info += "%(message).8192s"
+
+    formatter = logging.Formatter(formatter_info)
+
     console_handler = logging.StreamHandler()
     console_handler.setFormatter(formatter)
     file_handler = logging.FileHandler(log_file, 'a')

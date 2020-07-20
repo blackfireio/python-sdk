@@ -10,6 +10,8 @@ from blackfire.exceptions import *
 
 __all__ = ['start', 'stop', 'get_traces', 'clear_traces', 'run', 'is_running']
 
+log = get_logger(__name__, include_line_info=False)
+
 _max_prefix_cache = {}
 _timespan_selectors = {}
 MAX_TIMESPAN_THRESHOLD = 1000000000
@@ -79,7 +81,9 @@ def _format_func_name(module, name):
     return "%s.%s" % (module, name)
 
 
+# import time initialization code
 _bfext._set_format_func_name_callback(_format_func_name)
+_bfext._set_logger(log)
 
 
 # a custom dict class to reach keys as attributes
