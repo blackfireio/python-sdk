@@ -11,7 +11,8 @@ from blackfire import profiler
 from distutils.sysconfig import get_python_lib
 
 __all__ = [
-    'BlackfireConfiguration', 'VERSION', 'process_bootstrap', 'patch_all'
+    'BlackfireConfiguration', 'VERSION', 'process_bootstrap', 'patch_all',
+    'profile'
 ]
 
 ext_dir = os.path.dirname(os.path.abspath(__file__))
@@ -160,3 +161,17 @@ class BlackfireConfiguration(object):
             )
 
         return value
+
+
+def profile(func, client_id=None, client_token=None):
+    from blackfire.probe import enable, end, initialize
+
+    def wrapper():
+        initialize(client_id=client_id, client_token=client_token)
+        enable()
+        try:
+            func()
+        finally:
+            end()
+
+    return wrapper
