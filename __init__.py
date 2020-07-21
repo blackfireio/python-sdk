@@ -163,15 +163,19 @@ class BlackfireConfiguration(object):
         return value
 
 
-def profile(func, client_id=None, client_token=None):
+def profile(client_id=None, client_token=None):
     from blackfire.probe import enable, end, initialize
 
-    def wrapper():
-        initialize(client_id=client_id, client_token=client_token)
-        enable()
-        try:
-            func()
-        finally:
-            end()
+    def inner_func(func):
 
-    return wrapper
+        def wrapper():
+            initialize(client_id=client_id, client_token=client_token)
+            enable()
+            try:
+                func()
+            finally:
+                end()
+
+        return wrapper
+
+    return inner_func
