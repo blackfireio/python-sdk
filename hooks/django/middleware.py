@@ -1,5 +1,4 @@
-
-from blackfire import probe
+from blackfire import probe, apm
 from blackfire.utils import get_logger
 from blackfire.hooks.utils import try_enable_probe, try_end_probe, add_probe_response_header, reset_probe
 
@@ -46,7 +45,6 @@ class _DjangoCursorWrapper:
         self.close()
 
 
-
 class BlackfireDjangoMiddleware(object):
 
     def __init__(self, get_response):
@@ -57,7 +55,22 @@ class BlackfireDjangoMiddleware(object):
         if 'HTTP_X_BLACKFIRE_QUERY' in request.META:
             return self._profiled_request(request)
 
+        # TODO: If key-page matches and profile: true then make a BlackfireApmRequestProfileQuery
+        # to the agent and if we receive a signature call self._profiled_request()
+
+        if apm.trigger_trace():
+            return self._apm_request(request)
+
         response = self.get_response(request)
+        return response
+
+    def _apm_request(self, request):
+
+        # TODO:
+        #_ = apm.trigger_extended_trace()
+
+        response = self.get_response(request)
+        apm.send_trace(request)
         return response
 
     def _enable_sql_instrumentation(self):
