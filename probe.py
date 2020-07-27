@@ -39,7 +39,6 @@ _req_start = None
 _DEFAULT_OMIT_SYS_PATH = True
 _DEFAULT_ENDPOINT = 'https://blackfire.io/'
 _DEFAULT_CONFIG_FILE = os.path.join(get_home_dir(), '.blackfire.ini')
-_API_TIMEOUT = 5.0
 _DEFAULT_PROFILE_TITLE = 'unnamed profile'
 _DEFAULT_AGENT_TIMEOUT = 0.25
 _DEFAULT_AGENT_SOCKET = _get_default_agent_socket()
@@ -53,6 +52,8 @@ __all__ = [
 def _get_signing_response(
     signing_endpoint, client_id, client_token, urlopen=urlopen
 ):
+    _SIGNING_API_TIMEOUT = 5.0
+
     request = Request(signing_endpoint)
     auth_hdr = '%s:%s' % (client_id, client_token)
     if IS_PY3:
@@ -61,7 +62,7 @@ def _get_signing_response(
     if IS_PY3:
         base64string = base64string.decode("ascii")
     request.add_header("Authorization", "Basic %s" % base64string)
-    result = urlopen(request, timeout=_API_TIMEOUT)
+    result = urlopen(request, timeout=_SIGNING_API_TIMEOUT)
     if not (200 <= result.code < 400):
         raise BlackfireApiException(
             'Signing request failed for manual profiling. [%s]' % (result.code)
