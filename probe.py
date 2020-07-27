@@ -15,7 +15,7 @@ from collections import defaultdict
 from blackfire import profiler, VERSION
 from blackfire.utils import SysHooks, IS_PY3, get_home_dir, ConfigParser, \
     urlparse, urljoin, urlencode, get_load_avg, get_logger, quote, \
-    parse_qsl, Request, urlopen, json_prettify
+    parse_qsl, Request, urlopen, json_prettify, get_probed_runtime
 from blackfire.exceptions import *
 from blackfire import BlackfireConfiguration
 
@@ -61,13 +61,6 @@ __all__ = [
     'BlackfireRequest', 'BlackfireResponse', 'get_traces', 'clear_traces',
     'is_enabled', 'enable', 'end', 'reset', 'disable', 'run', 'initialize'
 ]
-
-
-def _get_probed_runtime():
-    return "%s %s+%s" % (
-        platform.python_implementation(), platform.python_version(),
-        platform.platform()
-    )
 
 
 def _get_signing_response(
@@ -728,7 +721,7 @@ def end(headers={}, omit_sys_path_dirs=_DEFAULT_OMIT_SYS_PATH):
     profile_title = _config.args.get('profile_title', _DEFAULT_PROFILE_TITLE)
     end_headers = {
         'file-format': 'BlackfireProbe',
-        'Probed-Runtime': _get_probed_runtime(),
+        'Probed-Runtime': get_probed_runtime(),
         'Probed-Language': 'python',
         'Probed-Os': platform.platform(),
         'Probe-version': VERSION,

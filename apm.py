@@ -1,22 +1,38 @@
 import random
+import _blackfire_profiler as _bfext
+from blackfire.utils import get_logger
+
+# globals
+_config = None
+log = get_logger(__name__)
 
 
-class ApmConfig(object):
+def _init_apm_config():
+    # init shared configuration from the C extension
+    global _config
 
-    def __init__(self):
-        self.sample_rate = 1.0
-        self.extended_sample_rate = 0.0
-        self.key_pages = []
-        self.timespan_entries = []
-        self.fn_arg_entries = []
+    _config = _bfext.get_apm_data()["config"]
 
 
-config = ApmConfig()
+_init_apm_config()
 
 
 def trigger_trace():
-    return config.sample_rate >= random.random()
+    global _config
+
+    return _config["sample_rate"] >= random.random()
 
 
 def trigger_extended_trace():
-    return config.extended_sample_rate >= random.random()
+    global _config
+
+    return _config["extended_sample_rate"] >= random.random()
+
+
+def send_trace(request, **kwargs):
+    print(kwargs)
+    print(">>>>>>>>>>>>>>>")
+
+
+def send_extended_trace(request, **kwargs):
+    pass

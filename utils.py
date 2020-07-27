@@ -3,6 +3,7 @@ import sys
 import json
 import traceback
 import logging
+import platform
 import importlib
 
 IS_PY3 = sys.version_info > (3, 0)
@@ -42,6 +43,13 @@ def function_wrapper(f, pre_func=None, post_func=None):
                 post_func(*args, **kwargs)
 
     return wrapper
+
+
+def get_probed_runtime():
+    return "%s %s+%s" % (
+        platform.python_implementation(), platform.python_version(),
+        platform.platform()
+    )
 
 
 # TODO: Use function_wrapper for SysHooks

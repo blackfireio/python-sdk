@@ -1,5 +1,7 @@
-from blackfire import probe, apm
-from blackfire.utils import get_logger
+import time
+import platform
+from blackfire import probe, apm, VERSION
+from blackfire.utils import get_logger, get_probed_runtime
 from blackfire.hooks.utils import try_enable_probe, try_end_probe, add_probe_response_header, reset_probe
 
 log = get_logger(__name__)
@@ -61,6 +63,7 @@ class BlackfireDjangoMiddleware(object):
         if apm.trigger_trace():
             return self._apm_request(request)
 
+        # no instrumentation
         response = self.get_response(request)
         return response
 
@@ -69,8 +72,28 @@ class BlackfireDjangoMiddleware(object):
         # TODO:
         #_ = apm.trigger_extended_trace()
 
-        response = self.get_response(request)
-        apm.send_trace(request)
+        t0 = time.time()
+        try:
+            response = self.get_response(request)
+        finally:
+            now = time.time()
+            apm.send_trace(
+                request,
+                wt=now - t0,
+                timestamp=now,
+                uri=request.path,
+                framework="django",
+                capabilities="trace",
+                host=request.META.get('HTTP_HOST'),
+                method=request.method,
+                os=platform.system(),
+                language="python",
+                runtime=get_probed_runtime(),
+                response_code=response.status_code,
+                stdout=len(response.content),
+                http_method=request.method,
+                version=VERSION,
+            )
         return response
 
     def _enable_sql_instrumentation(self):

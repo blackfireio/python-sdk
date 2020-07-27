@@ -42,6 +42,10 @@ class BlackfireFlaskMiddleware(object):
         return self.wsgi_app(environ, start_response)
 
     def _before_request(self):
+
+        # TODO: from flask import g
+        # You can use above global context (per-request) for holding APM data
+
         log.debug("FlaskMiddleware._before_request called.")
 
         request = get_current_request()
