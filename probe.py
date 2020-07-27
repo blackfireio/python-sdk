@@ -3,7 +3,6 @@ import os
 import sys
 import time
 import atexit
-import socket
 import platform
 import traceback
 import base64
@@ -11,8 +10,7 @@ import logging
 import json
 import random
 from contextlib import contextmanager
-from collections import defaultdict
-from blackfire import profiler, VERSION
+from blackfire import profiler, VERSION, agent
 from blackfire.utils import SysHooks, IS_PY3, get_home_dir, ConfigParser, \
     urlparse, urljoin, urlencode, get_load_avg, get_logger, quote, \
     parse_qsl, Request, urlopen, json_prettify, get_probed_runtime
@@ -38,10 +36,7 @@ _enabled = False
 _agent_conn = None
 _req_start = None
 
-_AGENT_PROTOCOL_MAX_RECV_SIZE = 4096
-_AGENT_PROTOCOL_MAX_SEND_SIZE = 4096
 _DEFAULT_OMIT_SYS_PATH = True
-_AGENT_PROTOCOL_ENCODING = 'utf-8'
 _DEFAULT_ENDPOINT = 'https://blackfire.io/'
 _DEFAULT_CONFIG_FILE = os.path.join(get_home_dir(), '.blackfire.ini')
 _API_TIMEOUT = 5.0
@@ -49,17 +44,9 @@ _DEFAULT_PROFILE_TITLE = 'unnamed profile'
 _DEFAULT_AGENT_TIMEOUT = 0.25
 _DEFAULT_AGENT_SOCKET = _get_default_agent_socket()
 
-_AGENT_HEADER_MARKER = '\n'
-_AGENT_PROTOCOL_MARKER = '\n\n'
-if IS_PY3:
-    _AGENT_PROTOCOL_MARKER = bytes(
-        _AGENT_PROTOCOL_MARKER, _AGENT_PROTOCOL_ENCODING
-    )
-    _AGENT_HEADER_MARKER = bytes(_AGENT_HEADER_MARKER, _AGENT_PROTOCOL_ENCODING)
-
 __all__ = [
-    'BlackfireRequest', 'BlackfireResponse', 'get_traces', 'clear_traces',
-    'is_enabled', 'enable', 'end', 'reset', 'disable', 'run', 'initialize'
+    'get_traces', 'clear_traces', 'is_enabled', 'enable', 'end', 'reset',
+    'disable', 'run', 'initialize'
 ]
 
 
@@ -85,329 +72,6 @@ def _get_signing_response(
     if isinstance(result, bytes):
         result = result.decode("ascii")
     return json.loads(result)
-
-
-class _AgentConnection(object):
-
-    def __init__(self, config):
-
-        self.config = config
-        self._closed = False
-        self.agent_response = None
-
-        # parse & init sock params
-        sock_parsed = urlparse(self.config.agent_socket)
-        if sock_parsed.scheme == "unix":
-            family = socket.AF_UNIX
-            self._sock_addr = sock_parsed.path
-        elif sock_parsed.scheme == "tcp":
-            # TODO: Old probe used AF_UNSPEC here to support IPv6?
-            family = socket.AF_INET
-            host, port = sock_parsed.netloc.split(':')
-            self._sock_addr = (
-                host,
-                int(port),
-            )
-        else:
-            raise BlackfireApiException(
-                "Unsupported socket type. [%s]" % (sock_parsed.scheme)
-            )
-
-        # init the real socket
-        self._socket = socket.socket(family, socket.SOCK_STREAM)
-        self._socket.settimeout(self.config.agent_timeout)
-
-        # it is advised to disable NAGLE algorithm
-        try:
-            self._socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-        except Exception as e:
-            log.warning(
-                "Error happened while disabling NODELAY option. [%s]", e
-            )
-
-    def __del__(self):
-        try:
-            self.close()
-        except:
-            pass
-
-    def connect(self):
-        log.debug("Connecting to agent at %s." % str(self._sock_addr))
-        try:
-            self._socket.connect(self._sock_addr)
-        except Exception as e:
-            raise BlackfireApiException(
-                'Agent connection failed.[%s][%s]' %
-                (e, self.config.agent_socket)
-            )
-
-        self._write_prolog()
-
-    def close(self):
-        if self._closed:
-            return
-
-        self._socket.close()
-        self._closed = True
-
-        log.debug("Agent connection closed.")
-
-    def send(self, data):
-        # Agent expects data is written in chunks
-        try:
-            while (data):
-                self._socket.sendall(data[:_AGENT_PROTOCOL_MAX_SEND_SIZE])
-                data = data[_AGENT_PROTOCOL_MAX_SEND_SIZE:]
-        except Exception as e:
-            raise BlackfireApiException(
-                'Agent send data failed.[%s][%s]' % (e, data)
-            )
-
-    def recv(self, header_only=False):
-        global _AGENT_PROTOCOL_MARKER
-
-        result = ''
-        if IS_PY3:
-            result = bytes(result, _AGENT_PROTOCOL_ENCODING)
-
-        try:
-            while (True):
-                data = self._socket.recv(_AGENT_PROTOCOL_MAX_RECV_SIZE)
-                if not len(data):
-                    # other side indicated no more data will be sent
-                    raise Exception('Agent closed the connection.')
-                result += data
-
-                if header_only and result.endswith(_AGENT_HEADER_MARKER):
-                    break
-
-                if result.endswith(_AGENT_PROTOCOL_MARKER):
-                    break
-
-        except Exception as e:
-            raise BlackfireApiException('Agent recv data failed.[%s]' % (e))
-
-        return result
-
-    def _write_prolog(self):
-        blackfire_yml = bool(int(_config.args.get('flag_yml', '1')))
-        blackfire_yml_contents = None
-        if blackfire_yml:
-            bf_yaml_files = [".blackfire.yaml", ".blackfire.yml"]
-            for fpath in bf_yaml_files:
-                if os.path.exists(fpath):
-                    with open(fpath, "r") as f:
-                        blackfire_yml_contents = f.read()
-                        break
-
-        bf_probe_header = 'python-%s' % (sys.hexversion)
-
-        # recv timespan entries if timespan enabled
-        recv_timespan = bool(int(_config.args.get('flag_timespan', '0')))
-        if recv_timespan:
-            bf_probe_header += ', timespan'
-
-        # it is an expected situation to not have the bf_yaml file in place
-        # even it is defined as a flag
-        if blackfire_yml_contents:
-            bf_probe_header += ', blackfire_yml'
-
-        headers = {
-            'Blackfire-Query':
-            '%s&signature=%s&%s' % (
-                self.config.challenge,
-                self.config.signature,
-                self.config.args_raw,
-            ),
-            'Blackfire-Probe':
-            bf_probe_header,
-        }
-
-        # add Blackfire-Auth header if server_id/server_token are defined as
-        # env. vars
-        bf_server_id = os.environ.get('BLACKFIRE_SERVER_ID')
-        bf_server_token = os.environ.get('BLACKFIRE_SERVER_TOKEN')
-        if bf_server_id and bf_server_token:
-            headers['Blackfire-Auth'
-                    ] = '%s:%s' % (bf_server_id, bf_server_token)
-
-        hello_req = BlackfireRequest(headers=headers)
-        self.send(hello_req.to_bytes())
-
-        log.debug("SEND hello_req ('%s')", hello_req.to_bytes())
-
-        response_raw = self.recv(header_only=bool(blackfire_yml_contents))
-        self.agent_response = BlackfireResponse().from_bytes(response_raw)
-        if self.agent_response.status_code != BlackfireResponse.StatusCode.OK:
-            raise BlackfireApiException(
-                'Invalid response received from Agent. [%s]' %
-                (self.agent_response)
-            )
-
-        log.debug("RECV hello_req response. ('%s')", self.agent_response)
-
-        if self.agent_response.status_val_dict.get('blackfire_yml') == 'true':
-            blackfire_yml_req = BlackfireRequest(
-                headers={'Blackfire-Yaml-Size': len(blackfire_yml_contents)},
-                data=blackfire_yml_contents,
-            )
-            self.send(blackfire_yml_req.to_bytes())
-
-            log.debug(
-                "SEND blackfire_yml_req ('%s')", blackfire_yml_req.to_bytes()
-            )
-
-            # as we send blackfire_yml back, the first agent_response should include
-            # some extra params that might be changed with blackfire_yml file.
-            # e.x: fn-args, timespan entries, metric defs.
-            response_raw = self.recv()
-            blackfire_yml_response = BlackfireResponse(
-            ).from_bytes(response_raw)
-            if blackfire_yml_response.status_code != BlackfireResponse.StatusCode.OK:
-                raise BlackfireApiException(
-                    'Invalid response received from Agent to blackfire_yml request. [%s]'
-                    % (blackfire_yml_response)
-                )
-
-            # TODO: Can there be more data to merge other than args?
-            self.agent_response.args.update(blackfire_yml_response.args)
-
-            log.debug(
-                "RECV blackfire_yml_req response. ('%s')",
-                blackfire_yml_response.to_bytes()
-            )
-
-
-class BlackfireMessage(object):
-
-    def to_bytes(self):
-        pass
-
-    def save(self, path):
-        with open(path, "wb") as f:
-            f.write(self.to_bytes())
-
-
-class BlackfireRequest(BlackfireMessage):
-
-    __slots__ = 'headers', 'data'
-
-    def __init__(self, headers=None, data=None):
-        if not headers:
-            headers = {}
-        self.headers = headers
-        self.data = data
-
-    def to_bytes(self):
-        result = ''
-        for k, v in self.headers.items():
-            result += '%s: %s\n' % (k, v)
-        if len(self.headers):
-            result += '\n'  # add header marker
-        if self.data:
-            result += str(self.data)
-
-        if IS_PY3:
-            result = bytes(result, _AGENT_PROTOCOL_ENCODING)
-        return result
-
-    def from_bytes(self, data):
-        data = data.decode(_AGENT_PROTOCOL_ENCODING)
-        dsp = data.split(
-            _AGENT_PROTOCOL_MARKER.decode(_AGENT_PROTOCOL_ENCODING)
-        )
-        header_lines = []
-        if len(dsp) == 3:
-            header_lines = dsp[0]
-            self.data = dsp[1] + '\n' + dsp[2]  # timespan + trace?
-        elif len(dsp) == 2:
-            header_lines, self.data = dsp
-        elif len(dsp) == 1:
-            header_lines = dsp[0]
-        else:
-            raise BlackfireApiException(
-                'Invalid BlackfireRequest message. [%s]' % (data)
-            )
-
-        header_lines = header_lines.split('\n')
-        for line in header_lines:
-            spos = line.find(':')
-            if spos > -1:
-                self.headers[line[:spos].strip()] = line[spos + 1:].strip()
-        return self
-
-    def pretty_print(self):
-        container_dict = {"headers": self.headers, "data": self.data}
-        print(json.dumps(container_dict, indent=4))
-
-
-class BlackfireResponse(BlackfireMessage):
-
-    # TODO: Do this later
-    #__slots__ = 'status_code', 'raw_data', 'err_reason', 'args', 'args_raw'
-
-    class StatusCode:
-        OK = 0
-        ERR = 1
-
-    def __init__(self):
-        self.status_code = BlackfireResponse.StatusCode.OK
-        self.status_val = None
-        self.raw_data = None
-        self.args = defaultdict(list)
-
-    def from_bytes(self, data):
-        if IS_PY3:
-            data = data.decode(_AGENT_PROTOCOL_ENCODING)
-        self.status_code = BlackfireResponse.StatusCode.OK
-        self.raw_data = data.strip()
-
-        lines = self.raw_data.split('\n')
-
-        # first line is the status line
-        resp_type, resp_val = lines[0].split(':')
-        resp_type = resp_type.strip()
-        self.status_val = resp_val.strip()
-        self.status_val_dict = dict(parse_qsl(self.status_val))
-        if resp_type == 'Blackfire-Error':
-            self.status_code = BlackfireResponse.StatusCode.ERR
-
-        for line in lines[1:]:
-            resp_key, resp_val = line.split(':')
-            resp_key = resp_key.strip()
-            resp_val = resp_val.strip()
-
-            # there are arguments which occur multiple times with different
-            # values (e.g: fn-args)
-            self.args[resp_key].append(resp_val)
-
-        return self
-
-    def to_bytes(self):
-        result = ''
-
-        # add the status line
-        if self.status_code == BlackfireResponse.StatusCode.ERR:
-            result += 'Blackfire-Error: '
-        elif self.status_code == BlackfireResponse.StatusCode.OK:
-            result += 'Blackfire-Response: '
-        result += self.status_val
-
-        # add .args
-        if len(self.args) > 0:
-            result += '\n'
-        for arg_key, arg_values in self.args.items():
-            for arg_val in arg_values:
-                result += '%s: %s\n' % (arg_key, arg_val)
-
-        if IS_PY3:
-            result = bytes(result, _AGENT_PROTOCOL_ENCODING)
-        return result
-
-    def __repr__(self):
-        return "status_code=%s, args=%s, status_val=%s" % (
-            self.status_code, self.args, self.status_val
-        )
 
 
 def get_traces(omit_sys_path_dirs=_DEFAULT_OMIT_SYS_PATH):
@@ -448,7 +112,7 @@ def generate_subprofile_query():
 
     s = ''.join(chr(random.randint(0, 255)) for _ in range(7))
     if IS_PY3:
-        s = bytes(s, _AGENT_PROTOCOL_ENCODING)
+        s = bytes(s, agent.Protocol.ENCODING)
     sid = base64.b64encode(s)
     sid = sid.decode("ascii")
     sid = sid.rstrip('=')
@@ -613,7 +277,7 @@ def enable(end_at_exit=False):
 
     if not _agent_conn:
         try:
-            _agent_conn = _AgentConnection(_config)
+            _agent_conn = agent.Connection(_config)
             _agent_conn.connect()
         except Exception as e:
             _agent_conn = None
@@ -742,7 +406,7 @@ def end(headers={}, omit_sys_path_dirs=_DEFAULT_OMIT_SYS_PATH):
         context_dict.update(end_headers['Context'])
     end_headers['Context'] = urlencode(context_dict, doseq=True)
 
-    profile_data_req = BlackfireRequest(headers=end_headers, data=traces)
+    profile_data_req = agent.BlackfireRequest(headers=end_headers, data=traces)
     _agent_conn.send(profile_data_req.to_bytes())
 
     _agent_conn.close()
