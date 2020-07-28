@@ -13,7 +13,7 @@ from blackfire import profiler, VERSION, agent, generate_config, DEFAULT_CONFIG_
 from blackfire.utils import SysHooks, IS_PY3, get_home_dir, ConfigParser, \
     urlparse, urljoin, urlencode, get_load_avg, get_logger, quote, \
     parse_qsl, Request, urlopen, json_prettify, get_probed_runtime
-from blackfire.exceptions import *
+from blackfire.exceptions import BlackfireApiException
 from blackfire import BlackfireConfiguration
 
 log = get_logger(__name__)

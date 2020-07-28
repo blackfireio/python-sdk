@@ -1,6 +1,3 @@
-# from blackfire.utils import SysHooks, IS_PY3, get_home_dir, ConfigParser, \
-#     urlparse, urljoin, urlencode, get_load_avg, get_logger, quote, \
-#     parse_qsl, Request, urlopen, json_prettify, get_probed_runtime
 import socket
 import os
 import sys
