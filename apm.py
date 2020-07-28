@@ -19,9 +19,11 @@ class ApmConfig(object):
 
 # init shared configuration from the C extension, this data will persist among
 # different interpreters in the same process
-
 _apm_config = None
+
+# init config for the APM for communicating with the Agent
 _apm_probe_config = None
+
 log = get_logger(__name__)
 
 
