@@ -9,7 +9,7 @@ import logging
 import base64
 import random
 from contextlib import contextmanager
-from blackfire import profiler, VERSION, agent, generate_config
+from blackfire import profiler, VERSION, agent, generate_config, DEFAULT_CONFIG_FILE
 from blackfire.utils import SysHooks, IS_PY3, get_home_dir, ConfigParser, \
     urlparse, urljoin, urlencode, get_load_avg, get_logger, quote, \
     parse_qsl, Request, urlopen, json_prettify, get_probed_runtime
@@ -97,7 +97,7 @@ def initialize(
     endpoint=None,
     log_file=None,
     log_level=None,
-    config_file=None,
+    config_file=DEFAULT_CONFIG_FILE,
     _method="manual",
 ):
     global _config, log

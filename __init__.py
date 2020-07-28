@@ -43,7 +43,7 @@ __version__ = VERSION
 _DEFAULT_AGENT_TIMEOUT = 0.25
 _DEFAULT_AGENT_SOCKET = _get_default_agent_socket()
 _DEFAULT_ENDPOINT = 'https://blackfire.io/'
-_DEFAULT_CONFIG_FILE = os.path.join(get_home_dir(), '.blackfire.ini')
+DEFAULT_CONFIG_FILE = os.path.join(get_home_dir(), '.blackfire.ini')
 
 log = get_logger("blackfire.init")
 
@@ -239,7 +239,7 @@ def generate_config(
     endpoint=None,
     log_file=None,
     log_level=None,
-    config_file=_DEFAULT_CONFIG_FILE,
+    config_file=DEFAULT_CONFIG_FILE,
 ):
     agent_socket = agent_socket or os.environ.get(
         'BLACKFIRE_AGENT_SOCKET', _DEFAULT_AGENT_SOCKET
