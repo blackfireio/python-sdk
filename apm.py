@@ -3,6 +3,7 @@ import os
 import _blackfire_profiler as _bfext
 from blackfire.utils import get_logger, IS_PY3, json_prettify
 from blackfire import agent, DEFAULT_AGENT_SOCKET, DEFAULT_AGENT_TIMEOUT
+from multiprocessing.pool import ThreadPool
 
 
 class ApmConfig(object):
@@ -31,6 +32,8 @@ class ApmProbeConfig(object):
 _apm_config = None
 # init config for the APM for communicating with the Agent
 _apm_probe_config = None
+_thread_pool = ThreadPool()
+
 log = get_logger(__name__)
 
 
@@ -43,9 +46,10 @@ def initialize():
     )
 
     log.debug(
-        "APM Configuration initialized. [%s] [%s]",
+        "APM Configuration initialized. [%s] [%s] [%s]",
         json_prettify(_apm_config.__dict__),
-        json_prettify(_apm_probe_config.__dict__)
+        json_prettify(_apm_probe_config.__dict__),
+        os.getpid(),
     )
 
 
@@ -61,28 +65,32 @@ def trigger_extended_trace():
     return _apm_config.extended_sample_rate >= random.random()
 
 
-def send_trace(request, **kwargs):
-
-    data = """file-format: BlackfireApm
-        sample-rate:{}
-    """.format(_apm_config.sample_rate)
-
+def _send_trace_async(data):
     agent_conn = agent.Connection(
         _apm_probe_config.agent_socket, _apm_probe_config.agent_timeout
     )
     try:
         agent_conn.connect()
-
-        for k, v in kwargs.items():
-            data += "%s: %s\n" % (k, v)
-        data += "\n"
-
-        if IS_PY3:
-            data = bytes(data, 'ascii')
-
         agent_conn.send(data)
     finally:
         agent_conn.close()
+
+
+def send_trace(request, **kwargs):
+
+    data = """file-format: BlackfireApm
+        sample-rate:{}
+    """.format(_apm_config.sample_rate)
+    for k, v in kwargs.items():
+        data += "%s: %s\n" % (k, v)
+    data += "\n"
+
+    if IS_PY3:
+        data = bytes(data, 'ascii')
+
+    # We should not have a blocking call in APM path. Do agent connection setup
+    # socket send in a separate thread.
+    _thread_pool.apply_async(_send_trace_async, args=(data, ))
 
 
 def send_extended_trace(request, **kwargs):
