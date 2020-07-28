@@ -69,7 +69,7 @@ class Connection(object):
         except:
             pass
 
-    def connect(self):
+    def connect(self, prolog=True):
         log.debug("Connecting to agent at %s." % str(self._sock_addr))
         try:
             self._socket.connect(self._sock_addr)
@@ -79,7 +79,8 @@ class Connection(object):
                 (e, self.config.agent_socket)
             )
 
-        self._write_prolog()
+        if prolog:
+            self._write_prolog()
 
     def close(self):
         if self._closed:

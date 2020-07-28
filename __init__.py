@@ -5,41 +5,104 @@ import sys
 import traceback
 import logging
 import atexit
+import json
+import base64
 import importlib
+import platform
 from blackfire.utils import *
 from blackfire import profiler
+from blackfire.exceptions import BlackfireApiException
 from distutils.sysconfig import get_python_lib
 
 __all__ = [
-    'BlackfireConfiguration', 'VERSION', 'process_bootstrap', 'patch_all',
-    'profile'
+    'BlackfireConfiguration',
+    'VERSION',
+    'process_bootstrap',
+    'patch_all',
+    'profile',
+    'generate_config',
 ]
 
 ext_dir = os.path.dirname(os.path.abspath(__file__))
 with io.open(os.path.join(ext_dir, 'VERSION')) as f:
     VERSION = f.read().strip()
 
+
+def _get_default_agent_socket():
+    plat = platform.system()
+    if plat == 'Windows':
+        return 'tcp://127.0.0.1:8307'
+    elif plat == 'Darwin':
+        return 'unix:///usr/local/var/run/blackfire-agent.sock'
+    else:
+        return 'unix:///var/run/blackfire/agent.sock'
+
+
 # conform with optional pep: PEP396
 __version__ = VERSION
+_DEFAULT_AGENT_TIMEOUT = 0.25
+_DEFAULT_AGENT_SOCKET = _get_default_agent_socket()
+_DEFAULT_ENDPOINT = 'https://blackfire.io/'
+_DEFAULT_CONFIG_FILE = os.path.join(get_home_dir(), '.blackfire.ini')
 
 log = get_logger("blackfire.init")
 
 
-# This code monkey patches Django and Flask frameworks if installed.
-# This code should be the first to run before any import is made.
-def patch_all():
-    PATCH_MODULES = ['django', 'flask']
+class BlackfireConfiguration(object):
 
-    patched_modules = []
-    for mod_name in PATCH_MODULES:
-        module = importlib.import_module(
-            'blackfire.hooks.%s.patch' % (mod_name)
+    def __init__(self, query, **kwargs):
+        """
+        query: is the BLACKFIRE_QUERY url encoded string that contains the signed params
+        signature ...etc.
+        """
+
+        for k, v in kwargs.items():
+            setattr(self, k, v)
+
+        matches = re.split('(?:^|&)signature=(.+?)(?:&|$)', query, 2)
+
+        self.challenge = matches[0]
+        self.signature = matches[1]
+        self.args_raw = matches[2]
+
+        self.args = dict(parse_qsl(self.args_raw))
+
+    def __getattribute__(self, name):
+        value = None
+        try:
+            value = object.__getattribute__(self, name)
+        except AttributeError:
+            raise AttributeError(
+                'BlackfireConfiguration object has no attribute=%s.' % (name)
+            )
+
+        return value
+
+
+def _get_signing_response(
+    signing_endpoint, client_id, client_token, urlopen=urlopen
+):
+    _SIGNING_API_TIMEOUT = 5.0
+
+    request = Request(signing_endpoint)
+    auth_hdr = '%s:%s' % (client_id, client_token)
+    if IS_PY3:
+        auth_hdr = bytes(auth_hdr, 'ascii')
+    base64string = base64.b64encode(auth_hdr)
+    if IS_PY3:
+        base64string = base64string.decode("ascii")
+    request.add_header("Authorization", "Basic %s" % base64string)
+    result = urlopen(request, timeout=_SIGNING_API_TIMEOUT)
+    if not (200 <= result.code < 400):
+        raise BlackfireApiException(
+            'Signing request failed for manual profiling. [%s]' % (result.code)
         )
-        r = module.patch()
-        if r:
-            patched_modules.append(mod_name)
-
-    log.info("Patched modules=%s", patched_modules)
+    result = result.read()
+    # python 3.5 does not accept bytes for json loads so always convert
+    # response to string
+    if isinstance(result, bytes):
+        result = result.decode("ascii")
+    return json.loads(result)
 
 
 def _stop_at_exit():
@@ -132,35 +195,21 @@ def process_bootstrap():
             traceback.print_exc()
 
 
-class BlackfireConfiguration(object):
+# This code monkey patches Django and Flask frameworks if installed.
+# This code should be the first to run before any import is made.
+def patch_all():
+    PATCH_MODULES = ['django', 'flask']
 
-    def __init__(self, query, **kwargs):
-        """
-        query: is the BLACKFIRE_QUERY url encoded string that contains the signed params
-        signature ...etc.
-        """
+    patched_modules = []
+    for mod_name in PATCH_MODULES:
+        module = importlib.import_module(
+            'blackfire.hooks.%s.patch' % (mod_name)
+        )
+        r = module.patch()
+        if r:
+            patched_modules.append(mod_name)
 
-        for k, v in kwargs.items():
-            setattr(self, k, v)
-
-        matches = re.split('(?:^|&)signature=(.+?)(?:&|$)', query, 2)
-
-        self.challenge = matches[0]
-        self.signature = matches[1]
-        self.args_raw = matches[2]
-
-        self.args = dict(parse_qsl(self.args_raw))
-
-    def __getattribute__(self, name):
-        value = None
-        try:
-            value = object.__getattribute__(self, name)
-        except AttributeError:
-            raise AttributeError(
-                'BlackfireConfiguration object has no attribute=%s.' % (name)
-            )
-
-        return value
+    log.info("Patched modules=%s", patched_modules)
 
 
 def profile(client_id=None, client_token=None):
@@ -179,3 +228,85 @@ def profile(client_id=None, client_token=None):
         return wrapper
 
     return inner_func
+
+
+def generate_config(
+    query=None,
+    client_id=None,
+    client_token=None,
+    agent_socket=None,
+    agent_timeout=None,
+    endpoint=None,
+    log_file=None,
+    log_level=None,
+    config_file=_DEFAULT_CONFIG_FILE,
+):
+    agent_socket = agent_socket or os.environ.get(
+        'BLACKFIRE_AGENT_SOCKET', _DEFAULT_AGENT_SOCKET
+    )
+    agent_timeout = agent_timeout or os.environ.get(
+        'BLACKFIRE_AGENT_TIMEOUT', _DEFAULT_AGENT_TIMEOUT
+    )
+    endpoint = endpoint or os.environ.get(
+        'BLACKFIRE_ENDPOINT', _DEFAULT_ENDPOINT
+    )
+    agent_timeout = float(agent_timeout)
+
+    # manual profiling?
+    if query is None:
+
+        c_client_id = c_client_token = None
+
+        # read config params from config file
+        if os.path.exists(config_file):
+            config = ConfigParser()
+            config.read(config_file)
+            if 'blackfire' in config.sections():
+                bf_section = dict(config.items('blackfire'))
+
+                c_client_id = bf_section.get('client-id', '').strip()
+                c_client_token = bf_section.get('client-token', '').strip()
+
+        # read config params from Env. vars, these have precedence
+        c_client_id = os.environ.get('BLACKFIRE_CLIENT_ID', c_client_id)
+        c_client_token = os.environ.get(
+            'BLACKFIRE_CLIENT_TOKEN', c_client_token
+        )
+
+        # now read from the params, these have more precedence, if everything fails
+        # use default ones wherever appropriate
+        client_id = client_id or c_client_id
+        client_token = client_token or c_client_token
+
+        # if we still not have client_id or token by here
+        if (not client_id or not client_token):
+            raise BlackfireApiException(
+                'No client id/token pair or query is provided '
+                'to initialize the probe.'
+            )
+
+        signing_endpoint = urljoin(endpoint, 'api/v1/signing')
+
+        # make a /signing request to server
+        resp_dict = _get_signing_response(
+            signing_endpoint, client_id, client_token
+        )
+
+        # tweak some options for manual profiling
+        resp_dict['options']['aggreg_samples'] = 1
+
+        # generate the query string from the signing req.
+        query = resp_dict['query_string'] + '&' + urlencode(
+            resp_dict['options']
+        )
+
+    return BlackfireConfiguration(
+        query,
+        agent_socket=agent_socket,
+        agent_timeout=agent_timeout,
+        client_id=client_id,
+        client_token=client_token,
+        endpoint=endpoint,
+        log_file=log_file,
+        log_level=log_level,
+    )

@@ -5,12 +5,11 @@ import time
 import atexit
 import platform
 import traceback
-import base64
 import logging
-import json
+import base64
 import random
 from contextlib import contextmanager
-from blackfire import profiler, VERSION, agent
+from blackfire import profiler, VERSION, agent, generate_config
 from blackfire.utils import SysHooks, IS_PY3, get_home_dir, ConfigParser, \
     urlparse, urljoin, urlencode, get_load_avg, get_logger, quote, \
     parse_qsl, Request, urlopen, json_prettify, get_probed_runtime
@@ -19,17 +18,6 @@ from blackfire import BlackfireConfiguration
 
 log = get_logger(__name__)
 
-
-def _get_default_agent_socket():
-    plat = platform.system()
-    if plat == 'Windows':
-        return 'tcp://127.0.0.1:8307'
-    elif plat == 'Darwin':
-        return 'unix:///usr/local/var/run/blackfire-agent.sock'
-    else:
-        return 'unix:///var/run/blackfire/agent.sock'
-
-
 # globals
 _config = None
 _enabled = False
@@ -37,42 +25,12 @@ _agent_conn = None
 _req_start = None
 
 _DEFAULT_OMIT_SYS_PATH = True
-_DEFAULT_ENDPOINT = 'https://blackfire.io/'
-_DEFAULT_CONFIG_FILE = os.path.join(get_home_dir(), '.blackfire.ini')
 _DEFAULT_PROFILE_TITLE = 'unnamed profile'
-_DEFAULT_AGENT_TIMEOUT = 0.25
-_DEFAULT_AGENT_SOCKET = _get_default_agent_socket()
 
 __all__ = [
     'get_traces', 'clear_traces', 'is_enabled', 'enable', 'end', 'reset',
     'disable', 'run', 'initialize'
 ]
-
-
-def _get_signing_response(
-    signing_endpoint, client_id, client_token, urlopen=urlopen
-):
-    _SIGNING_API_TIMEOUT = 5.0
-
-    request = Request(signing_endpoint)
-    auth_hdr = '%s:%s' % (client_id, client_token)
-    if IS_PY3:
-        auth_hdr = bytes(auth_hdr, 'ascii')
-    base64string = base64.b64encode(auth_hdr)
-    if IS_PY3:
-        base64string = base64string.decode("ascii")
-    request.add_header("Authorization", "Basic %s" % base64string)
-    result = urlopen(request, timeout=_SIGNING_API_TIMEOUT)
-    if not (200 <= result.code < 400):
-        raise BlackfireApiException(
-            'Signing request failed for manual profiling. [%s]' % (result.code)
-        )
-    result = result.read()
-    # python 3.5 does not accept bytes for json loads so always convert
-    # response to string
-    if isinstance(result, bytes):
-        result = result.decode("ascii")
-    return json.loads(result)
 
 
 def get_traces(omit_sys_path_dirs=_DEFAULT_OMIT_SYS_PATH):
@@ -139,7 +97,7 @@ def initialize(
     endpoint=None,
     log_file=None,
     log_level=None,
-    config_file=_DEFAULT_CONFIG_FILE,
+    config_file=None,
     _method="manual",
 ):
     global _config, log
@@ -152,76 +110,18 @@ def initialize(
             "These settings will be removed in the next version."
         )
 
-    agent_socket = agent_socket or os.environ.get(
-        'BLACKFIRE_AGENT_SOCKET', _DEFAULT_AGENT_SOCKET
-    )
-    agent_timeout = agent_timeout or os.environ.get(
-        'BLACKFIRE_AGENT_TIMEOUT', _DEFAULT_AGENT_TIMEOUT
-    )
-    endpoint = endpoint or os.environ.get(
-        'BLACKFIRE_ENDPOINT', _DEFAULT_ENDPOINT
-    )
-    agent_timeout = float(agent_timeout)
-
     log.debug("probe.initialize called. [method:'%s']", _method)
 
-    # manual profiling?
-    if query is None:
-
-        c_client_id = c_client_token = None
-
-        # read config params from config file
-        if os.path.exists(config_file):
-            config = ConfigParser()
-            config.read(config_file)
-            if 'blackfire' in config.sections():
-                bf_section = dict(config.items('blackfire'))
-
-                c_client_id = bf_section.get('client-id', '').strip()
-                c_client_token = bf_section.get('client-token', '').strip()
-
-        # read config params from Env. vars, these have precedence
-        c_client_id = os.environ.get('BLACKFIRE_CLIENT_ID', c_client_id)
-        c_client_token = os.environ.get(
-            'BLACKFIRE_CLIENT_TOKEN', c_client_token
-        )
-
-        # now read from the params, these have more precedence, if everything fails
-        # use default ones wherever appropriate
-        client_id = client_id or c_client_id
-        client_token = client_token or c_client_token
-
-        # if we still not have client_id or token by here
-        if (not client_id or not client_token):
-            raise BlackfireApiException(
-                'No client id/token pair or query is provided '
-                'to initialize the probe.'
-            )
-
-        signing_endpoint = urljoin(endpoint, 'api/v1/signing')
-
-        # make a /signing request to server
-        resp_dict = _get_signing_response(
-            signing_endpoint, client_id, client_token
-        )
-
-        # tweak some options for manual profiling
-        resp_dict['options']['aggreg_samples'] = 1
-
-        # generate the query string from the signing req.
-        query = resp_dict['query_string'] + '&' + urlencode(
-            resp_dict['options']
-        )
-
-    _config = BlackfireConfiguration(
+    _config = generate_config(
         query,
-        agent_socket=agent_socket,
-        agent_timeout=agent_timeout,
-        client_id=client_id,
-        client_token=client_token,
-        endpoint=endpoint,
-        log_file=log_file,
-        log_level=log_level,
+        client_id,
+        client_token,
+        agent_socket,
+        agent_timeout,
+        endpoint,
+        log_file,
+        log_level,
+        config_file,
     )
 
     log.debug(
