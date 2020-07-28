@@ -40,8 +40,8 @@ def _get_default_agent_socket():
 
 # conform with optional pep: PEP396
 __version__ = VERSION
-_DEFAULT_AGENT_TIMEOUT = 0.25
-_DEFAULT_AGENT_SOCKET = _get_default_agent_socket()
+DEFAULT_AGENT_TIMEOUT = 0.25
+DEFAULT_AGENT_SOCKET = _get_default_agent_socket()
 _DEFAULT_ENDPOINT = 'https://blackfire.io/'
 DEFAULT_CONFIG_FILE = os.path.join(get_home_dir(), '.blackfire.ini')
 
@@ -251,6 +251,8 @@ def generate_config(
         'BLACKFIRE_ENDPOINT', _DEFAULT_ENDPOINT
     )
     agent_timeout = float(agent_timeout)
+
+    log.debug("generate_config() called.")
 
     # manual profiling?
     if query is None:

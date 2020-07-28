@@ -24,14 +24,14 @@ class Protocol(object):
 
 class Connection(object):
 
-    def __init__(self, config):
-
-        self.config = config
+    def __init__(self, agent_socket, agent_timeout):
+        self.agent_socket = agent_socket
+        self.agent_timeout = agent_timeout
         self._closed = False
         self.agent_response = None
 
         # parse & init sock params
-        sock_parsed = urlparse(self.config.agent_socket)
+        sock_parsed = urlparse(self.agent_socket)
         if sock_parsed.scheme == "unix":
             family = socket.AF_UNIX
             self._sock_addr = sock_parsed.path
@@ -50,7 +50,7 @@ class Connection(object):
 
         # init the real socket
         self._socket = socket.socket(family, socket.SOCK_STREAM)
-        self._socket.settimeout(self.config.agent_timeout)
+        self._socket.settimeout(self.agent_timeout)
 
         # it is advised to disable NAGLE algorithm
         try:
@@ -66,18 +66,17 @@ class Connection(object):
         except:
             pass
 
-    def connect(self, prolog=True):
+    def connect(self, config=None):
         log.debug("Connecting to agent at %s." % str(self._sock_addr))
         try:
             self._socket.connect(self._sock_addr)
         except Exception as e:
             raise BlackfireApiException(
-                'Agent connection failed.[%s][%s]' %
-                (e, self.config.agent_socket)
+                'Agent connection failed.[%s][%s]' % (e, self.agent_socket)
             )
 
-        if prolog:
-            self._write_prolog()
+        if config:
+            self._write_prolog(config)
 
     def close(self):
         if self._closed:
@@ -123,8 +122,8 @@ class Connection(object):
 
         return result
 
-    def _write_prolog(self):
-        blackfire_yml = bool(int(self.config.args.get('flag_yml', '1')))
+    def _write_prolog(self, config):
+        blackfire_yml = bool(int(config.args.get('flag_yml', '1')))
         blackfire_yml_contents = None
         if blackfire_yml:
             bf_yaml_files = [".blackfire.yaml", ".blackfire.yml"]
@@ -137,7 +136,7 @@ class Connection(object):
         bf_probe_header = 'python-%s' % (sys.hexversion)
 
         # recv timespan entries if timespan enabled
-        recv_timespan = bool(int(self.config.args.get('flag_timespan', '0')))
+        recv_timespan = bool(int(config.args.get('flag_timespan', '0')))
         if recv_timespan:
             bf_probe_header += ', timespan'
 
@@ -149,9 +148,9 @@ class Connection(object):
         headers = {
             'Blackfire-Query':
             '%s&signature=%s&%s' % (
-                self.config.challenge,
-                self.config.signature,
-                self.config.args_raw,
+                config.challenge,
+                config.signature,
+                config.args_raw,
             ),
             'Blackfire-Probe':
             bf_probe_header,

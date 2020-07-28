@@ -125,7 +125,8 @@ def initialize(
     )
 
     log.debug(
-        "Configuration initialized. [%s]", json_prettify(_config.__dict__)
+        "Probe Configuration initialized. [%s]",
+        json_prettify(_config.__dict__)
     )
 
 
@@ -178,8 +179,10 @@ def enable(end_at_exit=False):
 
     if not _agent_conn:
         try:
-            _agent_conn = agent.Connection(_config)
-            _agent_conn.connect()
+            _agent_conn = agent.Connection(
+                _config.agent_socket, _config.agent_timeout
+            )
+            _agent_conn.connect(config=_config)
         except Exception as e:
             _agent_conn = None
             raise e  # re-raise

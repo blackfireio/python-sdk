@@ -57,6 +57,8 @@ class BlackfireDjangoMiddleware(object):
         if 'HTTP_X_BLACKFIRE_QUERY' in request.META:
             return self._profiled_request(request)
 
+        apm.initialize()
+
         # TODO: If key-page matches and profile: true then make a BlackfireApmRequestProfileQuery
         # to the agent and if we receive a signature call self._profiled_request()
 
@@ -68,7 +70,6 @@ class BlackfireDjangoMiddleware(object):
         return response
 
     def _apm_request(self, request):
-
         # TODO:
         #_ = apm.trigger_extended_trace()
 
