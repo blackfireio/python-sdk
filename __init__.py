@@ -242,10 +242,10 @@ def generate_config(
     config_file=DEFAULT_CONFIG_FILE,
 ):
     agent_socket = agent_socket or os.environ.get(
-        'BLACKFIRE_AGENT_SOCKET', _DEFAULT_AGENT_SOCKET
+        'BLACKFIRE_AGENT_SOCKET', DEFAULT_AGENT_SOCKET
     )
     agent_timeout = agent_timeout or os.environ.get(
-        'BLACKFIRE_AGENT_TIMEOUT', _DEFAULT_AGENT_TIMEOUT
+        'BLACKFIRE_AGENT_TIMEOUT', DEFAULT_AGENT_TIMEOUT
     )
     endpoint = endpoint or os.environ.get(
         'BLACKFIRE_ENDPOINT', _DEFAULT_ENDPOINT

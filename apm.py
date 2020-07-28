@@ -38,8 +38,6 @@ def initialize():
     global _apm_config, _apm_probe_config
 
     _apm_config = _bfext.get_or_set_ext_data("apm_config", ApmConfig())
-
-    # TODO: this makes a signing req. everytime, should be lazily evaluated somehow
     _apm_probe_config = _bfext.get_or_set_ext_data(
         "apm_probe_config", ApmProbeConfig()
     )
