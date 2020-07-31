@@ -1,8 +1,8 @@
 import random
 import os
 import _blackfire_profiler as _bfext
-from blackfire.utils import get_logger, IS_PY3, json_prettify, run_in_thread_pool
-from blackfire import agent, DEFAULT_AGENT_SOCKET, DEFAULT_AGENT_TIMEOUT
+from blackfire.utils import get_logger, IS_PY3, json_prettify, run_in_thread_pool, ConfigParser
+from blackfire import agent, DEFAULT_AGENT_SOCKET, DEFAULT_AGENT_TIMEOUT, DEFAULT_CONFIG_FILE
 from blackfire.exceptions import BlackfireAPMException
 
 
@@ -24,6 +24,21 @@ class ApmProbeConfig(object):
         )
         self.agent_timeout = os.environ.get(
             'BLACKFIRE_AGENT_TIMEOUT', DEFAULT_AGENT_TIMEOUT
+        )
+
+        # read APM_ENABLED config from env.var > file.
+        apm_enabled = 0
+        config_file = DEFAULT_CONFIG_FILE
+        if os.path.exists(config_file):
+            config = ConfigParser()
+            config.read(config_file)
+            if 'blackfire' in config.sections():
+                bf_section = dict(config.items('blackfire'))
+
+                apm_enabled = int(bf_section.get('apm_enabled', '0').strip())
+
+        self.apm_enabled = bool(
+            int(os.environ.get('BLACKFIRE_APM_ENABLED', apm_enabled))
         )
 
 
@@ -53,15 +68,17 @@ def initialize():
 
 
 def trigger_trace():
-    global _apm_config
+    global _apm_config, _apm_probe_config
 
-    return _apm_config.sample_rate >= random.random()
+    return _apm_probe_config.apm_enabled and \
+        _apm_config.sample_rate >= random.random()
 
 
 def trigger_extended_trace():
-    global _apm_config
+    global _apm_config, _apm_probe_config
 
-    return _apm_config.extended_sample_rate >= random.random()
+    return _apm_probe_config.apm_enabled and \
+        _apm_config.extended_sample_rate >= random.random()
 
 
 def _send_trace_async(data):
