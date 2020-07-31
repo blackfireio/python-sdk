@@ -185,8 +185,12 @@ def json_prettify(obj):
         return str(obj)
 
 
+def is_testing():
+    return 'BLACKFIRE_TESTING' in os.environ
+
+
 def run_in_thread_pool(fn, args):
-    if 'BLACKFIRE_TESTING' in os.environ:
+    if is_testing():
         _thread_pool.apply(fn, args=args)
     else:
         _thread_pool.apply_async(fn, args=args)

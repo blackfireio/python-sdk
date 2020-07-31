@@ -1,7 +1,7 @@
 import random
 import os
 import _blackfire_profiler as _bfext
-from blackfire.utils import get_logger, IS_PY3, json_prettify, run_in_thread_pool, ConfigParser
+from blackfire.utils import get_logger, IS_PY3, json_prettify, run_in_thread_pool, ConfigParser, is_testing
 from blackfire import agent, DEFAULT_AGENT_SOCKET, DEFAULT_AGENT_TIMEOUT, DEFAULT_CONFIG_FILE
 from blackfire.exceptions import BlackfireAPMException
 
@@ -130,9 +130,10 @@ def _send_trace_async(data):
             json_prettify(data),
         )
 
-    # TODO: rm comment
-    #except Exception as e:
-    #    log.error("APM message could not be sent. [reason:%s]" % (e))
+    except Exception as e:
+        if is_testing():
+            raise e
+        log.error("APM message could not be sent. [reason:%s]" % (e))
     finally:
         agent_conn.close()
 
