@@ -51,6 +51,13 @@ _apm_probe_config = None
 log = get_logger(__name__)
 
 
+def reset():
+    global _apm_config, _apm_probe_config
+
+    _bfext.del_ext_data("apm_config")
+    _bfext.del_ext_data("apm_probe_config")
+
+
 def initialize():
     global _apm_config, _apm_probe_config
 
