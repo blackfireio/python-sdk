@@ -3,6 +3,7 @@ import platform
 from blackfire import probe, apm, VERSION
 from blackfire.utils import get_logger, get_probed_runtime
 from blackfire.hooks.utils import try_enable_probe, try_end_probe, add_probe_response_header, reset_probe
+from blackfire.hooks.django.utils import get_current_view_name
 
 log = get_logger(__name__)
 
@@ -80,6 +81,7 @@ class BlackfireDjangoMiddleware(object):
             now = time.time()
             apm.send_trace(
                 request,
+                controller_name=get_current_view_name(request),
                 wt=now - t0,
                 timestamp=now,
                 uri=request.path,

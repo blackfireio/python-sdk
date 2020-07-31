@@ -5,6 +5,7 @@ import traceback
 import logging
 import platform
 import importlib
+from multiprocessing.pool import ThreadPool
 
 IS_PY3 = sys.version_info > (3, 0)
 
@@ -22,6 +23,7 @@ else:
 
 _DEFAULT_LOG_LEVEL = 2
 _DEFAULT_LOG_FILE = 'python-probe.log'
+_thread_pool = ThreadPool()
 
 
 def import_module(mod_name):
@@ -181,3 +183,10 @@ def json_prettify(obj):
         return json.dumps(obj, indent=4, cls=_JsonSetEncoder)
     except:
         return str(obj)
+
+
+def run_in_thread_pool(fn, args):
+    if 'BLACKFIRE_TESTING' in os.environ:
+        _thread_pool.apply(fn, args=args)
+    else:
+        _thread_pool.apply_async(fn, args=args)

@@ -4,3 +4,7 @@ class BlackfireApiException(Exception):
 
 class BlackfireProfilerException(Exception):
     pass
+
+
+class BlackfireAPMException(Exception):
+    pass
