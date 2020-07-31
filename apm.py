@@ -79,6 +79,28 @@ def _send_trace_async(data):
         if 'false' in agent_resp.status_val_dict['success']:
             raise BlackfireAPMException(agent_resp.status_val_dict['error'])
 
+        # Update config if any configuration update received
+        if len(agent_resp.args) or len(agent_resp.key_pages):
+            new_apm_config = ApmConfig()
+            try:
+                new_apm_config.sample_rate = float(
+                    agent_resp.args['sample-rate'][0]
+                )
+            except:
+                pass
+            try:
+                new_apm_config.extended_sample_rate = float(
+                    agent_resp.args['extended-sample-rate'][0]
+                )
+            except:
+                pass
+
+            new_apm_config.key_pages = tuple(agent_resp.key_pages)
+
+            # update the process-wise global apm configuration. Once this is set
+            # the new HTTP requests making initialize() will get this new config
+            _bfext.set_ext_data("apm_config", new_apm_config)
+
         log.debug(
             "APM trace sent. [%s]",
             json_prettify(data),

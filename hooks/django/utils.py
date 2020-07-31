@@ -1,5 +1,14 @@
 def get_current_view_name(request):
-    from django.urls import resolve
+    try:
+        from django.urls import resolve
+    except:
+        pass
+
+    # 1.8 and below
+    try:
+        from django.core.urlresolvers import resolve
+    except:
+        pass
 
     try:
         return resolve(request.path).view_name

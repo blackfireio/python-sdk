@@ -286,6 +286,7 @@ class BlackfireResponse(BlackfireMessage):
         self.status_val = None
         self.raw_data = None
         self.args = defaultdict(list)
+        self.key_pages = []
 
     def from_bytes(self, data):
         if IS_PY3:
@@ -303,14 +304,30 @@ class BlackfireResponse(BlackfireMessage):
         if resp_type == 'Blackfire-Error':
             self.status_code = BlackfireResponse.StatusCode.ERR
 
+        key_page = None
         for line in lines[1:]:
-            resp_key, resp_val = line.split(':')
+            line = line.strip()
+            # every key-page entry starts with `key-page(` and endswith `)`
+            if line.startswith('key-page('):
+                key_page = {}
+                continue
+            elif line.startswith(')'):
+                self.key_pages.append(key_page)
+                key_page = None
+                continue
+
+            # split only first occurrence
+            resp_key, resp_val = line.split(':', 1)
             resp_key = resp_key.strip()
             resp_val = resp_val.strip()
 
-            # there are arguments which occur multiple times with different
-            # values (e.g: fn-args)
-            self.args[resp_key].append(resp_val)
+            # are we parsing a key-page entry?
+            if key_page is not None:
+                key_page[resp_key] = resp_val
+            else:
+                # there are arguments which occur multiple times with different
+                # values (e.g: fn-args)
+                self.args[resp_key].append(resp_val)
 
         return self
 
