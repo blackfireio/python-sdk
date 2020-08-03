@@ -140,7 +140,7 @@ def _send_trace_async(data):
 
 def send_trace(request, **kwargs):
     data = """file-format: BlackfireApm
-        sample-rate:{}
+        sample-rate: {}
     """.format(_apm_config.sample_rate)
     for k, v in kwargs.items():
         if v:
