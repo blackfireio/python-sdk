@@ -99,7 +99,7 @@ def _send_trace_async(data):
 
         # verify agent responds success
         response_raw = agent_conn.recv()
-        agent_resp = agent.BlackfireResponse().from_bytes(response_raw)
+        agent_resp = agent.BlackfireAPMResponse().from_bytes(response_raw)
         if 'false' in agent_resp.status_val_dict['success']:
             raise BlackfireAPMException(agent_resp.status_val_dict['error'])
 

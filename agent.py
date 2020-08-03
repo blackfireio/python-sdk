@@ -272,26 +272,15 @@ class BlackfireRequest(BlackfireMessage):
         print(json.dumps(container_dict, indent=4))
 
 
-class BlackfireResponse(BlackfireMessage):
-
-    # TODO: Do this later
-    #__slots__ = 'status_code', 'raw_data', 'err_reason', 'args', 'args_raw'
-
-    class StatusCode:
-        OK = 0
-        ERR = 1
+class BlackfireAPMResponse(BlackfireMessage):
 
     def __init__(self):
-        self.status_code = BlackfireResponse.StatusCode.OK
-        self.status_val = None
-        self.raw_data = None
         self.args = defaultdict(list)
         self.key_pages = []
 
     def from_bytes(self, data):
         if IS_PY3:
             data = data.decode(Protocol.ENCODING)
-        self.status_code = BlackfireResponse.StatusCode.OK
         self.raw_data = data.strip()
 
         lines = self.raw_data.split('\n')
@@ -301,8 +290,6 @@ class BlackfireResponse(BlackfireMessage):
         resp_type = resp_type.strip()
         self.status_val = resp_val.strip()
         self.status_val_dict = dict(parse_qsl(self.status_val))
-        if resp_type == 'Blackfire-Error':
-            self.status_code = BlackfireResponse.StatusCode.ERR
 
         key_page = None
         for line in lines[1:]:
@@ -327,7 +314,56 @@ class BlackfireResponse(BlackfireMessage):
             else:
                 # there are arguments which occur multiple times with different
                 # values (e.g: fn-args)
+                # e.g:
+                # timespan: =mysql_connect
+                # timespan: =mysql_query
+                # timespan: ^PDO::
+                # fn-args: file_get_contents 1,2
+                # fn-args: PDO::query 1
                 self.args[resp_key].append(resp_val)
+
+        return self
+
+
+class BlackfireResponse(BlackfireMessage):
+
+    # TODO: Do this later
+    #__slots__ = 'status_code', 'raw_data', 'err_reason', 'args', 'args_raw'
+
+    class StatusCode:
+        OK = 0
+        ERR = 1
+
+    def __init__(self):
+        self.status_code = BlackfireResponse.StatusCode.OK
+        self.status_val = None
+        self.raw_data = None
+        self.args = defaultdict(list)
+
+    def from_bytes(self, data):
+        if IS_PY3:
+            data = data.decode(Protocol.ENCODING)
+        self.status_code = BlackfireResponse.StatusCode.OK
+        self.raw_data = data.strip()
+
+        lines = self.raw_data.split('\n')
+
+        # first line is the status line
+        resp_type, resp_val = lines[0].split(':')
+        resp_type = resp_type.strip()
+        self.status_val = resp_val.strip()
+        self.status_val_dict = dict(parse_qsl(self.status_val))
+        if resp_type == 'Blackfire-Error':
+            self.status_code = BlackfireResponse.StatusCode.ERR
+
+        for line in lines[1:]:
+            resp_key, resp_val = line.split(':')
+            resp_key = resp_key.strip()
+            resp_val = resp_val.strip()
+
+            # there are arguments which occur multiple times with different
+            # values (e.g: fn-args)
+            self.args[resp_key].append(resp_val)
 
         return self
 
