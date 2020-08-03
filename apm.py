@@ -26,20 +26,9 @@ class ApmProbeConfig(object):
             'BLACKFIRE_AGENT_TIMEOUT', DEFAULT_AGENT_TIMEOUT
         )
 
-        # read APM_ENABLED config from env.var > file.
-        apm_enabled = 0
-        config_file = DEFAULT_CONFIG_FILE
-        if os.path.exists(config_file):
-            config = ConfigParser()
-            config.read(config_file)
-            if 'blackfire' in config.sections():
-                bf_section = dict(config.items('blackfire'))
-
-                apm_enabled = int(bf_section.get('apm_enabled', '0').strip())
-
-        self.apm_enabled = bool(
-            int(os.environ.get('BLACKFIRE_APM_ENABLED', apm_enabled))
-        )
+        # read APM_ENABLED config from env.var.
+        # TODO: Config file initialization will be done later
+        self.apm_enabled = bool(int(os.environ.get('BLACKFIRE_APM_ENABLED', 0)))
 
 
 # init shared configuration from the C extension, this data will persist among
