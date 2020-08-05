@@ -191,8 +191,6 @@ def send_trace(request, **kwargs):
     # add final marker
     data += "\n"
 
-    print(data)
-
     if IS_PY3:
         data = bytes(data, 'ascii')
 
