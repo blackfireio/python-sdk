@@ -1,9 +1,43 @@
 import random
 import os
+import psutil
+import logging
+import time
 import _blackfire_profiler as _bfext
 from blackfire.utils import get_logger, IS_PY3, json_prettify, run_in_thread_pool, ConfigParser, is_testing
 from blackfire import agent, DEFAULT_AGENT_SOCKET, DEFAULT_AGENT_TIMEOUT, DEFAULT_CONFIG_FILE
 from blackfire.exceptions import BlackfireAPMException
+
+
+class RuntimeMetrics(object):
+
+    CACHE_INTERVAL = 1.0
+
+    def __init__(self):
+        self._last_collected = 0
+        self._cache = {}
+
+    def memory(self):
+        if time.time() - self._last_collected <= self.CACHE_INTERVAL:
+            return self._cache["memory"]
+
+        usage = peak_usage = 0
+
+        mem_info = psutil.Process().memory_info()
+        usage = mem_info.rss  # this is platform independent
+        if os.name == 'nt':
+            # psutil uses GetProcessMemoryInfo API to get PeakWorkingSet
+            # counter. It is in bytes.
+            peak_usage = mem_info.peak_wset
+        else:
+            import resource
+            peak_usage = resource.getrusage(
+                resource.RUSAGE_SELF
+            ).ru_maxrss * 1024
+
+        result = (usage, peak_usage)
+        self._cache["memory"] = result
+        return result
 
 
 class ApmConfig(object):
@@ -36,31 +70,38 @@ class ApmProbeConfig(object):
 _apm_config = None
 # init config for the APM for communicating with the Agent
 _apm_probe_config = None
+_runtime_metrics = None
 
 log = get_logger(__name__)
 
 
 def reset():
-    global _apm_config, _apm_probe_config
+    global _apm_config, _apm_probe_config, _runtime_metrics
 
     _bfext.del_ext_data("apm_config")
     _bfext.del_ext_data("apm_probe_config")
+    _runtime_metrics = None
 
 
 def initialize():
-    global _apm_config, _apm_probe_config
+    global _apm_config, _apm_probe_config, _runtime_metrics
 
     _apm_config = _bfext.get_or_set_ext_data("apm_config", ApmConfig())
     _apm_probe_config = _bfext.get_or_set_ext_data(
         "apm_probe_config", ApmProbeConfig()
     )
 
-    log.debug(
-        "APM Configuration initialized. [%s] [%s] [%s]",
-        json_prettify(_apm_config.__dict__),
-        json_prettify(_apm_probe_config.__dict__),
-        os.getpid(),
-    )
+    if not _runtime_metrics:
+        _runtime_metrics = RuntimeMetrics()
+
+    # do not even evaluate the params if DEBUG is not set in APM path
+    if log.isEnabledFor(logging.DEBUG):
+        log.debug(
+            "APM Configuration initialized. [%s] [%s] [%s]",
+            json_prettify(_apm_config.__dict__),
+            json_prettify(_apm_probe_config.__dict__),
+            os.getpid(),
+        )
 
 
 def trigger_trace():
@@ -114,10 +155,11 @@ def _send_trace_async(data):
             # the new HTTP requests making initialize() will get this new config
             _bfext.set_ext_data("apm_config", new_apm_config)
 
-        log.debug(
-            "APM trace sent. [%s]",
-            json_prettify(data),
-        )
+        if log.isEnabledFor(logging.DEBUG):
+            log.debug(
+                "APM trace sent. [%s]",
+                json_prettify(data),
+            )
 
     except Exception as e:
         if is_testing():
@@ -128,15 +170,27 @@ def _send_trace_async(data):
 
 
 def send_trace(request, **kwargs):
+    global _runtime_metrics
+
     data = """file-format: BlackfireApm
         sample-rate: {}
     """.format(_apm_config.sample_rate)
+
+    # add extra headers
+    mu, pmu = _runtime_metrics.memory()
+    kwargs["mu"] = mu
+    kwargs["pmu"] = pmu
+
     for k, v in kwargs.items():
         if v:
             # convert `_` to `-` in keys. e.g: controller_name -> controller-name
             k = k.replace('_', '-')
             data += "%s: %s\n" % (k, v)
+
+    # add final marker
     data += "\n"
+
+    print(data)
 
     if IS_PY3:
         data = bytes(data, 'ascii')
