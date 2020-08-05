@@ -1,6 +1,5 @@
 import random
 import os
-import psutil
 import logging
 import time
 import _blackfire_profiler as _bfext
@@ -20,6 +19,8 @@ class RuntimeMetrics(object):
     def memory(self):
         if time.time() - self._last_collected <= self.CACHE_INTERVAL:
             return self._cache["memory"]
+
+        import psutil
 
         usage = peak_usage = 0
 
