@@ -34,9 +34,6 @@ class BlackfireFlaskMiddleware(object):
         self.app = app
         self.wsgi_app = app.wsgi_app
 
-        # TODO: Comment
-        self._probe_err = None
-
         # we use before/after request hooks instead of __call__ directly because
         # these functions are called in registered order: meaning that the first function
         # registered will be called last. This means, assuming blackfire.patch_all()
