@@ -1,4 +1,7 @@
-from blackfire.utils import get_logger
+import time
+import platform
+from blackfire import apm, VERSION
+from blackfire.utils import get_logger, get_probed_runtime
 from blackfire.hooks.utils import try_enable_probe, try_end_probe, reset_probe, add_probe_response_header
 
 log = get_logger(__name__)
@@ -16,6 +19,13 @@ def get_current_request():
     # then this file can only be imported through patch_all() which will be safe
     import flask
     return flask.request
+
+
+def get_request_context():
+    # TODO: Remove this lazy imports after explicit middleware usage is deprecated
+    # then this file can only be imported through patch_all() which will be safe
+    from flask import g
+    return g
 
 
 class BlackfireFlaskMiddleware(object):
@@ -42,9 +52,11 @@ class BlackfireFlaskMiddleware(object):
         return self.wsgi_app(environ, start_response)
 
     def _before_request(self):
+        context = get_request_context()
 
-        # TODO: from flask import g
-        # You can use above global context (per-request) for holding APM data
+        context.apm = False
+        context.profile = False
+        context.req_start = time.time()
 
         log.debug("FlaskMiddleware._before_request called.")
 
@@ -53,47 +65,82 @@ class BlackfireFlaskMiddleware(object):
         # When signal is registered we might received other events from other
         # requests. Look at the request object of the current response to determine
         # for finishing the profile session
-        if 'HTTP_X_BLACKFIRE_QUERY' not in request.environ:
+        if 'HTTP_X_BLACKFIRE_QUERY' in request.environ:
+            self._probe_err = try_enable_probe(
+                request.environ['HTTP_X_BLACKFIRE_QUERY']
+            )
+            context.profile = True
             return
 
-        self._probe_err = try_enable_probe(
-            request.environ['HTTP_X_BLACKFIRE_QUERY']
-        )
+        apm.initialize()
+
+        # TODO: If key-page matches and profile: true then make a BlackfireApmRequestProfileQuery
+        # to the agent and if we receive a signature call try_enable_probe()
+
+        if apm.trigger_trace():
+            # TODO:
+            #_ = apm.trigger_extended_trace()
+
+            context.apm = True
 
     def _after_request(self, response):
-        log.debug("FlaskMiddleware._after_request called.")
-
+        context = get_request_context()
         request = get_current_request()
 
-        try:
-            if self._probe_err:
-                add_probe_response_header(response.headers, self._probe_err)
-                return
+        log.debug("FlaskMiddleware._after_request called.")
 
-            probe_resp = try_end_probe(
-                response_status_code=response.status_code,
-                response_len=response.headers['Content-Length'],
+        if context.profile:
+            try:
+                if self._probe_err:
+                    add_probe_response_header(response.headers, self._probe_err)
+                    return response
+
+                probe_resp = try_end_probe(
+                    response_status_code=response.status_code,
+                    response_len=response.headers['Content-Length'],
+                    http_method=request.method,
+                    http_uri=request.path,
+                    https='1' if request.is_secure else '',
+                    http_server_addr=request.environ.get('SERVER_NAME'),
+                    http_server_software=request.environ.get('SERVER_SOFTWARE'),
+                    http_server_port=request.environ.get('SERVER_PORT'),
+                    http_header_host=request.environ.get('HTTP_HOST'),
+                    http_header_user_agent=request.environ
+                    .get('HTTP_USER_AGENT'),
+                    http_header_x_forwarded_host=request.environ
+                    .get('HTTP_X_FORWARDED_HOST'),
+                    http_header_x_forwarded_proto=request.environ
+                    .get('HTTP_X_FORWARDED_PROTO'),
+                    http_header_x_forwarded_port=request.environ
+                    .get('HTTP_X_FORWARDED_PORT'),
+                    http_header_forwarded=request.environ.get('HTTP_FORWARDED'),
+                )
+
+                add_probe_response_header(response.headers, probe_resp)
+            except Exception as e:
+                # signals run in the context of app. Do not fail app code on any error
+                log.exception(e)
+        elif context.apm:
+            print("assss")
+            now = time.time()
+            apm.send_trace(
+                request,
+                controller_name=request.endpoint,
+                wt=now - context.req_start,
+                timestamp=now,
+                uri=request.path,
+                framework="flask",
+                capabilities="trace",
+                host=request.environ.get('HTTP_HOST'),
+                method=request.method,
+                os=platform.system(),
+                language="python",
+                runtime=get_probed_runtime(),
+                response_code=response.status_code,
+                stdout=response.headers['Content-Length'],
                 http_method=request.method,
-                http_uri=request.path,
-                https='1' if request.is_secure else '',
-                http_server_addr=request.environ.get('SERVER_NAME'),
-                http_server_software=request.environ.get('SERVER_SOFTWARE'),
-                http_server_port=request.environ.get('SERVER_PORT'),
-                http_header_host=request.environ.get('HTTP_HOST'),
-                http_header_user_agent=request.environ.get('HTTP_USER_AGENT'),
-                http_header_x_forwarded_host=request.environ
-                .get('HTTP_X_FORWARDED_HOST'),
-                http_header_x_forwarded_proto=request.environ
-                .get('HTTP_X_FORWARDED_PROTO'),
-                http_header_x_forwarded_port=request.environ
-                .get('HTTP_X_FORWARDED_PORT'),
-                http_header_forwarded=request.environ.get('HTTP_FORWARDED'),
+                version=VERSION,
             )
-
-            add_probe_response_header(response.headers, probe_resp)
-        except Exception as e:
-            # signals run in the context of app. Do not fail app code on any error
-            log.exception(e)
 
         return response
 

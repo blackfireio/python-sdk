@@ -173,30 +173,33 @@ def _send_trace_async(data):
 def send_trace(request, **kwargs):
     global _runtime_metrics
 
-    data = """file-format: BlackfireApm
-        sample-rate: {}
-    """.format(_apm_config.sample_rate)
+    try:
+        data = """file-format: BlackfireApm
+            sample-rate: {}
+        """.format(_apm_config.sample_rate)
 
-    # add extra headers
-    mu, pmu = _runtime_metrics.memory()
-    kwargs["mu"] = mu
-    kwargs["pmu"] = pmu
+        # add extra headers
+        mu, pmu = _runtime_metrics.memory()
+        kwargs["mu"] = mu
+        kwargs["pmu"] = pmu
 
-    for k, v in kwargs.items():
-        if v:
-            # convert `_` to `-` in keys. e.g: controller_name -> controller-name
-            k = k.replace('_', '-')
-            data += "%s: %s\n" % (k, v)
+        for k, v in kwargs.items():
+            if v:
+                # convert `_` to `-` in keys. e.g: controller_name -> controller-name
+                k = k.replace('_', '-')
+                data += "%s: %s\n" % (k, v)
 
-    # add final marker
-    data += "\n"
+        # add final marker
+        data += "\n"
 
-    if IS_PY3:
-        data = bytes(data, 'ascii')
+        if IS_PY3:
+            data = bytes(data, 'ascii')
 
-    # We should not have a blocking call in APM path. Do agent connection setup
-    # socket send in a separate thread.
-    run_in_thread_pool(_send_trace_async, args=(data, ))
+        # We should not have a blocking call in APM path. Do agent connection setup
+        # socket send in a separate thread.
+        run_in_thread_pool(_send_trace_async, args=(data, ))
+    except Exception as e:
+        log.exception(e)
 
 
 def send_extended_trace(request, **kwargs):
