@@ -199,6 +199,9 @@ def send_trace(request, **kwargs):
         # socket send in a separate thread.
         run_in_thread_pool(_send_trace_async, args=(data, ))
     except Exception as e:
+        if is_testing():
+            raise e
+
         log.exception(e)
 
 
