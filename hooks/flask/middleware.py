@@ -121,7 +121,6 @@ class BlackfireFlaskMiddleware(object):
                 # signals run in the context of app. Do not fail app code on any error
                 log.exception(e)
         elif context.apm:
-            print("assss")
             now = time.time()
             apm.send_trace(
                 request,
