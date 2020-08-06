@@ -48,15 +48,16 @@ class BlackfireFlaskMiddleware(object):
 
     def __call__(self, environ, start_response):
         # this stays here for Backward compat.
-        # TODO: Remove after deprecation period
+        # TODO: Remove after deprecation period for patch_all
         return self.wsgi_app(environ, start_response)
 
     def _before_request(self):
-        context = get_request_context()
+        req_context = get_request_context()
 
-        context.apm = False
-        context.profile = False
-        context.req_start = time.time()
+        req_context.apm = False
+        req_context.profile = False
+        req_context.req_start = time.time()
+        req_context.probe_err = None
 
         log.debug("FlaskMiddleware._before_request called.")
 
@@ -66,10 +67,10 @@ class BlackfireFlaskMiddleware(object):
         # requests. Look at the request object of the current response to determine
         # for finishing the profile session
         if 'HTTP_X_BLACKFIRE_QUERY' in request.environ:
-            self._probe_err = try_enable_probe(
+            req_context.probe_err = try_enable_probe(
                 request.environ['HTTP_X_BLACKFIRE_QUERY']
             )
-            context.profile = True
+            req_context.profile = True
             return
 
         apm.initialize()
@@ -81,18 +82,20 @@ class BlackfireFlaskMiddleware(object):
             # TODO:
             #_ = apm.trigger_extended_trace()
 
-            context.apm = True
+            req_context.apm = True
 
     def _after_request(self, response):
-        context = get_request_context()
+        req_context = get_request_context()
         request = get_current_request()
 
         log.debug("FlaskMiddleware._after_request called.")
 
-        if context.profile:
-            try:
-                if self._probe_err:
-                    add_probe_response_header(response.headers, self._probe_err)
+        try:
+            if req_context.profile:
+                if req_context.probe_err:
+                    add_probe_response_header(
+                        response.headers, req_context.probe_err
+                    )
                     return response
 
                 probe_resp = try_end_probe(
@@ -117,35 +120,33 @@ class BlackfireFlaskMiddleware(object):
                 )
 
                 add_probe_response_header(response.headers, probe_resp)
-            except Exception as e:
-                # signals run in the context of app. Do not fail app code on any error
-                log.exception(e)
-        elif context.apm:
-            now = time.time()
-            apm.send_trace(
-                request,
-                controller_name=request.endpoint,
-                wt=now - context.req_start,
-                timestamp=now,
-                uri=request.path,
-                framework="flask",
-                capabilities="trace",
-                host=request.environ.get('HTTP_HOST'),
-                method=request.method,
-                os=platform.system(),
-                language="python",
-                runtime=get_probed_runtime(),
-                response_code=response.status_code,
-                stdout=response.headers['Content-Length'],
-                http_method=request.method,
-                version=VERSION,
-            )
+            elif req_context.apm:
+                now = time.time()
+                apm.send_trace(
+                    request,
+                    controller_name=request.endpoint,
+                    wt=now - req_context.req_start,
+                    timestamp=now,
+                    uri=request.path,
+                    framework="flask",
+                    capabilities="trace",
+                    host=request.environ.get('HTTP_HOST'),
+                    method=request.method,
+                    os=platform.system(),
+                    language="python",
+                    runtime=get_probed_runtime(),
+                    response_code=response.status_code,
+                    stdout=response.headers['Content-Length'],
+                    http_method=request.method,
+                    version=VERSION,
+                )
+        except Exception as e:
+            # signals run in the context of app. Do not fail app code on any error
+            log.exception(e)
 
         return response
 
     def _teardown_request(self, exception):
         log.debug("FlaskMiddleware._teardown_request called.")
-
-        self._probe_err = None
 
         reset_probe()
