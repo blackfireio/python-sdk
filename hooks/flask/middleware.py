@@ -117,7 +117,10 @@ class BlackfireFlaskMiddleware(object):
                 )
 
                 add_probe_response_header(response.headers, probe_resp)
-            elif req_context.apm:
+
+                return response
+
+            if req_context.apm:
                 now = time.time()
                 apm.send_trace(
                     request,
