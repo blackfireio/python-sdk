@@ -15,7 +15,7 @@ class DjangoMiddleware(BlackfireDjangoMiddleware):
 
 log = get_logger(__name__)
 
-# log.warning(
-#     "DeprecationWarning: FlaskMiddleware/DjangoMiddleware will be deprecated. Please use 'blackfire.patch_all' "
-#     "or run your server via 'blackfire run --xyz'."
-# )
+log.warning(
+    "DeprecationWarning: FlaskMiddleware/DjangoMiddleware will be deprecated. Please use 'blackfire.patch_all' "
+    "or run your web server via prepending 'blackfire-python'."
+)

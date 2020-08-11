@@ -13,6 +13,7 @@ from blackfire.utils import *
 from blackfire import profiler
 from blackfire.exceptions import BlackfireApiException
 from distutils.sysconfig import get_python_lib
+from distutils import spawn
 
 __all__ = [
     'BlackfireConfiguration',
@@ -116,6 +117,35 @@ def _stop_at_exit():
 atexit.register(_stop_at_exit)
 
 
+def _add_bootstrap_to_pythonpath(bootstrap_dir):
+    """
+    Add our bootstrap directory to the head of $PYTHONPATH to ensure
+    it is loaded before program code
+    """
+    python_path = os.environ.get('PYTHONPATH', '')
+
+    if python_path:
+        new_path = '%s%s%s' % (
+            bootstrap_dir, os.path.pathsep, os.environ['PYTHONPATH']
+        )
+        os.environ['PYTHONPATH'] = new_path
+    else:
+        os.environ['PYTHONPATH'] = bootstrap_dir
+
+
+def bootstrap():
+    global ext_dir
+
+    bootstrap_dir = os.path.join(ext_dir, 'bootstrap')
+
+    _add_bootstrap_to_pythonpath(bootstrap_dir)
+
+    log.debug('PYTHONPATH: %s' % os.environ['PYTHONPATH'])
+
+    executable = spawn.find_executable(sys.argv[1])
+    os.execl(executable, executable, *sys.argv[2:])
+
+
 def _uninstall_bootstrap():
     site_packages_dir = get_python_lib()
     bootstrap_pth_file = os.path.join(
@@ -182,17 +212,21 @@ def _install_bootstrap():
 
 
 def process_bootstrap():
-    query = os.environ.get('BLACKFIRE_QUERY')
-    if query:
-        del os.environ['BLACKFIRE_QUERY']
-        try:
+
+    try:
+        patch_all()
+
+        query = os.environ.get('BLACKFIRE_QUERY')
+        if query:
+            del os.environ['BLACKFIRE_QUERY']
+
             from blackfire.probe import initialize, enable
             initialize(query=query, _method="bootstrap")
             enable(end_at_exit=True)
-        except:
-            # As this is called in import time, tracebacks cannot be seen
-            # this is to ensure traceback is available if exception occurs
-            traceback.print_exc()
+    except:
+        # As this is called in import time, tracebacks cannot be seen
+        # this is to ensure traceback is available if exception occurs
+        traceback.print_exc()
 
 
 # This code should be the first to run before any import is made.
