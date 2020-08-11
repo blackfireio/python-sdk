@@ -1,3 +1,3 @@
 import blackfire
 
-blackfire.process_bootstrap()
+blackfire.patch_all()

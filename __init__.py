@@ -214,7 +214,6 @@ def _install_bootstrap():
 def process_bootstrap():
 
     try:
-        patch_all()
 
         query = os.environ.get('BLACKFIRE_QUERY')
         if query:
