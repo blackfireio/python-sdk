@@ -1,3 +1,3 @@
 import blackfire
 
-blackfire.patch_all()
+blackfire.initialize()
