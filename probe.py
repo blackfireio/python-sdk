@@ -269,7 +269,7 @@ def initialize(
     log_file=None,
     log_level=None,
     config_file=DEFAULT_CONFIG_FILE,
-    _method="manual",
+    method="manual",
 ):
     global _config, log, _probe
 
@@ -281,7 +281,7 @@ def initialize(
             "These settings will be removed in the next version."
         )
 
-    log.debug("probe.initialize called. [method:'%s']", _method)
+    log.debug("probe.initialize called. [method:'%s']", method)
 
     _config = generate_config(
         query,

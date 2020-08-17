@@ -151,26 +151,30 @@ def _bootstrap():
 
 def initialize():
 
-    patch_all()
+    try:
+        patch_all()
+    except Exception as e:
+        log.exception(e)
 
     try:
         query = os.environ.get('BLACKFIRE_QUERY')
         if query:
             del os.environ['BLACKFIRE_QUERY']
 
-            from blackfire.probe import initialize, enable
-            initialize(query=query, _method="bootstrap")
-            enable(end_at_exit=True)
-    except:
-        # As this is called in import time, tracebacks cannot be seen
-        # this is to ensure traceback is available if exception occurs
-        traceback.print_exc()
+            from blackfire import probe
+
+            probe.initialize(query=query, method="bootstrap")
+            probe.enable(end_at_exit=True)
+    except Exception as e:
+        log.exception(e)
 
 
 # This code should be the first to run before any import is made.
 # It monkey patches the modules given if installed.
 def patch_all():
     PATCH_MODULES = ['django', 'flask']
+
+    raise Exception('aaa')
 
     patched_modules = []
     for mod_name in PATCH_MODULES:
