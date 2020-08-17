@@ -154,6 +154,7 @@ def bootstrap():
         patch_all()
     except Exception as e:
         log.exception(e)
+        traceback.print_exc()
 
     try:
         query = os.environ.get('BLACKFIRE_QUERY')
@@ -166,6 +167,7 @@ def bootstrap():
             probe.enable(end_at_exit=True)
     except Exception as e:
         log.exception(e)
+        traceback.print_exc()
 
 
 # This code should be the first to run before any import is made.
