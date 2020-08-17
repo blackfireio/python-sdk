@@ -133,7 +133,7 @@ def _add_bootstrap_to_pythonpath(bootstrap_dir):
         os.environ['PYTHONPATH'] = bootstrap_dir
 
 
-def _bootstrap():
+def bootstrap_python():
     global ext_dir
 
     bootstrap_dir = os.path.join(ext_dir, 'bootstrap')
@@ -149,8 +149,7 @@ def _bootstrap():
     os.execl(executable, executable, *sys.argv[2:])
 
 
-def initialize():
-
+def bootstrap():
     try:
         patch_all()
     except Exception as e:
