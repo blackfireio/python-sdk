@@ -2,6 +2,7 @@ import os
 import sys
 import json
 import warnings
+import threading
 import _blackfire_profiler as _bfext
 from contextlib import contextmanager
 from collections import Counter
@@ -379,6 +380,7 @@ class _TraceEnumerator(dict):
 
 
 def start(
+    session_id_callback=None,
     builtins=True,
     profile_cpu=True,
     profile_memory=True,
@@ -387,6 +389,13 @@ def start(
     timespan_selectors={},
     timespan_threshold=MAX_TIMESPAN_THRESHOLD,  # ms
 ):
+
+    def _profile_thread_callback(frame, event, arg):
+        """
+        _profile_thread_callback will only be called once per-thread.
+        """
+        _bfext._profile_event(frame, event, arg)
+
     global _max_prefix_cache, _timespan_selectors
 
     if is_running():
@@ -404,14 +413,14 @@ def start(
 
     _timespan_selectors = {}
 
-    profile_threads = False
     if profile_timespan:
         _timespan_selectors = timespan_selectors
         _bfext.set_timespan_selector_callback(_fn_matches_timespan_selector)
 
+    threading.setprofile(_profile_thread_callback)
     _bfext.start(
+        session_id_callback,
         builtins,
-        profile_threads,
         profile_cpu,
         profile_memory,
         profile_timespan,
