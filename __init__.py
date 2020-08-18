@@ -211,6 +211,8 @@ def bootstrap_python():
         raise Exception("No command specified '%s'" % (sys.argv[1:]))
 
     executable = spawn.find_executable(sys.argv[1])
+
+    # execl(...) propagates current env. vars
     os.execl(executable, executable, *sys.argv[2:])
 
 
@@ -218,7 +220,6 @@ def bootstrap():
     try:
         patch_all()
     except Exception as e:
-        #log.exception(e)
         traceback.print_exc()
 
     try:
@@ -232,7 +233,6 @@ def bootstrap():
             probe.enable(end_at_exit=True)
     except Exception as e:
         traceback.print_exc()
-        #log.exception(e)
 
 
 # This code should be the first to run before any import is made.
@@ -261,7 +261,7 @@ def profile(client_id=None, client_token=None):
             initialize(
                 client_id=client_id,
                 client_token=client_token,
-                _method="decorator"
+                method="decorator"
             )
             enable()
             try:
