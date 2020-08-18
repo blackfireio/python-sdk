@@ -153,7 +153,7 @@ def bootstrap():
     try:
         patch_all()
     except Exception as e:
-        log.exception(e)
+        #log.exception(e)
         traceback.print_exc()
 
     try:
@@ -166,16 +166,14 @@ def bootstrap():
             probe.initialize(query=query, method="bootstrap")
             probe.enable(end_at_exit=True)
     except Exception as e:
-        log.exception(e)
         traceback.print_exc()
+        #log.exception(e)
 
 
 # This code should be the first to run before any import is made.
 # It monkey patches the modules given if installed.
 def patch_all():
     PATCH_MODULES = ['django', 'flask']
-
-    raise Exception('aaa')
 
     patched_modules = []
     for mod_name in PATCH_MODULES:
