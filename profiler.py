@@ -429,11 +429,11 @@ def start(
     )
 
 
-def stop():
-    _bfext.stop()
+def stop(session_id):
+    _bfext.stop(session_id)
 
 
-def get_traces(omit_sys_path_dirs=True):
+def get_traces(session_id, omit_sys_path_dirs=True):
     '''
     We need these _pause/_resume functions. That is because enumerating stats
     are simply calling Python from C and that again can trigger a call_event on
@@ -441,14 +441,14 @@ def get_traces(omit_sys_path_dirs=True):
     enumerating. This might causes duplicate stats(or deadlocks! in some cases)
     to be enumerated.
     '''
-    _bfext._pause()
+    _bfext._pause(session_id)
     try:
         traces = _TraceEnumerator(omit_sys_path_dirs)
-        _bfext.enum_func_stats(traces._enum_func_cbk)
+        _bfext.enum_func_stats(session_id, traces._enum_func_cbk)
         _bfext.enum_timeline_stats(traces._enum_timeline_cbk)
         return traces.to_traceformat()
     finally:
-        _bfext._resume()
+        _bfext._resume(session_id)
 
 
 @contextmanager
