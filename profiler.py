@@ -82,9 +82,38 @@ def _format_func_name(module, name):
     return "%s.%s" % (module, name)
 
 
+def _set_threading_profile(on, _):
+
+    def _profile_thread_callback(frame, event, arg):
+        """
+        _profile_thread_callback will only be called once per-thread.
+        """
+        _bfext._profile_event(frame, event, arg)
+
+    if on:
+        threading.setprofile(_profile_thread_callback)
+    else:
+        threading.setprofile(None)
+
+
+# TODO: these session_id_callbacks should be shared from Python side as we need
+# an API to add/remove to this list somehow on the fly. Caution for the thread safety
+# as we might be in the middle of a session_id callback while it is being changed.
+def _default_session_id_callback(*args):
+    result = threading.current_thread().ident
+    return result
+
+
 # import time initialization code
-_bfext._set_format_func_name_callback(_format_func_name)
-_bfext._set_logger(log)
+_bfext._initialize(
+    {
+        "format_func_name": _format_func_name,
+        "timespan_selector": _fn_matches_timespan_selector,
+        "set_threading_profile": _set_threading_profile,
+        "session_id_callbacks": set(_default_session_id_callback, )
+    },
+    log,
+)
 
 
 # a custom dict class to reach keys as attributes
@@ -380,7 +409,6 @@ class _TraceEnumerator(dict):
 
 
 def start(
-    session_id_callback=None,
     builtins=True,
     profile_cpu=True,
     profile_memory=True,
@@ -389,13 +417,6 @@ def start(
     timespan_selectors={},
     timespan_threshold=MAX_TIMESPAN_THRESHOLD,  # ms
 ):
-
-    def _profile_thread_callback(frame, event, arg):
-        """
-        _profile_thread_callback will only be called once per-thread.
-        """
-        _bfext._profile_event(frame, event, arg)
-
     global _max_prefix_cache, _timespan_selectors
 
     if is_running():
@@ -415,11 +436,9 @@ def start(
 
     if profile_timespan:
         _timespan_selectors = timespan_selectors
-        _bfext.set_timespan_selector_callback(_fn_matches_timespan_selector)
 
-    threading.setprofile(_profile_thread_callback)
+    # TODO: Pass session_id_callback as proxy method
     _bfext.start(
-        session_id_callback,
         builtins,
         profile_cpu,
         profile_memory,
