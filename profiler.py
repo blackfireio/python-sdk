@@ -107,7 +107,7 @@ def _default_session_id_callback(*args):
 # import time initialization code
 _bfext._initialize(
     {
-        "format_func_name": _format_func_name,
+        "_format_funcname": _format_funcname,
         "timespan_selector": _fn_matches_timespan_selector,
         "set_threading_profile": _set_threading_profile,
         "session_id_callbacks": set(_default_session_id_callback, )
