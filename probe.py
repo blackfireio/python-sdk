@@ -131,7 +131,9 @@ def initialize(
 
 
 def is_enabled():
-    return profiler.is_running()
+    global _enabled
+
+    return _enabled
 
 
 def enable(end_at_exit=False):

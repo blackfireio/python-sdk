@@ -48,7 +48,7 @@ def _fn_matches_timespan_selector(name, name_formatted):
     return 0
 
 
-def _format_func_name(module, name):
+def _format_funcname(module, name):
     global _max_prefix_cache
 
     # called internally each time a _pit is generated to set the .formatted_name
@@ -96,24 +96,35 @@ def _set_threading_profile(on, _):
         threading.setprofile(None)
 
 
+# TODO: make this static class?
+_thread_local = threading.local()
+_monotonic_counter = 0
+
+
 # TODO: these session_id_callbacks should be shared from Python side as we need
 # an API to add/remove to this list somehow on the fly. Caution for the thread safety
 # as we might be in the middle of a session_id callback while it is being changed.
 def _default_session_id_callback(*args):
-    result = threading.current_thread().ident
-    return result
+    global _thread_local, _monotonic_counter
+    try:
+        return _thread_local._session_id
+    except AttributeError:
+        _monotonic_counter += 1  # TODO: thread-safety
+        _thread_local._session_id = _monotonic_counter
+
+    return _thread_local._session_id
 
 
 # import time initialization code
-_bfext._initialize(
-    {
-        "_format_funcname": _format_funcname,
-        "timespan_selector": _fn_matches_timespan_selector,
-        "set_threading_profile": _set_threading_profile,
-        "session_id_callbacks": set(_default_session_id_callback, )
-    },
-    log,
-)
+_py_proxy_methods_dict = {
+    "_format_funcname": _format_funcname,
+    "timespan_selector": _fn_matches_timespan_selector,
+    "set_threading_profile": _set_threading_profile,
+    "session_id_callbacks": set([
+        _default_session_id_callback,
+    ])
+}
+_bfext._initialize(_py_proxy_methods_dict, log)
 
 
 # a custom dict class to reach keys as attributes
@@ -409,6 +420,7 @@ class _TraceEnumerator(dict):
 
 
 def start(
+    session_id=None,
     builtins=True,
     profile_cpu=True,
     profile_memory=True,
@@ -418,9 +430,6 @@ def start(
     timespan_threshold=MAX_TIMESPAN_THRESHOLD,  # ms
 ):
     global _max_prefix_cache, _timespan_selectors
-
-    if is_running():
-        return
 
     if not isinstance(timespan_selectors, dict):
         raise BlackfireProfilerException(
@@ -437,8 +446,14 @@ def start(
     if profile_timespan:
         _timespan_selectors = timespan_selectors
 
-    # TODO: Pass session_id_callback as proxy method
+    if session_id is None:
+        session_id = _default_session_id_callback()
+
+    # TODO: remove after debug
+    profile_memory = False
+
     _bfext.start(
+        session_id,
         builtins,
         profile_cpu,
         profile_memory,
@@ -448,26 +463,23 @@ def start(
     )
 
 
-def stop(session_id):
+def stop(session_id=None):
+    if session_id is None:
+        session_id = _default_session_id_callback()
+
     _bfext.stop(session_id)
 
 
-def get_traces(session_id, omit_sys_path_dirs=True):
-    '''
-    We need these _pause/_resume functions. That is because enumerating stats
-    are simply calling Python from C and that again can trigger a call_event on
-    profiler side which again can mutate the internal hash table that we are
-    enumerating. This might causes duplicate stats(or deadlocks! in some cases)
-    to be enumerated.
-    '''
-    _bfext._pause(session_id)
-    try:
-        traces = _TraceEnumerator(omit_sys_path_dirs)
-        _bfext.enum_func_stats(session_id, traces._enum_func_cbk)
-        _bfext.enum_timeline_stats(traces._enum_timeline_cbk)
-        return traces.to_traceformat()
-    finally:
-        _bfext._resume(session_id)
+def get_traces(session_id=None, omit_sys_path_dirs=True):
+    if session_id is None:
+        session_id = _default_session_id_callback()
+
+    return _bfext.get_traces(session_id)
+
+    # traces = _TraceEnumerator(omit_sys_path_dirs)
+    # _bfext.enum_func_stats(session_id, traces._enum_func_cbk)
+    # _bfext.enum_timeline_stats(traces._enum_timeline_cbk)
+    # return traces.to_traceformat()
 
 
 @contextmanager
@@ -479,16 +491,11 @@ def run(builtins=False):
         stop()
 
 
-def is_running():
-    return bool(_bfext.is_running())
+def clear_traces(session_id):
+    if session_id is None:
+        session_id = _default_session_id_callback()
 
-
-def clear_traces():
-    _bfext._pause()
-    try:
-        _bfext.clear_stats()
-    finally:
-        _bfext._resume()
+    _bfext.clear_stats(session_id)
 
 
 def get_traced_memory():
