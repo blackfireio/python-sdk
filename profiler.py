@@ -417,7 +417,6 @@ class _BlackfireTracesBase(dict):
             )
 
             i += 1
-
         return result
 
 

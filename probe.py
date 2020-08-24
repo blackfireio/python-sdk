@@ -137,15 +137,17 @@ def is_enabled():
 
 
 def enable(end_at_exit=False):
-    global _agent_conn, _req_start, _config
+    global _agent_conn, _req_start, _config, _enabled
 
     if not _config:
         raise BlackfireApiException(
             'no configuration set. initialize should be called first.'
         )
 
-    if is_enabled():
+    if _enabled:
         raise BlackfireApiException('Another probe is already profiling')
+
+    _enabled = True
 
     log.debug("probe.enable() called.")
 
@@ -187,6 +189,7 @@ def enable(end_at_exit=False):
             _agent_conn.connect(config=_config)
         except Exception as e:
             _agent_conn = None
+            _enabled = False
             raise e  # re-raise
 
     # pass start options from _config.args, set defaults as necessary
@@ -254,8 +257,6 @@ def enable(end_at_exit=False):
 
     # TODO: 'Blackfire-Error: 103 Samples quota is out'
 
-    _enabled = True
-
     log.debug(
         "profiler started. [instrumented_funcs:%s, timespan_selectors:%s]",
         json_prettify(instrumented_funcs),
@@ -286,8 +287,6 @@ def end(headers={}, omit_sys_path_dirs=_DEFAULT_OMIT_SYS_PATH):
     disable()
     traces = get_traces(omit_sys_path_dirs=omit_sys_path_dirs)
     clear_traces()
-
-    print(traces)
 
     # write main prolog
     profile_title = _config.args.get('profile_title', _DEFAULT_PROFILE_TITLE)
