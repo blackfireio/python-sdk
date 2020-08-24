@@ -254,13 +254,16 @@ class BlackfireTraces(dict):
         print(json.dumps(self, indent=4))
 
 
-class _TraceEnumerator(dict):
+class _BlackfireTracesBase(dict):
 
-    def __init__(self, omit_sys_path_dirs):
+    def __init__(self, traces, timeline_traces, omit_sys_path_dirs):
+        self._traces = traces
+        self._timeline_traces = timeline_traces
         self._omit_sys_path_dirs = omit_sys_path_dirs
-        self._timeline_traces = []
 
-    def _enum_func_cbk(self, stat):
+        self._add_traces()
+
+    def _add_traces(self):
 
         def _is_special_function(fname_formatted):
             SPECIAL_FUNCS = [
@@ -274,46 +277,45 @@ class _TraceEnumerator(dict):
 
             return False
 
-        fname, fmodule, fname_formatted, flineno, fncall, fnactualcall, fbuiltin, \
-            fttot_wall, ftsub_wall, fttot_cpu, ftsub_cpu, findex, fchildren, fctxid, \
-            fmem_usage, fpeak_mem_usage, ffn_args, frec_level = stat
+        for trace in self._traces:
+            fname, fmodule, fname_formatted, flineno, fncall, fnactualcall, fbuiltin, \
+                fttot_wall, ftsub_wall, fttot_cpu, ftsub_cpu, findex, fchildren, fctxid, \
+                fmem_usage, fpeak_mem_usage, ffn_args, frec_level = trace
 
-        assert findex not in self, stat  # assert no duplicate index exists
+            assert findex not in self, trace  # assert no duplicate index exists
 
-        dir_path = os.path.dirname(os.path.normpath(fmodule))
-        last_dir = os.path.basename(dir_path)
+            dir_path = os.path.dirname(os.path.normpath(fmodule))
+            last_dir = os.path.basename(dir_path)
 
-        # Filter out profile specific modules like our profiler extension related
-        # call stack
-        if last_dir in ["blackfire"] or fmodule == '_blackfire_profiler':
-            if fname_formatted and not _is_special_function(fname_formatted):
-                return
-
-        # we do not generate the traceformat directly as for each children,
-        # we need to have the 'index' available. For this, we first add all
-        # traces and then call to_traceformat(...)
-        self[findex] = {
-            "name": fname,
-            "module": fmodule,
-            "name_formatted": fname_formatted or '',
-            "lineno": flineno,
-            "ncall": fncall,
-            "nnonrecursivecall": fnactualcall,
-            "is_builtin": fbuiltin,
-            "twall": fttot_wall,
-            "sub_twall": ftsub_wall,
-            "tcpu": fttot_cpu,
-            "sub_tcpu": ftsub_cpu,
-            "children": fchildren,
-            "ctx_id": fctxid,
-            "mem_usage": fmem_usage,
-            "peak_mem_usage": fpeak_mem_usage,
-            "fn_args": ffn_args or '',
-            "rec_level": frec_level,
-        }
-
-    def _enum_timeline_cbk(self, stat):
-        self._timeline_traces.append(stat)
+            # Filter out profile specific modules like our profiler extension related
+            # call stack
+            if last_dir in ["blackfire"] or fmodule == '_blackfire_profiler':
+                if fname_formatted and not _is_special_function(
+                    fname_formatted
+                ):
+                    continue
+            # we do not generate the traceformat directly as for each children,
+            # we need to have the 'index' available. For this, we first add all
+            # traces and then call to_traceformat(...)
+            self[findex] = {
+                "name": fname,
+                "module": fmodule,
+                "name_formatted": fname_formatted or '',
+                "lineno": flineno,
+                "ncall": fncall,
+                "nnonrecursivecall": fnactualcall,
+                "is_builtin": fbuiltin,
+                "twall": fttot_wall,
+                "sub_twall": ftsub_wall,
+                "tcpu": fttot_cpu,
+                "sub_tcpu": ftsub_cpu,
+                "children": fchildren,
+                "ctx_id": fctxid,
+                "mem_usage": fmem_usage,
+                "peak_mem_usage": fpeak_mem_usage,
+                "fn_args": ffn_args or '',
+                "rec_level": frec_level,
+            }
 
     def to_traceformat(self):
         """
@@ -474,12 +476,9 @@ def get_traces(session_id=None, omit_sys_path_dirs=True):
     if session_id is None:
         session_id = _default_session_id_callback()
 
-    return _bfext.get_traces(session_id)
-
-    # traces = _TraceEnumerator(omit_sys_path_dirs)
-    # _bfext.enum_func_stats(session_id, traces._enum_func_cbk)
-    # _bfext.enum_timeline_stats(traces._enum_timeline_cbk)
-    # return traces.to_traceformat()
+    traces, timeline_traces = _bfext.get_traces(session_id)
+    traces = _BlackfireTracesBase(traces, timeline_traces, omit_sys_path_dirs)
+    return traces.to_traceformat()
 
 
 @contextmanager
@@ -491,11 +490,11 @@ def run(builtins=False):
         stop()
 
 
-def clear_traces(session_id):
+def clear_traces(session_id=None):
     if session_id is None:
         session_id = _default_session_id_callback()
 
-    _bfext.clear_stats(session_id)
+    _bfext.clear_traces(session_id)
 
 
 def get_traced_memory():

@@ -287,6 +287,8 @@ def end(headers={}, omit_sys_path_dirs=_DEFAULT_OMIT_SYS_PATH):
     traces = get_traces(omit_sys_path_dirs=omit_sys_path_dirs)
     clear_traces()
 
+    print(traces)
+
     # write main prolog
     profile_title = _config.args.get('profile_title', _DEFAULT_PROFILE_TITLE)
     end_headers = {
