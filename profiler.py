@@ -104,8 +104,13 @@ _monotonic_counter = 0
 # used from testing to set Probe state to a consistent state
 def reset():
     global _thread_local, _monotonic_counter
+
     _monotonic_counter = 0
-    delattr(_thread_local, "_session_id")
+    if hasattr(_thread_local, "_session_id"):
+        delattr(_thread_local, "_session_id")
+
+    # reset to defaults
+    initialize()
 
 
 # TODO: these session_id_callbacks should be shared from Python side as we need
@@ -499,6 +504,10 @@ def clear_traces(session_id=None):
 
 def get_traced_memory():
     return _bfext.get_traced_memory()
+
+
+def get_sessions():
+    return _bfext._get_sessions()
 
 
 # import time
