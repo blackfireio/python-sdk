@@ -41,6 +41,7 @@ def clear_traces():
     profiler.clear_traces()
 
 
+# used from testing to set Probe state to a consistent state
 def reset():
     global _config, _enabled, _agent_conn, _req_start
 

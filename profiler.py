@@ -101,6 +101,13 @@ _thread_local = threading.local()
 _monotonic_counter = 0
 
 
+# used from testing to set Probe state to a consistent state
+def reset():
+    global _thread_local, _monotonic_counter
+    _monotonic_counter = 0
+    delattr(_thread_local, "_session_id")
+
+
 # TODO: these session_id_callbacks should be shared from Python side as we need
 # an API to add/remove to this list somehow on the fly. Caution for the thread safety
 # as we might be in the middle of a session_id callback while it is being changed.
@@ -115,16 +122,13 @@ def _default_session_id_callback(*args):
     return _thread_local._session_id
 
 
-# import time initialization code
-_py_proxy_methods_dict = {
-    "_format_funcname": _format_funcname,
-    "timespan_selector": _fn_matches_timespan_selector,
-    "set_threading_profile": _set_threading_profile,
-    "session_id_callbacks": set([
-        _default_session_id_callback,
-    ])
-}
-_bfext._initialize(_py_proxy_methods_dict, log)
+def initialize(
+    format_funcname=_format_funcname,
+    timespan_selector=_fn_matches_timespan_selector,
+    set_threading_profile=_set_threading_profile,
+    session_id_callback=_default_session_id_callback,
+):
+    _bfext._initialize(locals(), log)
 
 
 # a custom dict class to reach keys as attributes
@@ -450,9 +454,6 @@ def start(
     if session_id is None:
         session_id = _default_session_id_callback()
 
-    # TODO: remove after debug
-    profile_memory = False
-
     _bfext.start(
         session_id,
         builtins,
@@ -498,3 +499,8 @@ def clear_traces(session_id=None):
 
 def get_traced_memory():
     return _bfext.get_traced_memory()
+
+
+# import time
+if __name__ != '__main__':
+    initialize()
