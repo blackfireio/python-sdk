@@ -3,7 +3,7 @@ import os
 import logging
 import time
 import _blackfire_profiler as _bfext
-from blackfire.utils import get_logger, IS_PY3, json_prettify, run_in_thread_pool, ConfigParser, is_testing
+from blackfire.utils import get_logger, IS_PY3, json_prettify, ConfigParser, is_testing
 from blackfire import agent, DEFAULT_AGENT_SOCKET, DEFAULT_AGENT_TIMEOUT, DEFAULT_CONFIG_FILE
 from blackfire.exceptions import BlackfireAPMException
 
