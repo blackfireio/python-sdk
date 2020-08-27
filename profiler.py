@@ -106,10 +106,8 @@ def reset():
     global _thread_local, _monotonic_counter
 
     _monotonic_counter = 0
-    if hasattr(_thread_local, "_session_id"):
-        delattr(_thread_local, "_session_id")
+    _thread_local = threading.local()
 
-    # reset to defaults
     initialize()
 
 
