@@ -96,33 +96,39 @@ def _set_threading_profile(on, _):
         threading.setprofile(None)
 
 
-# TODO: make this static class?
-_thread_local = threading.local()
-_monotonic_counter = 0
+class _DefaultSessionID(object):
+
+    _tlocal = threading.local()
+    _counter = 0  # monotonic
+    _counter_lock = threading.Lock()
+
+    @classmethod
+    def get(cls):
+        try:
+            return cls._tlocal._session_id
+        except AttributeError:
+            with cls._counter_lock:
+                cls._counter += 1
+                cls._tlocal._session_id = cls._counter
+
+        return cls._tlocal._session_id
+
+    @classmethod
+    def reset(cls):
+        cls._counter = 0
+        cls._tlocal = threading.local()
 
 
 # used from testing to set Probe state to a consistent state
 def reset():
-    global _thread_local, _monotonic_counter
-
-    _monotonic_counter = 0
-    _thread_local = threading.local()
+    _DefaultSessionID.reset()
 
     initialize()
 
 
-# TODO: these session_id_callbacks should be shared from Python side as we need
-# an API to add/remove to this list somehow on the fly. Caution for the thread safety
-# as we might be in the middle of a session_id callback while it is being changed.
+# the default session ID callback used when there is no session_id callback available
 def _default_session_id_callback(*args):
-    global _thread_local, _monotonic_counter
-    try:
-        return _thread_local._session_id
-    except AttributeError:
-        _monotonic_counter += 1  # TODO: thread-safety
-        _thread_local._session_id = _monotonic_counter
-
-    return _thread_local._session_id
+    return _DefaultSessionID.get()
 
 
 def initialize(
