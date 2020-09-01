@@ -68,41 +68,30 @@ class ApmProbeConfig(object):
 
 # init shared configuration from the C extension, this data will persist among
 # different interpreters in the same process
-_apm_config = None
+_apm_config = ApmConfig()
 # init config for the APM for communicating with the Agent
-_apm_probe_config = None
-_runtime_metrics = None
+_apm_probe_config = ApmProbeConfig()
+_runtime_metrics = RuntimeMetrics()
 
 log = get_logger(__name__)
+
+# do not even evaluate the params if DEBUG is not set in APM path
+if log.isEnabledFor(logging.DEBUG):
+    log.debug(
+        "APM Configuration initialized. [%s] [%s] [%s]",
+        json_prettify(_apm_config.__dict__),
+        json_prettify(_apm_probe_config.__dict__),
+        os.getpid(),
+    )
 
 
 def reset():
     global _apm_config, _apm_probe_config, _runtime_metrics
 
-    _bfext.del_ext_data("apm_config")
-    _bfext.del_ext_data("apm_probe_config")
-    _runtime_metrics = None
-
-
-def initialize():
-    global _apm_config, _apm_probe_config, _runtime_metrics
-
-    _apm_config = _bfext.get_or_set_ext_data("apm_config", ApmConfig())
-    _apm_probe_config = _bfext.get_or_set_ext_data(
-        "apm_probe_config", ApmProbeConfig()
-    )
-
-    if not _runtime_metrics:
-        _runtime_metrics = RuntimeMetrics()
-
-    # do not even evaluate the params if DEBUG is not set in APM path
-    if log.isEnabledFor(logging.DEBUG):
-        log.debug(
-            "APM Configuration initialized. [%s] [%s] [%s]",
-            json_prettify(_apm_config.__dict__),
-            json_prettify(_apm_probe_config.__dict__),
-            os.getpid(),
-        )
+    _apm_config = ApmConfig()
+    # init config for the APM for communicating with the Agent
+    _apm_probe_config = ApmProbeConfig()
+    _runtime_metrics = RuntimeMetrics()
 
 
 def trigger_trace():
