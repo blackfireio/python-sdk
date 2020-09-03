@@ -96,7 +96,19 @@ def _set_threading_profile(on, _):
         threading.setprofile(None)
 
 
-class _DefaultSessionID(object):
+# SessionIDManagers should derive from this class.
+class BaseSessionIDManager(object):
+
+    @classmethod
+    def get(cls):
+        pass
+
+    @classmethod
+    def reset(cls):
+        pass
+
+
+class _DefaultSessionIDManager(BaseSessionIDManager):
 
     _tlocal = threading.local()
     _counter = 0  # monotonic
@@ -121,14 +133,14 @@ class _DefaultSessionID(object):
 
 # used from testing to set Probe state to a consistent state
 def reset():
-    _DefaultSessionID.reset()
+    _DefaultSessionIDManager.reset()
 
     initialize()
 
 
 # the default session ID callback used when there is no session_id callback available
 def _default_session_id_callback(*args):
-    return _DefaultSessionID.get()
+    return _DefaultSessionIDManager.get()
 
 
 def initialize(
@@ -146,6 +158,16 @@ class BlackfireTrace(Counter):
 
     def __str__(self):
         return json.dumps(self, indent=4)
+
+    def update_counters(self, other):
+        # if we end up here, that means the traces are equal. That means we only
+        # need to update the counters, rec_level/fn_args/name all these params are
+        # used for checking equality
+        self.call_count += other.call_count
+        self.wall_time += other.wall_time
+        self.cpu_time += other.cpu_time
+        self.mem_usage += other.mem_usage
+        self.peak_mem_usage += other.peak_mem_usage
 
 
 def _generate_trace_key(omit_sys_path_dirs, trace):
@@ -206,7 +228,12 @@ class BlackfireTraces(dict):
         # TODO: Some builtin functions have same name but different index
         #assert _trace_key not in self
 
-        self[_trace_key] = trace
+        if _trace_key in self:
+            # multiple ctx_id single session might endup same _trace_key being
+            # used more than once. In that case, we update the BlackfireTrace(Counter)
+            self[_trace_key].update_counters(trace)
+        else:
+            self[_trace_key] = trace
 
     def add_timeline(self, **kwargs):
         trace = BlackfireTrace(kwargs)
