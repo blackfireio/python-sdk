@@ -5,6 +5,7 @@ import traceback
 import logging
 import platform
 import importlib
+from threading import Thread
 
 IS_PY3 = sys.version_info > (3, 0)
 
@@ -13,12 +14,14 @@ if IS_PY3:
     from configparser import ConfigParser
     console_input = input
     from urllib.request import Request, urlopen
+    from queue import Queue
 else:
     from urlparse import parse_qsl, urlparse, urljoin
     from urllib import quote, urlencode
     from ConfigParser import ConfigParser
     console_input = raw_input
     from urllib2 import Request, urlopen
+    from Queue import Queue
 
 _DEFAULT_LOG_LEVEL = 2
 _DEFAULT_LOG_FILE = 'python-probe.log'
@@ -185,3 +188,48 @@ def json_prettify(obj):
 
 def is_testing():
     return 'BLACKFIRE_TESTING' in os.environ
+
+
+class _PoolWorker(Thread):
+
+    def __init__(self, tasks):
+        Thread.__init__(self)
+        self.tasks = tasks
+        self.daemon = True
+        self.start()
+
+    def run(self):
+        while True:
+            func, args, kwargs = self.tasks.get()
+            try:
+                if func is None:
+                    break
+                func(*args, **kwargs)
+            except Exception as e:
+                print(e)
+            finally:
+                self.tasks.task_done()
+
+    def shutdown(self):
+        self.tasks.put((None, None, None))
+
+
+class ThreadPool(object):
+
+    def __init__(self, size=16):
+        self.tasks = Queue(size)
+        self._workers = []
+        for _ in range(size):
+            self._workers.append(_PoolWorker(self.tasks))
+
+    def apply(self, fn, *args, **kwargs):
+        if is_testing():
+            fn(args, kwargs)
+        else:
+            self.tasks.put((fn, args, kwargs))
+
+    def close(self):
+        for w in self._workers:
+            w.shutdown()
+        for w in self._workers:
+            w.join()
