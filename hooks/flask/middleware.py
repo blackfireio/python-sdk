@@ -122,10 +122,11 @@ class BlackfireFlaskMiddleware(object):
 
             if req_context.apm:
                 now = time.time()
+                elapsed_wt_usec = int((now - req_context.req_start) * 1_000_000)
                 apm.send_trace(
                     request,
                     controller_name=request.endpoint,
-                    wt=now - req_context.req_start,
+                    wt=elapsed_wt_usec,
                     timestamp=now,
                     uri=request.path,
                     framework="flask",
