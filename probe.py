@@ -41,6 +41,7 @@ def clear_traces():
     profiler.clear_traces()
 
 
+# used from testing to set Probe state to a consistent state
 def reset():
     global _config, _enabled, _agent_conn, _req_start
 
@@ -131,19 +132,23 @@ def initialize(
 
 
 def is_enabled():
-    return profiler.is_running()
+    global _enabled
+
+    return _enabled
 
 
 def enable(end_at_exit=False):
-    global _agent_conn, _req_start, _config
+    global _agent_conn, _req_start, _config, _enabled
 
     if not _config:
         raise BlackfireApiException(
             'no configuration set. initialize should be called first.'
         )
 
-    if is_enabled():
+    if _enabled:
         raise BlackfireApiException('Another probe is already profiling')
+
+    _enabled = True
 
     log.debug("probe.enable() called.")
 
@@ -185,6 +190,7 @@ def enable(end_at_exit=False):
             _agent_conn.connect(config=_config)
         except Exception as e:
             _agent_conn = None
+            _enabled = False
             raise e  # re-raise
 
     # pass start options from _config.args, set defaults as necessary
@@ -251,8 +257,6 @@ def enable(end_at_exit=False):
     )
 
     # TODO: 'Blackfire-Error: 103 Samples quota is out'
-
-    _enabled = True
 
     log.debug(
         "profiler started. [instrumented_funcs:%s, timespan_selectors:%s]",

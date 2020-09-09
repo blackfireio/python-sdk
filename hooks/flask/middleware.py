@@ -70,8 +70,6 @@ class BlackfireFlaskMiddleware(object):
             req_context.profile = True
             return
 
-        apm.initialize()
-
         # TODO: If key-page matches and profile: true then make a BlackfireApmRequestProfileQuery
         # to the agent and if we receive a signature call try_enable_probe()
 

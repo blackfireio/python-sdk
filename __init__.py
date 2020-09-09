@@ -218,7 +218,11 @@ def profile(client_id=None, client_token=None):
     def inner_func(func):
 
         def wrapper():
-            initialize(client_id=client_id, client_token=client_token)
+            initialize(
+                client_id=client_id,
+                client_token=client_token,
+                _method="decorator"
+            )
             enable()
             try:
                 func()

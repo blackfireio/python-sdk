@@ -2,6 +2,7 @@ import os
 import sys
 import json
 import warnings
+import threading
 import _blackfire_profiler as _bfext
 from contextlib import contextmanager
 from collections import Counter
@@ -47,7 +48,7 @@ def _fn_matches_timespan_selector(name, name_formatted):
     return 0
 
 
-def _format_func_name(module, name):
+def _format_funcname(module, name):
     global _max_prefix_cache
 
     # called internally each time a _pit is generated to set the .formatted_name
@@ -81,9 +82,74 @@ def _format_func_name(module, name):
     return "%s.%s" % (module, name)
 
 
-# import time initialization code
-_bfext._set_format_func_name_callback(_format_func_name)
-_bfext._set_logger(log)
+def _set_threading_profile(on, _):
+
+    def _profile_thread_callback(frame, event, arg):
+        """
+        _profile_thread_callback will only be called once per-thread.
+        """
+        _bfext._profile_event(frame, event, arg)
+
+    if on:
+        threading.setprofile(_profile_thread_callback)
+    else:
+        threading.setprofile(None)
+
+
+# SessionIDManagers should derive from this class.
+class BaseSessionIDManager(object):
+
+    @classmethod
+    def get(cls):
+        pass
+
+    @classmethod
+    def reset(cls):
+        pass
+
+
+class _DefaultSessionIDManager(BaseSessionIDManager):
+
+    _tlocal = threading.local()
+    _counter = 0  # monotonic
+    _counter_lock = threading.Lock()
+
+    @classmethod
+    def get(cls):
+        try:
+            return cls._tlocal._session_id
+        except AttributeError:
+            with cls._counter_lock:
+                cls._counter += 1
+                cls._tlocal._session_id = cls._counter
+
+        return cls._tlocal._session_id
+
+    @classmethod
+    def reset(cls):
+        cls._counter = 0
+        cls._tlocal = threading.local()
+
+
+# used from testing to set Probe state to a consistent state
+def reset():
+    _DefaultSessionIDManager.reset()
+
+    initialize()
+
+
+# the default session ID callback used when there is no session_id callback available
+def _default_session_id_callback(*args):
+    return _DefaultSessionIDManager.get()
+
+
+def initialize(
+    format_funcname=_format_funcname,
+    timespan_selector=_fn_matches_timespan_selector,
+    set_threading_profile=_set_threading_profile,
+    session_id_callback=_default_session_id_callback,
+):
+    _bfext._initialize(locals(), log)
 
 
 # a custom dict class to reach keys as attributes
@@ -92,6 +158,16 @@ class BlackfireTrace(Counter):
 
     def __str__(self):
         return json.dumps(self, indent=4)
+
+    def update_counters(self, other):
+        # if we end up here, that means the traces are equal. That means we only
+        # need to update the counters, rec_level/fn_args/name all these params are
+        # used for checking equality
+        self.call_count += other.call_count
+        self.wall_time += other.wall_time
+        self.cpu_time += other.cpu_time
+        self.mem_usage += other.mem_usage
+        self.peak_mem_usage += other.peak_mem_usage
 
 
 def _generate_trace_key(omit_sys_path_dirs, trace):
@@ -152,7 +228,12 @@ class BlackfireTraces(dict):
         # TODO: Some builtin functions have same name but different index
         #assert _trace_key not in self
 
-        self[_trace_key] = trace
+        if _trace_key in self:
+            # multiple ctx_id single session might endup same _trace_key being
+            # used more than once. In that case, we update the BlackfireTrace(Counter)
+            self[_trace_key].update_counters(trace)
+        else:
+            self[_trace_key] = trace
 
     def add_timeline(self, **kwargs):
         trace = BlackfireTrace(kwargs)
@@ -213,13 +294,16 @@ class BlackfireTraces(dict):
         print(json.dumps(self, indent=4))
 
 
-class _TraceEnumerator(dict):
+class _BlackfireTracesBase(dict):
 
-    def __init__(self, omit_sys_path_dirs):
+    def __init__(self, traces, timeline_traces, omit_sys_path_dirs):
+        self._traces = traces
+        self._timeline_traces = timeline_traces
         self._omit_sys_path_dirs = omit_sys_path_dirs
-        self._timeline_traces = []
 
-    def _enum_func_cbk(self, stat):
+        self._add_traces()
+
+    def _add_traces(self):
 
         def _is_special_function(fname_formatted):
             SPECIAL_FUNCS = [
@@ -233,46 +317,45 @@ class _TraceEnumerator(dict):
 
             return False
 
-        fname, fmodule, fname_formatted, flineno, fncall, fnactualcall, fbuiltin, \
-            fttot_wall, ftsub_wall, fttot_cpu, ftsub_cpu, findex, fchildren, fctxid, \
-            fmem_usage, fpeak_mem_usage, ffn_args, frec_level = stat
+        for trace in self._traces:
+            fname, fmodule, fname_formatted, flineno, fncall, fnactualcall, fbuiltin, \
+                fttot_wall, ftsub_wall, fttot_cpu, ftsub_cpu, findex, fchildren, fctxid, \
+                fmem_usage, fpeak_mem_usage, ffn_args, frec_level = trace
 
-        assert findex not in self, stat  # assert no duplicate index exists
+            assert findex not in self, trace  # assert no duplicate index exists
 
-        dir_path = os.path.dirname(os.path.normpath(fmodule))
-        last_dir = os.path.basename(dir_path)
+            dir_path = os.path.dirname(os.path.normpath(fmodule))
+            last_dir = os.path.basename(dir_path)
 
-        # Filter out profile specific modules like our profiler extension related
-        # call stack
-        if last_dir in ["blackfire"] or fmodule == '_blackfire_profiler':
-            if fname_formatted and not _is_special_function(fname_formatted):
-                return
-
-        # we do not generate the traceformat directly as for each children,
-        # we need to have the 'index' available. For this, we first add all
-        # traces and then call to_traceformat(...)
-        self[findex] = {
-            "name": fname,
-            "module": fmodule,
-            "name_formatted": fname_formatted or '',
-            "lineno": flineno,
-            "ncall": fncall,
-            "nnonrecursivecall": fnactualcall,
-            "is_builtin": fbuiltin,
-            "twall": fttot_wall,
-            "sub_twall": ftsub_wall,
-            "tcpu": fttot_cpu,
-            "sub_tcpu": ftsub_cpu,
-            "children": fchildren,
-            "ctx_id": fctxid,
-            "mem_usage": fmem_usage,
-            "peak_mem_usage": fpeak_mem_usage,
-            "fn_args": ffn_args or '',
-            "rec_level": frec_level,
-        }
-
-    def _enum_timeline_cbk(self, stat):
-        self._timeline_traces.append(stat)
+            # Filter out profile specific modules like our profiler extension related
+            # call stack
+            if last_dir in ["blackfire"] or fmodule == '_blackfire_profiler':
+                if fname_formatted and not _is_special_function(
+                    fname_formatted
+                ):
+                    continue
+            # we do not generate the traceformat directly as for each children,
+            # we need to have the 'index' available. For this, we first add all
+            # traces and then call to_traceformat(...)
+            self[findex] = {
+                "name": fname,
+                "module": fmodule,
+                "name_formatted": fname_formatted or '',
+                "lineno": flineno,
+                "ncall": fncall,
+                "nnonrecursivecall": fnactualcall,
+                "is_builtin": fbuiltin,
+                "twall": fttot_wall,
+                "sub_twall": ftsub_wall,
+                "tcpu": fttot_cpu,
+                "sub_tcpu": ftsub_cpu,
+                "children": fchildren,
+                "ctx_id": fctxid,
+                "mem_usage": fmem_usage,
+                "peak_mem_usage": fpeak_mem_usage,
+                "fn_args": ffn_args or '',
+                "rec_level": frec_level,
+            }
 
     def to_traceformat(self):
         """
@@ -374,11 +457,11 @@ class _TraceEnumerator(dict):
             )
 
             i += 1
-
         return result
 
 
 def start(
+    session_id=None,
     builtins=True,
     profile_cpu=True,
     profile_memory=True,
@@ -388,9 +471,6 @@ def start(
     timespan_threshold=MAX_TIMESPAN_THRESHOLD,  # ms
 ):
     global _max_prefix_cache, _timespan_selectors
-
-    if is_running():
-        return
 
     if not isinstance(timespan_selectors, dict):
         raise BlackfireProfilerException(
@@ -404,14 +484,15 @@ def start(
 
     _timespan_selectors = {}
 
-    profile_threads = False
     if profile_timespan:
         _timespan_selectors = timespan_selectors
-        _bfext.set_timespan_selector_callback(_fn_matches_timespan_selector)
+
+    if session_id is None:
+        session_id = _default_session_id_callback()
 
     _bfext.start(
+        session_id,
         builtins,
-        profile_threads,
         profile_cpu,
         profile_memory,
         profile_timespan,
@@ -420,26 +501,20 @@ def start(
     )
 
 
-def stop():
-    _bfext.stop()
+def stop(session_id=None):
+    if session_id is None:
+        session_id = _default_session_id_callback()
+
+    _bfext.stop(session_id)
 
 
-def get_traces(omit_sys_path_dirs=True):
-    '''
-    We need these _pause/_resume functions. That is because enumerating stats
-    are simply calling Python from C and that again can trigger a call_event on
-    profiler side which again can mutate the internal hash table that we are
-    enumerating. This might causes duplicate stats(or deadlocks! in some cases)
-    to be enumerated.
-    '''
-    _bfext._pause()
-    try:
-        traces = _TraceEnumerator(omit_sys_path_dirs)
-        _bfext.enum_func_stats(traces._enum_func_cbk)
-        _bfext.enum_timeline_stats(traces._enum_timeline_cbk)
-        return traces.to_traceformat()
-    finally:
-        _bfext._resume()
+def get_traces(session_id=None, omit_sys_path_dirs=True):
+    if session_id is None:
+        session_id = _default_session_id_callback()
+
+    traces, timeline_traces = _bfext.get_traces(session_id)
+    traces = _BlackfireTracesBase(traces, timeline_traces, omit_sys_path_dirs)
+    return traces.to_traceformat()
 
 
 @contextmanager
@@ -451,17 +526,21 @@ def run(builtins=False):
         stop()
 
 
-def is_running():
-    return bool(_bfext.is_running())
+def clear_traces(session_id=None):
+    if session_id is None:
+        session_id = _default_session_id_callback()
 
-
-def clear_traces():
-    _bfext._pause()
-    try:
-        _bfext.clear_stats()
-    finally:
-        _bfext._resume()
+    _bfext.clear_traces(session_id)
 
 
 def get_traced_memory():
     return _bfext.get_traced_memory()
+
+
+def get_sessions():
+    return _bfext._get_sessions()
+
+
+# import time
+if __name__ != '__main__':
+    initialize()
