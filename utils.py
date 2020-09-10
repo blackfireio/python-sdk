@@ -31,7 +31,11 @@ def import_module(mod_name):
         pass
 
 
-def function_wrapper(f, pre_func=None, post_func=None):
+def wrap(f, pre_func=None, post_func=None, orig=None):
+    """
+    orig: sometimes the original function might be different than f. Like what 
+    we do to patch sys.stdout: we convert it to StringIO and then patch.
+    """
 
     def wrapper(*args, **kwargs):
         if pre_func:
@@ -42,7 +46,23 @@ def function_wrapper(f, pre_func=None, post_func=None):
             if post_func:
                 post_func(*args, **kwargs)
 
+    if orig is not None:
+        wrapper._orig = orig
+    else:
+        wrapper._orig = f
+
     return wrapper
+
+
+def unwrap(obj, name):
+
+    f = getattr(obj, name)
+
+    # function wrapped?
+    if getattr(f, "_orig", None) is None:
+        return
+
+    setattr(obj, name, f._orig)
 
 
 def get_probed_runtime():
@@ -50,57 +70,6 @@ def get_probed_runtime():
         platform.python_implementation(), platform.python_version(),
         platform.platform()
     )
-
-
-# TODO: Use function_wrapper for SysHooks
-
-
-class SysHooks(object):
-
-    def __init__(self):
-        self.exit_code = 0  # if nothing happens, exit_code should be zero 0
-        self.stdout_len = 0
-        self.stderr_len = 0
-
-    def _sys_exit(self, code):
-        self.exit_code = code
-        self._orig_exit(code)
-
-    def _sys_excepthook(self, exc_type, exc_value, exc_traceback):
-        self.exit_code = 1
-        sys.__excepthook__(exc_type, exc_value, exc_traceback)
-
-    def _sys_stdout_write(self, s):
-        self.stdout_len += len(s)
-        self._orig_stdout_write(s)
-
-    def _sys_stderr_write(self, s):
-        self.stderr_len += len(s)
-        self._orig_stderr_write(s)
-
-    def unregister(self):
-        sys.stdout.write = self._orig_stdout_write
-        sys.stderr.write = self._orig_stderr_write
-        sys.exit = self._orig_exit
-
-    def register(self):
-        self._orig_exit = sys.exit
-        self._orig_stdout_write = sys.stdout.write
-        self._orig_stderr_write = sys.stderr.write
-        sys.exit = self._sys_exit
-        sys.excepthook = self._sys_excepthook
-
-        try:
-            sys.stdout.write = self._sys_stdout_write
-            sys.stderr.write = self._sys_stderr_write
-        except AttributeError:
-            # in Py2, stdout.write is a read-only attribute. To overcome this,
-            # we need to change stdout to StringIO and then monkey patch.
-            from StringIO import StringIO
-            sys.stdout = StringIO()
-            sys.stdout.write = self._sys_stdout_write
-            sys.stderr = StringIO()
-            sys.stderr.write = self._sys_stderr_write
 
 
 def get_load_avg():

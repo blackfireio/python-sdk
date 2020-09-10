@@ -1,4 +1,4 @@
-from blackfire.utils import function_wrapper, import_module, get_logger
+from blackfire.utils import wrap, import_module, get_logger
 
 log = get_logger(__name__)
 
@@ -44,10 +44,9 @@ def patch():
     # already patched?
     if getattr(module, '_blackfire_patch', False):
         return
-    setattr(module, '_blackfire_patch', True)
 
     try:
-        module.BaseHandler.load_middleware = function_wrapper(
+        module.BaseHandler.load_middleware = wrap(
             module.BaseHandler.load_middleware,
             pre_func=_insert_leading_middleware
         )
@@ -55,6 +54,8 @@ def patch():
         import django
         django_version = getattr(django, '__version__', None)
         log.debug('Django version %s patched.', (django_version))
+
+        setattr(module, '_blackfire_patch', True)
 
         return True
     except Exception as e:

@@ -10,7 +10,7 @@ import base64
 import random
 from contextlib import contextmanager
 from blackfire import profiler, VERSION, agent, generate_config, DEFAULT_CONFIG_FILE
-from blackfire.utils import SysHooks, IS_PY3, get_home_dir, ConfigParser, \
+from blackfire.utils import IS_PY3, get_home_dir, ConfigParser, \
     urlparse, urljoin, urlencode, get_load_avg, get_logger, quote, \
     parse_qsl, Request, urlopen, json_prettify, get_probed_runtime
 from blackfire.exceptions import BlackfireApiException
@@ -155,19 +155,19 @@ def enable(end_at_exit=False):
     _req_start = time.time()
 
     if end_at_exit:  # used for profiling CLI scripts
-        # install a exitcode hook to get the exit code by hooking into sys.exit
-        # and sys.excepthook, this is not called if application killed by a signal
-        sys_hooks = SysHooks()
-        sys_hooks.register()
+
+        # patch sys module to get the exit code/stdout/stderr output lengths
+        from blackfire.hooks.sys.patch import patch
+        from blackfire.hooks.sys import SysHooks
+
+        patch()
 
         def _deinitialize():
 
-            sys_hooks.unregister()
-
             headers = {}
-            headers['Response-Code'] = sys_hooks.exit_code
+            headers['Response-Code'] = SysHooks.exit_code
             headers['Response-Bytes'
-                    ] = sys_hooks.stdout_len + sys_hooks.stderr_len
+                    ] = SysHooks.stdout_len + SysHooks.stderr_len
             try:
                 end(headers=headers)
             except:
