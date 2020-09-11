@@ -77,10 +77,11 @@ class BlackfireDjangoMiddleware(object):
             response = self.get_response(request)
         finally:
             now = time.time()
+            elapsed_wt_usec = int((now - t0) * 1000000)
             apm.send_trace(
                 request,
                 controller_name=get_current_view_name(request),
-                wt=now - t0,
+                wt=elapsed_wt_usec,
                 timestamp=now,
                 uri=request.path,
                 framework="django",
