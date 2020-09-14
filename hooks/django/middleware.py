@@ -58,8 +58,11 @@ class BlackfireDjangoMiddleware(object):
         if 'HTTP_X_BLACKFIRE_QUERY' in request.META:
             return self._profiled_request(request)
 
-        if apm.trigger_auto_profile(request.method, request.path):
-            return self._apm_profiled_request(request)
+        trigger_auto_profile, key_page = apm.trigger_auto_profile(
+            request.method, request.path
+        )
+        if trigger_auto_profile:
+            return self._apm_profiled_request(request, key_page)
 
         if apm.trigger_trace():
             return self._apm_request(request)
@@ -68,8 +71,13 @@ class BlackfireDjangoMiddleware(object):
         response = self.get_response(request)
         return response
 
-    def _apm_profiled_request(self, request):
-        pass
+    def _apm_profiled_request(self, request, key_page):
+        log.debug("DjangoMiddleware._APM_profiled_request called.")
+
+        apm.auto_profile(request.method, request.path, key_page)
+
+        response = self.get_response(request)
+        return response
 
     def _apm_request(self, request):
         # TODO:

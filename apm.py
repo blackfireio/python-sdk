@@ -7,11 +7,12 @@ import platform
 import _blackfire_profiler as _bfext
 from blackfire.utils import get_logger, IS_PY3, json_prettify, ConfigParser, is_testing, ThreadPool
 from blackfire import agent, DEFAULT_AGENT_SOCKET, DEFAULT_AGENT_TIMEOUT, DEFAULT_CONFIG_FILE
-from blackfire.exceptions import BlackfireAPMException
+from contextlib import contextmanager
 
 _thread_pool = ThreadPool()
 
 log = get_logger(__name__)
+
 
 class RuntimeMetrics(object):
 
@@ -62,6 +63,7 @@ class ApmConfig(object):
 
 
 class ApmProbeConfig(object):
+
     def __init__(self):
         self.agent_socket = os.environ.get(
             'BLACKFIRE_AGENT_SOCKET', DEFAULT_AGENT_SOCKET
@@ -74,18 +76,18 @@ class ApmProbeConfig(object):
         # TODO: Config file initialization will be done later
         self.apm_enabled = bool(int(os.environ.get('BLACKFIRE_APM_ENABLED', 0)))
 
+
 _apm_config = ApmConfig()
 _apm_probe_config = ApmProbeConfig()
 
-
 # do not even evaluate the params if DEBUG is not set in APM path
-if log.isEnabledFor(logging.DEBUG):
-    log.debug(
-        "APM Configuration initialized. [%s] [%s] [%s]",
-        json_prettify(_apm_config.__dict__),
-        json_prettify(_apm_probe_config.__dict__),
-        os.getpid(),
-    )
+
+log.debug(
+    "APM Configuration initialized. [%s] [%s] [%s]",
+    json_prettify(_apm_config.__dict__),
+    json_prettify(_apm_probe_config.__dict__),
+    os.getpid(),
+)
 
 
 def reset():
@@ -115,74 +117,127 @@ def trigger_auto_profile(method, uri):
     global _apm_config
 
     for key_page in _apm_config.key_pages:
-        if key_page["matcher-type"] != "uri":
-            continue
-        
-        # auto-profile defined?
-        if key_page["profile"] != "true":
+
+        # skip key-page if mandatory fields are missing
+        if "matcher-pattern" not in key_page or "id" not in key_page:
+            log.warning(
+                "KeyPage skipped as mandatory fields are missing. [%s]",
+                key_page
+            )
             continue
 
-        # method matches?
-        if method != "*" and method.upper() != key_page["http-method"]:
+        # matcher-type is optional
+        matcher_type = key_page.get("matcher-type", "uri")
+        if matcher_type != "uri":
             continue
 
-        # TODO: need full uri or part of it?
+        # auto-profile defined? profile is optional
+        profile = key_page.get("profile", "false")
+        if profile == "false":
+            continue
+
+        # method matches? http_method is optional
+        http_method = key_page.get("http-method", "*")
+        if http_method != "*" and method != http_method:
+            continue
+
+        # TODO: need a custom regex pre-processing
         if re.match(key_page["matcher-pattern"], uri):
-            return True
-        
-    return False
+            log.debug(
+                "Uri:%s matched against matcher-pattern:%s." %
+                (uri, key_page["matcher-pattern"])
+            )
+            return True, key_page
+
+    return False, None
 
 
-def _send_trace(data):
-    global _apm_config, _apm_probe_config
+@contextmanager
+def get_agent_connection():
+    global _apm_probe_config
 
     agent_conn = agent.Connection(
         _apm_probe_config.agent_socket, _apm_probe_config.agent_timeout
     )
-
     try:
         agent_conn.connect()
-        agent_conn.send(data)
+        yield agent_conn
+    finally:
+        agent_conn.close()
 
-        # verify agent responds success
-        response_raw = agent_conn.recv()
-        agent_resp = agent.BlackfireAPMResponse().from_bytes(response_raw)
-        if 'false' in agent_resp.status_val_dict['success']:
-            raise BlackfireAPMException(agent_resp.status_val_dict['error'])
 
-        # Update config if any configuration update received
-        if len(agent_resp.args) or len(agent_resp.key_pages):
-            new_apm_config = ApmConfig()
-            try:
-                new_apm_config.sample_rate = float(
-                    agent_resp.args['sample-rate'][0]
+def _update_apm_config(response):
+    global _apm_config
+
+    agent_resp = agent.BlackfireAPMResponse().from_bytes(response)
+
+    # Update config if any configuration update received
+    if len(agent_resp.args) or len(agent_resp.key_pages):
+        new_apm_config = ApmConfig()
+        try:
+            new_apm_config.sample_rate = float(
+                agent_resp.args['sample-rate'][0]
+            )
+        except:
+            pass
+        try:
+            new_apm_config.extended_sample_rate = float(
+                agent_resp.args['extended-sample-rate'][0]
+            )
+        except:
+            pass
+
+        new_apm_config.key_pages = tuple(agent_resp.key_pages)
+
+        # update the process-wise global apm configuration. Once this is set
+        # the new HTTP requests making initialize() will get this new config
+        _apm_config = new_apm_config
+
+        if log.isEnabledFor(logging.DEBUG):
+            log.debug(
+                "APM Configuration updated. [%s] [%s]",
+                json_prettify(_apm_config.__dict__),
+                os.getpid(),
+            )
+
+
+def _send_trace(data):
+    try:
+        with get_agent_connection() as agent_conn:
+            agent_conn.send(data)
+
+            response_raw = agent_conn.recv()
+            _update_apm_config(response_raw)
+
+            if log.isEnabledFor(logging.DEBUG):
+                log.debug(
+                    "APM trace sent. [%s]",
+                    json_prettify(data),
                 )
-            except:
-                pass
-            try:
-                new_apm_config.extended_sample_rate = float(
-                    agent_resp.args['extended-sample-rate'][0]
-                )
-            except:
-                pass
-
-            new_apm_config.key_pages = tuple(agent_resp.key_pages)
-
-            # update the process-wise global apm configuration. Once this is set
-            # the new HTTP requests making initialize() will get this new config
-            _apm_config = new_apm_config
-
-        log.debug(
-            "APM trace sent. [%s]",
-            json_prettify(data),
-        )
 
     except Exception as e:
         if is_testing():
             raise e
         log.error("APM message could not be sent. [reason:%s]" % (e))
-    finally:
-        agent_conn.close()
+
+
+def auto_profile(method, uri, key_page):
+    # TODO: blackfire-auth header?
+    data = """file-format: BlackfireApmRequestProfileQuery
+        uri: {}
+        method: {}
+        key-page-id: {}\n""".format(method, uri, key_page["id"])
+    if IS_PY3:
+        data = bytes(data, 'ascii')
+    data += agent.Protocol.HEADER_MARKER
+
+    with get_agent_connection() as agent_conn:
+        agent_conn.send(data)
+
+        response_raw = agent_conn.recv()
+        agent_resp = agent.BlackfireAPMResponse().from_bytes(response_raw)
+
+        # TODO: Continue
 
 
 def send_trace(request, **kwargs):
@@ -196,10 +251,9 @@ def send_trace(request, **kwargs):
             # convert `_` to `-` in keys. e.g: controller_name -> controller-name
             k = k.replace('_', '-')
             data += "%s: %s\n" % (k, v)
-    data += "\n"
-
     if IS_PY3:
         data = bytes(data, 'ascii')
+    data += agent.Protocol.HEADER_MARKER
 
     # We should not have a blocking call in APM path. Do agent connection setup
     # socket send in a separate thread.
