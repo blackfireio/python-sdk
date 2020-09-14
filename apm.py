@@ -8,18 +8,25 @@ from blackfire.utils import get_logger, IS_PY3, json_prettify, ConfigParser, is_
 from blackfire import agent, DEFAULT_AGENT_SOCKET, DEFAULT_AGENT_TIMEOUT, DEFAULT_CONFIG_FILE
 from blackfire.exceptions import BlackfireAPMException
 
+_thread_pool = ThreadPool()
+
+log = get_logger(__name__)
 
 class RuntimeMetrics(object):
 
     CACHE_INTERVAL = 1.0
+    _last_collected = 0
+    _cache = {}
 
-    def __init__(self):
-        self._last_collected = 0
-        self._cache = {}
+    @classmethod
+    def reset(cls):
+        cls._last_collected = 0
+        cls._cache = {}
 
-    def memory(self):
-        if time.time() - self._last_collected <= self.CACHE_INTERVAL:
-            return self._cache["memory"]
+    @classmethod
+    def memory(cls):
+        if time.time() - cls._last_collected <= cls.CACHE_INTERVAL:
+            return cls._cache["memory"]
 
         import psutil
 
@@ -39,44 +46,50 @@ class RuntimeMetrics(object):
                 peak_usage = peak_usage * 1024
 
         result = (usage, peak_usage)
-        self._cache["memory"] = result
+        cls._cache["memory"] = result
         return result
 
 
 class ApmConfig(object):
 
-    def __init__(self):
-        self.sample_rate = 1.0
-        self.extended_sample_rate = 0.0
-        self.key_pages = ()
-        self.timespan_entries = ()
-        self.fn_arg_entries = ()
+    sample_rate = 1.0
+    extended_sample_rate = 0.0
+    key_pages = ()
+    timespan_entries = ()
+    fn_arg_entries = ()
+
+    @classmethod
+    def reset(cls):
+        cls.sample_rate = 1.0
+        cls.extended_sample_rate = 0.0
+        cls.key_pages = ()
+        cls.timespan_entries = ()
+        cls.fn_arg_entries = ()
 
 
 class ApmProbeConfig(object):
-
-    def __init__(self):
-        self.agent_socket = os.environ.get(
+    agent_socket = os.environ.get(
             'BLACKFIRE_AGENT_SOCKET', DEFAULT_AGENT_SOCKET
         )
-        self.agent_timeout = os.environ.get(
+    agent_timeout = os.environ.get(
+        'BLACKFIRE_AGENT_TIMEOUT', DEFAULT_AGENT_TIMEOUT
+    )
+    apm_enabled = bool(int(os.environ.get('BLACKFIRE_APM_ENABLED', 0)))
+
+    @classmethod
+    def reset(cls):
+        cls.agent_socket = os.environ.get(
+            'BLACKFIRE_AGENT_SOCKET', DEFAULT_AGENT_SOCKET
+        )
+        cls.agent_timeout = os.environ.get(
             'BLACKFIRE_AGENT_TIMEOUT', DEFAULT_AGENT_TIMEOUT
         )
 
         # read APM_ENABLED config from env.var.
         # TODO: Config file initialization will be done later
-        self.apm_enabled = bool(int(os.environ.get('BLACKFIRE_APM_ENABLED', 0)))
+        cls.apm_enabled = bool(int(os.environ.get('BLACKFIRE_APM_ENABLED', 0)))
 
 
-# init shared configuration from the C extension, this data will persist among
-# different interpreters in the same process
-_apm_config = ApmConfig()
-# init config for the APM for communicating with the Agent
-_apm_probe_config = ApmProbeConfig()
-_runtime_metrics = RuntimeMetrics()
-_thread_pool = ThreadPool()
-
-log = get_logger(__name__)
 
 # do not even evaluate the params if DEBUG is not set in APM path
 if log.isEnabledFor(logging.DEBUG):
@@ -89,32 +102,26 @@ if log.isEnabledFor(logging.DEBUG):
 
 
 def reset():
-    global _apm_config, _apm_probe_config, _runtime_metrics
-
-    _apm_config = ApmConfig()
+    ApmConfig.reset()
     # init config for the APM for communicating with the Agent
-    _apm_probe_config = ApmProbeConfig()
-    _runtime_metrics = RuntimeMetrics()
+    ApmProbeConfig.reset()
+    RuntimeMetrics.reset()
 
 
 def trigger_trace():
-    global _apm_config, _apm_probe_config
 
-    return _apm_probe_config.apm_enabled and \
-        _apm_config.sample_rate >= random.random()
+    return ApmProbeConfig.apm_enabled and \
+        ApmConfig.sample_rate >= random.random()
 
 
 def trigger_extended_trace():
-    global _apm_config, _apm_probe_config
-
-    return _apm_probe_config.apm_enabled and \
-        _apm_config.extended_sample_rate >= random.random()
+    return ApmProbeConfig.apm_enabled and \
+        ApmConfig.extended_sample_rate >= random.random()
 
 
 def _send_trace(data):
-    global _apm_config
     agent_conn = agent.Connection(
-        _apm_probe_config.agent_socket, _apm_probe_config.agent_timeout
+        ApmProbeConfig.agent_socket, ApmProbeConfig.agent_timeout
     )
 
     try:
@@ -129,25 +136,20 @@ def _send_trace(data):
 
         # Update config if any configuration update received
         if len(agent_resp.args) or len(agent_resp.key_pages):
-            new_apm_config = ApmConfig()
             try:
-                new_apm_config.sample_rate = float(
+                ApmConfig.sample_rate = float(
                     agent_resp.args['sample-rate'][0]
                 )
             except:
                 pass
             try:
-                new_apm_config.extended_sample_rate = float(
+                ApmConfig.extended_sample_rate = float(
                     agent_resp.args['extended-sample-rate'][0]
                 )
             except:
                 pass
 
-            new_apm_config.key_pages = tuple(agent_resp.key_pages)
-
-            # update the process-wise global apm configuration. Once this is set
-            # the new HTTP requests making initialize() will get this new config
-            _apm_config = new_apm_config
+            ApmConfig.key_pages = tuple(agent_resp.key_pages)
 
         log.debug(
             "APM trace sent. [%s]",
@@ -165,7 +167,7 @@ def _send_trace(data):
 def send_trace(request, **kwargs):
     data = """file-format: BlackfireApm
         sample-rate: {}
-    """.format(_apm_config.sample_rate)
+    """.format(ApmConfig.sample_rate)
     for k, v in kwargs.items():
         if v:
             # convert `_` to `-` in keys. e.g: controller_name -> controller-name
