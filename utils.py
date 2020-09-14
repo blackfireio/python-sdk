@@ -191,9 +191,9 @@ class ThreadPool(object):
         for _ in range(size):
             self._workers.append(_PoolWorker(self.tasks))
 
-    def apply(self, fn, *args, **kwargs):
+    def apply(self, fn, args=(), kwargs={}):
         if is_testing():
-            fn(args, kwargs)
+            fn(*args, **kwargs)
         else:
             self.tasks.put((fn, args, kwargs))
 

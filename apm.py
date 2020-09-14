@@ -4,7 +4,7 @@ import logging
 import time
 import platform
 import _blackfire_profiler as _bfext
-from blackfire.utils import get_logger, IS_PY3, json_prettify, ConfigParser, is_testing
+from blackfire.utils import get_logger, IS_PY3, json_prettify, ConfigParser, is_testing, ThreadPool
 from blackfire import agent, DEFAULT_AGENT_SOCKET, DEFAULT_AGENT_TIMEOUT, DEFAULT_CONFIG_FILE
 from blackfire.exceptions import BlackfireAPMException
 
@@ -74,6 +74,7 @@ _apm_config = ApmConfig()
 # init config for the APM for communicating with the Agent
 _apm_probe_config = ApmProbeConfig()
 _runtime_metrics = RuntimeMetrics()
+_thread_pool = ThreadPool()
 
 log = get_logger(__name__)
 
@@ -110,12 +111,74 @@ def trigger_extended_trace():
         _apm_config.extended_sample_rate >= random.random()
 
 
-def _send_trace_async(data):
-    return
+def _send_trace(data):
+    global _apm_config
+    agent_conn = agent.Connection(
+        _apm_probe_config.agent_socket, _apm_probe_config.agent_timeout
+    )
+
+    try:
+        agent_conn.connect()
+        agent_conn.send(data)
+
+        # verify agent responds success
+        response_raw = agent_conn.recv()
+        agent_resp = agent.BlackfireAPMResponse().from_bytes(response_raw)
+        if 'false' in agent_resp.status_val_dict['success']:
+            raise BlackfireAPMException(agent_resp.status_val_dict['error'])
+
+        # Update config if any configuration update received
+        if len(agent_resp.args) or len(agent_resp.key_pages):
+            new_apm_config = ApmConfig()
+            try:
+                new_apm_config.sample_rate = float(
+                    agent_resp.args['sample-rate'][0]
+                )
+            except:
+                pass
+            try:
+                new_apm_config.extended_sample_rate = float(
+                    agent_resp.args['extended-sample-rate'][0]
+                )
+            except:
+                pass
+
+            new_apm_config.key_pages = tuple(agent_resp.key_pages)
+
+            # update the process-wise global apm configuration. Once this is set
+            # the new HTTP requests making initialize() will get this new config
+            _apm_config = new_apm_config
+
+        log.debug(
+            "APM trace sent. [%s]",
+            json_prettify(data),
+        )
+
+    except Exception as e:
+        if is_testing():
+            raise e
+        log.error("APM message could not be sent. [reason:%s]" % (e))
+    finally:
+        agent_conn.close()
 
 
 def send_trace(request, **kwargs):
-    return
+    data = """file-format: BlackfireApm
+        sample-rate: {}
+    """.format(_apm_config.sample_rate)
+    for k, v in kwargs.items():
+        if v:
+            # convert `_` to `-` in keys. e.g: controller_name -> controller-name
+            k = k.replace('_', '-')
+            data += "%s: %s\n" % (k, v)
+    data += "\n"
+
+    if IS_PY3:
+        data = bytes(data, 'ascii')
+
+    # We should not have a blocking call in APM path. Do agent connection setup
+    # socket send in a separate thread.
+    _thread_pool.apply(_send_trace, args=(data, ))
 
 
 def send_extended_trace(request, **kwargs):
