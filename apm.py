@@ -221,7 +221,7 @@ def _send_trace(data):
         log.error("APM message could not be sent. [reason:%s]" % (e))
 
 
-def auto_profile(method, uri, key_page):
+def get_autoprofile_signature(method, uri, key_page):
     # TODO: blackfire-auth header?
     data = """file-format: BlackfireApmRequestProfileQuery
         uri: {}
@@ -237,7 +237,7 @@ def auto_profile(method, uri, key_page):
         response_raw = agent_conn.recv()
         agent_resp = agent.BlackfireAPMResponse().from_bytes(response_raw)
 
-        # TODO: Continue
+        return agent_resp.args['blackfire-query'][0]
 
 
 def send_trace(request, **kwargs):

@@ -56,26 +56,25 @@ class BlackfireDjangoMiddleware(object):
 
     def __call__(self, request):
         if 'HTTP_X_BLACKFIRE_QUERY' in request.META:
-            return self._profiled_request(request)
+            return self._profiled_request(
+                request, request.META['HTTP_X_BLACKFIRE_QUERY']
+            )
 
         trigger_auto_profile, key_page = apm.trigger_auto_profile(
             request.method, request.path
         )
         if trigger_auto_profile:
-            return self._apm_profiled_request(request, key_page)
+            log.debug("DjangoMiddleware autoprofile triggered.")
+            query = apm.get_autoprofile_query(
+                request.method, request.path, key_page
+            )
+
+            return self._profiled_request(request, query)
 
         if apm.trigger_trace():
             return self._apm_request(request)
 
         # no instrumentation
-        response = self.get_response(request)
-        return response
-
-    def _apm_profiled_request(self, request, key_page):
-        log.debug("DjangoMiddleware._APM_profiled_request called.")
-
-        apm.auto_profile(request.method, request.path, key_page)
-
         response = self.get_response(request)
         return response
 
@@ -152,10 +151,10 @@ class BlackfireDjangoMiddleware(object):
         except Exception as e:
             log.exception(e)
 
-    def _profiled_request(self, request):
+    def _profiled_request(self, request, query):
         log.debug("DjangoMiddleware._profiled_request called.")
         try:
-            probe_err = try_enable_probe(request.META['HTTP_X_BLACKFIRE_QUERY'])
+            probe_err = try_enable_probe(query)
 
             if not probe_err:
                 self._enable_sql_instrumentation()
