@@ -68,8 +68,9 @@ class BlackfireDjangoMiddleware(object):
             query = apm.get_autoprofile_query(
                 request.method, request.path, key_page
             )
-
-            return self._profiled_request(request, query)
+            return
+            # TODO:
+            #return self._profiled_request(request, query)
 
         if apm.trigger_trace():
             return self._apm_request(request)
