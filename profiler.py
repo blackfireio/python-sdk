@@ -473,7 +473,7 @@ def start(
     timespan_selectors={},
     timespan_threshold=MAX_TIMESPAN_THRESHOLD,  # ms
 ):
-    global _max_prefix_cache, _timespan_selectors, log
+    global _max_prefix_cache, _timespan_selectors
 
     if not isinstance(timespan_selectors, dict):
         raise BlackfireProfilerException(
@@ -493,8 +493,6 @@ def start(
     if session_id is None:
         session_id = _default_session_id_callback()
 
-    log.debug("Profiler started with session_id=%s" % (session_id))
-
     _bfext.start(
         session_id,
         builtins,
@@ -511,8 +509,6 @@ def stop(session_id=None):
 
     if session_id is None:
         session_id = _default_session_id_callback()
-
-    log.debug("Profiler stopped with session_id=%s" % (session_id))
 
     _bfext.stop(session_id)
 
