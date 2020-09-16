@@ -113,6 +113,7 @@ class _DefaultSessionIDManager(BaseSessionIDManager):
     _tlocal = threading.local()
     _counter = 0  # monotonic
     _counter_lock = threading.Lock()
+    MAX_COUNTER_SIZE = 2**32  # counter should not be greater than uint32
 
     @classmethod
     def get(cls):
@@ -120,6 +121,8 @@ class _DefaultSessionIDManager(BaseSessionIDManager):
             return cls._tlocal._session_id
         except AttributeError:
             with cls._counter_lock:
+                if cls._counter == cls.MAX_COUNTER_SIZE:
+                    cls._counter = 0  # restart
                 cls._counter += 1
                 cls._tlocal._session_id = cls._counter
 
@@ -470,7 +473,7 @@ def start(
     timespan_selectors={},
     timespan_threshold=MAX_TIMESPAN_THRESHOLD,  # ms
 ):
-    global _max_prefix_cache, _timespan_selectors
+    global _max_prefix_cache, _timespan_selectors, log
 
     if not isinstance(timespan_selectors, dict):
         raise BlackfireProfilerException(
@@ -490,6 +493,8 @@ def start(
     if session_id is None:
         session_id = _default_session_id_callback()
 
+    log.debug("Profiler started with session_id=%s" % (session_id))
+
     _bfext.start(
         session_id,
         builtins,
@@ -502,8 +507,12 @@ def start(
 
 
 def stop(session_id=None):
+    global log
+
     if session_id is None:
         session_id = _default_session_id_callback()
+
+    log.debug("Profiler stopped with session_id=%s" % (session_id))
 
     _bfext.stop(session_id)
 

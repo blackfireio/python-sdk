@@ -20,9 +20,6 @@ log = get_logger(__name__)
 
 # globals
 _config = None
-_enabled = False
-_agent_conn = None
-_req_start = None
 _probe = None
 
 _DEFAULT_OMIT_SYS_PATH = True
