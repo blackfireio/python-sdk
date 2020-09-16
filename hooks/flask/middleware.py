@@ -2,7 +2,7 @@ import time
 import platform
 from blackfire import apm, VERSION
 from blackfire.utils import get_logger, get_probed_runtime
-from blackfire.hooks.utils import try_enable_probe, try_end_probe, reset_probe, add_probe_response_header
+from blackfire.hooks.utils import try_enable_probe, try_end_probe, add_probe_response_header
 
 log = get_logger(__name__)
 
@@ -55,6 +55,7 @@ class BlackfireFlaskMiddleware(object):
         req_context.profile = False
         req_context.req_start = time.time()
         req_context.probe_err = None
+        req_context.probe = None
 
         log.debug("FlaskMiddleware._before_request called.")
 
@@ -64,14 +65,24 @@ class BlackfireFlaskMiddleware(object):
         # requests. Look at the request object of the current response to determine
         # for finishing the profile session
         if 'HTTP_X_BLACKFIRE_QUERY' in request.environ:
-            req_context.probe_err = try_enable_probe(
+            req_context.probe_err, req_context.probe = try_enable_probe(
                 request.environ['HTTP_X_BLACKFIRE_QUERY']
             )
             req_context.profile = True
             return
 
-        # TODO: If key-page matches and profile: true then make a BlackfireApmRequestProfileQuery
-        # to the agent and if we receive a signature call try_enable_probe()
+        # auto-profile triggered?
+        trigger_auto_profile, key_page = apm.trigger_auto_profile(
+            request.method, request.path
+        )
+        if trigger_auto_profile:
+            log.debug("DjangoMiddleware autoprofile triggered.")
+            query = apm.get_autoprofile_query(
+                request.method, request.path, key_page
+            )
+            req_context.probe_err, req_context.probe = try_enable_probe(query)
+            req_context.profile = True
+            return
 
         if apm.trigger_trace():
             # TODO:
@@ -94,6 +105,7 @@ class BlackfireFlaskMiddleware(object):
                     return response
 
                 probe_resp = try_end_probe(
+                    req_context.probe,
                     response_status_code=response.status_code,
                     response_len=response.headers['Content-Length'],
                     http_method=request.method,
@@ -147,5 +159,8 @@ class BlackfireFlaskMiddleware(object):
 
     def _teardown_request(self, exception):
         log.debug("FlaskMiddleware._teardown_request called.")
+        req_context = get_request_context()
 
-        reset_probe()
+        if req_context.probe:
+            req_context.probe.disable()
+            req_context.probe.clear_traces()

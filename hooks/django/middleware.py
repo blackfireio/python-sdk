@@ -1,8 +1,8 @@
 import time
 import platform
-from blackfire import probe, apm, VERSION
+from blackfire import probe, apm, VERSION, generate_config
 from blackfire.utils import get_logger, get_probed_runtime
-from blackfire.hooks.utils import try_enable_probe, try_end_probe, add_probe_response_header, reset_probe
+from blackfire.hooks.utils import try_enable_probe, try_end_probe, add_probe_response_header
 from blackfire.hooks.django.utils import get_current_view_name
 
 log = get_logger(__name__)
@@ -55,11 +55,13 @@ class BlackfireDjangoMiddleware(object):
         # One-time configuration and initialization.
 
     def __call__(self, request):
+        # regular profile
         if 'HTTP_X_BLACKFIRE_QUERY' in request.META:
             return self._profiled_request(
                 request, request.META['HTTP_X_BLACKFIRE_QUERY']
             )
 
+        # auto-profile triggered?
         trigger_auto_profile, key_page = apm.trigger_auto_profile(
             request.method, request.path
         )
@@ -68,9 +70,8 @@ class BlackfireDjangoMiddleware(object):
             query = apm.get_autoprofile_query(
                 request.method, request.path, key_page
             )
-            return
-            # TODO:
-            #return self._profiled_request(request, query)
+
+            return self._profiled_request(request, query)
 
         if apm.trigger_trace():
             return self._apm_request(request)
@@ -154,9 +155,9 @@ class BlackfireDjangoMiddleware(object):
 
     def _profiled_request(self, request, query):
         log.debug("DjangoMiddleware._profiled_request called.")
-        try:
-            probe_err = try_enable_probe(query)
 
+        try:
+            probe_err, new_probe = try_enable_probe(query)
             if not probe_err:
                 self._enable_sql_instrumentation()
 
@@ -168,6 +169,7 @@ class BlackfireDjangoMiddleware(object):
                 return response
 
             probe_resp = try_end_probe(
+                new_probe,
                 response_status_code=response.status_code,
                 response_len=len(response.content),
                 http_method=request.method,
@@ -196,4 +198,5 @@ class BlackfireDjangoMiddleware(object):
             # code that will be run no matter what happened above
             self._disable_sql_instrumentation()
 
-            reset_probe()
+            new_probe.disable()
+            new_probe.clear_traces()

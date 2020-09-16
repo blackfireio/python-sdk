@@ -1,6 +1,6 @@
 import os
 import sys
-from blackfire import probe
+from blackfire import probe, generate_config
 from blackfire.utils import get_logger
 
 log = get_logger(__name__)
@@ -14,24 +14,24 @@ def format_exc_for_display():
 
 
 def try_enable_probe(query):
-    probe_err = None
+    probe_err = new_probe = None
     try:
-        probe.initialize(query=query, _method="middleware")
-
-        probe.enable()
+        config = generate_config(query=query)
+        new_probe = probe.Probe(config=config)
+        new_probe.enable()
     except Exception as e:
         # TODO: Is this really quote or urlencode?
         probe_err = ('X-Blackfire-Error', '101 ' + format_exc_for_display())
         log.exception(e)
-    return probe_err
+    return probe_err, new_probe
 
 
-def try_end_probe(response_status_code, response_len, **kwargs):
+def try_end_probe(new_probe, response_status_code, response_len, **kwargs):
     try:
         headers = {}
         headers['Response-Code'] = response_status_code
         headers['Response-Bytes'] = response_len
-        _agent_status_val = probe._agent_conn.agent_response.status_val
+        _agent_status_val = new_probe._agent_conn.agent_response.status_val
 
         context_dict = {}
         for k, v in kwargs.items():
@@ -39,7 +39,7 @@ def try_end_probe(response_status_code, response_len, **kwargs):
                 context_dict[k] = v
         headers['Context'] = context_dict
 
-        probe.end(headers=headers)
+        new_probe.end(headers=headers)
 
         return ('X-Blackfire-Response', _agent_status_val)
     except:
@@ -48,8 +48,3 @@ def try_end_probe(response_status_code, response_len, **kwargs):
 
 def add_probe_response_header(http_response, probe_response):
     http_response[probe_response[0]] = probe_response[1]
-
-
-def reset_probe():
-    probe.disable()
-    probe.clear_traces()
