@@ -44,6 +44,12 @@ class Probe(object):
     def is_enabled(self):
         return self._enabled
 
+    def get_agent_prolog_response(self):
+        '''Returns the first response of the Agent in prolog dialogue'''
+        assert self._agent_conn is not None
+
+        return self._agent_conn.agent_response
+
     def enable(self):
         if self._enabled:
             raise BlackfireApiException('Another probe is already profiling')

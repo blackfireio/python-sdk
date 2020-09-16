@@ -31,7 +31,7 @@ def try_end_probe(new_probe, response_status_code, response_len, **kwargs):
         headers = {}
         headers['Response-Code'] = response_status_code
         headers['Response-Bytes'] = response_len
-        _agent_status_val = new_probe._agent_conn.agent_response.status_val
+        _agent_status_val = new_probe.get_agent_prolog_response().status_val
 
         context_dict = {}
         for k, v in kwargs.items():
