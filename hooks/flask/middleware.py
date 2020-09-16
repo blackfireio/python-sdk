@@ -73,7 +73,7 @@ class BlackfireFlaskMiddleware(object):
 
         # auto-profile triggered?
         trigger_auto_profile, key_page = apm.trigger_auto_profile(
-            request.method, request.path
+            request.method, request.path, request.endpoint
         )
         if trigger_auto_profile:
             log.debug("DjangoMiddleware autoprofile triggered.")

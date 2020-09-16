@@ -63,7 +63,7 @@ class BlackfireDjangoMiddleware(object):
 
         # auto-profile triggered?
         trigger_auto_profile, key_page = apm.trigger_auto_profile(
-            request.method, request.path
+            request.method, request.path, get_current_view_name(request)
         )
         if trigger_auto_profile:
             log.debug("DjangoMiddleware autoprofile triggered.")
@@ -198,5 +198,6 @@ class BlackfireDjangoMiddleware(object):
             # code that will be run no matter what happened above
             self._disable_sql_instrumentation()
 
-            new_probe.disable()
-            new_probe.clear_traces()
+            if new_probe:
+                new_probe.disable()
+                new_probe.clear_traces()

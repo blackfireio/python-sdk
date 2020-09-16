@@ -16,6 +16,7 @@ def format_exc_for_display():
 def try_enable_probe(query):
     probe_err = new_probe = None
     try:
+        print("try_enable_probe query=", query)
         config = generate_config(query=query)
         new_probe = probe.Probe(config=config)
         new_probe.enable()

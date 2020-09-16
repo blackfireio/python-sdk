@@ -113,7 +113,7 @@ def trigger_extended_trace():
         _apm_config.extended_sample_rate >= random.random()
 
 
-def trigger_auto_profile(method, uri):
+def trigger_auto_profile(method, uri, controller_name):
     global _apm_config
 
     for key_page in _apm_config.key_pages:
@@ -126,14 +126,14 @@ def trigger_auto_profile(method, uri):
             )
             continue
 
-        # matcher-type is optional
-        matcher_type = key_page.get("matcher-type", "uri")
-        if matcher_type != "uri":
-            continue
-
         # auto-profile defined? profile is optional
         profile = key_page.get("profile", "false")
         if profile == "false":
+            continue
+
+        # matcher-type is optional
+        matcher_type = key_page.get("matcher-type", "uri")
+        if matcher_type not in ["uri", "controller"]:
             continue
 
         # method matches? http_method is optional
@@ -141,13 +141,21 @@ def trigger_auto_profile(method, uri):
         if http_method != "*" and method != http_method:
             continue
 
-        # TODO: need a custom regex pre-processing
-        if re.match(key_page["matcher-pattern"], uri):
-            log.debug(
-                "Uri:%s matched against matcher-pattern:%s." %
-                (uri, key_page["matcher-pattern"])
-            )
-            return True, key_page
+        # first char is '=' for equal matcher and '#' or '/' for regex matcher
+        matcher_pattern = key_page["matcher-pattern"]
+        matcher_value = uri
+        if matcher_type == 'controller':
+            matcher_value = controller_name
+        if matcher_pattern[0] == '=':
+            if matcher_pattern[1:] == matcher_value:
+                return True, key_page
+        elif matcher_pattern[0] == '/' or matcher_pattern[0] == '#':
+            if re.match(matcher_pattern[1:], matcher_value):
+                log.debug(
+                    "matcher_value:%s matched against matcher-pattern:%s." %
+                    (matcher_value, key_page["matcher-pattern"])
+                )
+                return True, key_page
 
     return False, None
 
