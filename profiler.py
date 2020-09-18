@@ -113,7 +113,7 @@ class _DefaultSessionIDManager(BaseSessionIDManager):
     _tlocal = threading.local()
     _counter = 0  # monotonic
     _counter_lock = threading.Lock()
-    MAX_COUNTER_SIZE = 2**32  # counter should not be greater than uint32
+    MAX_COUNTER_SIZE = (2**32) - 1  # counter should not be greater than uint32
 
     @classmethod
     def get(cls):
