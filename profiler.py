@@ -505,8 +505,6 @@ def start(
 
 
 def stop(session_id=None):
-    global log
-
     if session_id is None:
         session_id = _default_session_id_callback()
 
