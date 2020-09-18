@@ -108,6 +108,8 @@ class BlackfireFlaskMiddleware(object):
                     req_context.probe,
                     response_status_code=response.status_code,
                     response_len=response.headers['Content-Length'],
+                    controller_name=request.endpoint,
+                    framework="flask",
                     http_method=request.method,
                     http_uri=request.path,
                     https='1' if request.is_secure else '',

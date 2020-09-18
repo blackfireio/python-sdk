@@ -16,7 +16,6 @@ def format_exc_for_display():
 def try_enable_probe(query):
     probe_err = new_probe = None
     try:
-        print("try_enable_probe query=", query)
         config = generate_config(query=query)
         new_probe = probe.Probe(config=config)
         new_probe.enable()
@@ -27,12 +26,18 @@ def try_enable_probe(query):
     return probe_err, new_probe
 
 
-def try_end_probe(new_probe, response_status_code, response_len, **kwargs):
+def try_end_probe(
+    new_probe, response_status_code, response_len, controller_name, framework,
+    **kwargs
+):
     try:
+        agent_status_val = new_probe.get_agent_prolog_response().status_val
+
         headers = {}
         headers['Response-Code'] = response_status_code
         headers['Response-Bytes'] = response_len
-        _agent_status_val = new_probe.get_agent_prolog_response().status_val
+        headers['controller-name'] = controller_name
+        headers['framework'] = framework
 
         context_dict = {}
         for k, v in kwargs.items():
@@ -42,7 +47,7 @@ def try_end_probe(new_probe, response_status_code, response_len, **kwargs):
 
         new_probe.end(headers=headers)
 
-        return ('X-Blackfire-Response', _agent_status_val)
+        return ('X-Blackfire-Response', agent_status_val)
     except:
         return ('X-Blackfire-Error', '101 ' + format_exc_for_display())
 

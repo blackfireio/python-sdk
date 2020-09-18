@@ -172,6 +172,8 @@ class BlackfireDjangoMiddleware(object):
                 new_probe,
                 response_status_code=response.status_code,
                 response_len=len(response.content),
+                controller_name=get_current_view_name(request),
+                framework="django",
                 http_method=request.method,
                 http_uri=request.path,
                 https='1' if request.is_secure() else '',
