@@ -150,7 +150,8 @@ def trigger_auto_profile(method, uri, controller_name):
             if matcher_pattern[1:] == matcher_value:
                 return True, key_page
         elif matcher_pattern[0] == '/' or matcher_pattern[0] == '#':
-            if re.match(matcher_pattern[1:], matcher_value):
+            # first and last chars are regex chars
+            if re.match(matcher_pattern[1:-1], matcher_value):
                 log.debug(
                     "matcher_value:%s matched against matcher-pattern:%s." %
                     (matcher_value, key_page["matcher-pattern"])
