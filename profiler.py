@@ -493,6 +493,8 @@ def start(
     if session_id is None:
         session_id = _default_session_id_callback()
 
+    print("start prof")
+
     _bfext.start(
         session_id,
         builtins,
@@ -507,6 +509,8 @@ def start(
 def stop(session_id=None):
     if session_id is None:
         session_id = _default_session_id_callback()
+
+    print("stop prof")
 
     _bfext.stop(session_id)
 
