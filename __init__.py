@@ -118,10 +118,10 @@ atexit.register(_stop_at_exit)
 
 def _uninstall_bootstrap(override_site_packages_dir=None):
     if override_site_packages_dir and isinstance(override_site_packages_dir, str):
-            site_packages_dir = override_site_packages_dir
-        else:
-            site_packages_dir = get_python_lib()
-            
+        site_packages_dir = override_site_packages_dir
+    else:
+        site_packages_dir = get_python_lib()
+
     bootstrap_pth_file = os.path.join(
         site_packages_dir, 'zzz_blackfire_bootstrap.pth'
     )
