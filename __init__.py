@@ -131,7 +131,7 @@ def _uninstall_bootstrap():
     print("The pre-interpreter hook files has been uninstalled.")
 
 
-def _install_bootstrap():
+def _install_bootstrap(override_site_packages_dir=None):
     # add zzz_bootstrap.pth to site-packages dir for the init code. This is to
     # run code at pre-interpreter startup. This is especially needed for 'blackfire run'
     # cmd as we will enable profiler if BLACKFIRE_QUERY is in env. vars. There seems to be
@@ -143,9 +143,17 @@ def _install_bootstrap():
     # to the orig. sitecustomize on uninstall. So, the second way is cleaner
     # at least for uninstall operations. There are also other libs choosing this
     # approach. See: https://nedbatchelder.com/blog/201001/running_code_at_python_startup.html
+    # 
+    # 
+    # If override_site_packages_dir is set to a string, use this directory instead of the default one reported by the system.
+    # Useful in special cases and special configurations.
     site_packages_dir = None
     try:
-        site_packages_dir = get_python_lib()
+        if override_site_packages_dir and isinstance(override_site_packages_dir, str):
+            site_packages_dir = override_site_packages_dir
+        else:
+            site_packages_dir = get_python_lib()
+
         # generate the .pth file to be loaded at startup
         bootstrap_pth_file = os.path.join(
             site_packages_dir, 'zzz_blackfire_bootstrap.pth'
