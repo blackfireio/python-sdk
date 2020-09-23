@@ -79,8 +79,6 @@ def _format_funcname(module, name):
     # drop the extension
     module = os.path.splitext(module)[0]
 
-    #print("fffff ->", "%s.%s" % (module, name), _max_prefix_cache)
-
     return "%s.%s" % (module, name)
 
 
