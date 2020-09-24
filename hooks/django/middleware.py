@@ -84,16 +84,21 @@ class BlackfireDjangoMiddleware(object):
         # TODO:
         #_ = apm.trigger_extended_trace()
 
+        apm.start_memory_profiler()
         t0 = time.time()
         try:
             response = self.get_response(request)
         finally:
+            mu, pmu = apm.get_traced_memory()
+            apm.stop_memory_profiler()
             now = time.time()
             elapsed_wt_usec = int((now - t0) * 1000000)
             apm.send_trace(
                 request,
                 controller_name=get_current_view_name(request),
                 wt=elapsed_wt_usec,
+                mu=mu,
+                pmu=pmu,
                 timestamp=now,
                 uri=request.path,
                 framework="django",

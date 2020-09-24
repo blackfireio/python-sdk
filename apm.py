@@ -3,6 +3,7 @@ import os
 import logging
 import time
 import re
+import sys
 import platform
 import _blackfire_profiler as _bfext
 from blackfire.utils import get_logger, IS_PY3, json_prettify, ConfigParser, is_testing, ThreadPool
@@ -14,7 +15,7 @@ _thread_pool = ThreadPool()
 log = get_logger(__name__)
 
 
-class RuntimeMetrics(object):
+class _RuntimeMetrics(object):
 
     CACHE_INTERVAL = 1.0
     _last_collected = 0
@@ -89,6 +90,29 @@ log.debug(
     os.getpid(),
 )
 
+_MEMALLOCATOR_API_AVAILABLE = sys.version_info[
+    0] == 3 and sys.version_info[1] >= 5
+
+
+def start_memory_profiler():
+    if _MEMALLOCATOR_API_AVAILABLE:
+        log.debug("APM memory profiler activated.")
+        _bfext.start_memory_profiler()
+
+
+def stop_memory_profiler():
+    _bfext.stop_memory_profiler()
+    _RuntimeMetrics.reset()
+
+    log.debug("APM memory profiler deactivated.")
+
+
+def get_traced_memory():
+    if _MEMALLOCATOR_API_AVAILABLE:
+        return _bfext.get_traced_memory()
+    else:
+        return _RuntimeMetrics.memory()
+
 
 def reset():
     global _apm_config, _apm_probe_config, _runtime_metrics
@@ -96,7 +120,7 @@ def reset():
     _apm_config = ApmConfig()
     # init config for the APM for communicating with the Agent
     _apm_probe_config = ApmProbeConfig()
-    RuntimeMetrics.reset()
+    _RuntimeMetrics.reset()
 
 
 def trigger_trace():
