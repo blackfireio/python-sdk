@@ -35,7 +35,7 @@ elif cmd == 'uninstall-bootstrap':
         "\n\nDo you confirm? [y/N]: "
     r = console_input(q).lower().strip()
     if r == 'y':
-        _uninstall_bootstrap(options.site_packages_dir)
+        _uninstall_bootstrap(override_site_packages_dir=options.site_packages_dir)
 elif cmd == 'hello-world':
     hello_world()
 else:
