@@ -165,11 +165,14 @@ def bootstrap_python():
                     executable = None
 
     if executable is None:
-        executable = spawn.find_executable(sys.argv[1])
+        executable = sys.argv[1]
         args = sys.argv[2:]
     else:
-        executable = spawn.find_executable(executable)
         args = sys.argv[1:]
+
+    executable_path = spawn.find_executable(executable)
+    if executable_path is None:
+        raise Exception('`%s` is not a valid executable.' % (executable))
 
     log.debug(
         'Executing command = %s (executable=%s, args=%s)', cmd, executable, args
