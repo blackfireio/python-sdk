@@ -18,7 +18,7 @@ from distutils import spawn
 __all__ = [
     'BlackfireConfiguration',
     'VERSION',
-    'process_bootstrap',
+    'bootstrap_python',
     'patch_all',
     'profile',
     'generate_config',
@@ -45,6 +45,7 @@ DEFAULT_AGENT_TIMEOUT = 0.25
 DEFAULT_AGENT_SOCKET = _get_default_agent_socket()
 _DEFAULT_ENDPOINT = 'https://blackfire.io/'
 DEFAULT_CONFIG_FILE = os.path.join(get_home_dir(), '.blackfire.ini')
+BLACKFIRE_CLI_EXEC = 'blackfire'
 
 log = get_logger("blackfire.init")
 
@@ -133,6 +134,56 @@ def _add_bootstrap_to_pythonpath(bootstrap_dir):
         os.environ['PYTHONPATH'] = bootstrap_dir
 
 
+def _print_help():
+    help_string = '''
+Usage: blackfire-python <program>
+       blackfire-python [options] run [options] <program>
+       blackfire-python help <command>
+
+blackfire-python will make the Python program <program> instrumentable by Blackfire without any code modification.
+
+Commands:
+
+  run		Enable code instrumentation and start profiling immediately with "blackfire run".
+  help		Provide help
+
+For more information on blackfire-python, please visit https://blackfire.io/docs.
+    '''
+    if spawn.find_executable(BLACKFIRE_CLI_EXEC) is None:
+        help_string += '\nWarning: The "blackfire" CLI is not installed. It is needed for the "run"' \
+            'command to work properly.\nPlease visit https://blackfire.io/docs/up-and-running/installation ' \
+            'to install it.\n'
+    print(help_string)
+
+
+def _print_help_run():
+    help_string = '''
+Usage: blackfire-python <program>
+       blackfire-python [options] run [options] <program>
+       blackfire-python help <command>
+
+Help for the "run" command:
+
+Enable code instrumentation, run a python program, and starts profiling
+immediately.
+
+blackfire-python [options] run [options] <program>
+
+The "blackfire-python run" command is a proxy for "blackfire run".
+Any options accepted by "blackfire run" are available in this command.
+To learn more, please run "blackfire help run".
+
+For more information on blackfire-python, please visit https://blackfire.io/docs.
+'''
+
+    if spawn.find_executable(BLACKFIRE_CLI_EXEC) is None:
+        help_string += '\nWarning: The "blackfire" CLI is not installed. It is needed for the "run"' \
+            'command to work properly.\nPlease visit https://blackfire.io/docs/up-and-running/installation ' \
+            'to install it.\n'
+
+    print(help_string)
+
+
 def bootstrap_python():
     global ext_dir
 
@@ -143,26 +194,32 @@ def bootstrap_python():
     log.debug('PYTHONPATH: %s' % os.environ['PYTHONPATH'])
 
     if len(sys.argv) < 2:
-        raise Exception("No command specified '%s'" % (sys.argv[1:]))
+        _print_help()
+        sys.exit(1)
 
     # `blackfire-python` cmd has a run command that propagates the call to `blackfire run`.
     # `blackfire run` arguments can either be passed as prefixes and/or suffixes.
     # There are also commands like `blackfire-python python3 myapp.py run` which should
-    # not be propagated to `bf run`. To differentiate having a run command and not having
+    # not be propagated to `blackfire run`. To differentiate having a run command and not having
     # it is: looking at the prefix of run and checking if the arguments are valid for
     # `blackfire run`. Specifically: if they start with `-` or `--`. One more exception to
     # this is: `blackfire-python help run`. `help` is also a valid prefix, too.
     cmd = sys.argv[1:]
+
+    if len(cmd) == 1 and cmd[0] == 'help':
+        _print_help()
+        sys.exit(1)
+    elif len(cmd) == 2 and cmd[0] == 'help' and cmd[1] == 'run':
+        _print_help_run()
+        sys.exit(1)
+
     run_index = cmd.index('run') if 'run' in cmd else None
     executable = None
     if run_index is not None:
-        if run_index == 1 and cmd[0] == 'help':
-            executable = 'blackfire'
-        else:
-            executable = 'blackfire'
-            for i in range(run_index):
-                if not cmd[i][0] in ['-', '--']:  # is not a run option?
-                    executable = None
+        executable = BLACKFIRE_CLI_EXEC
+        for i in range(run_index):
+            if not cmd[i][0] in ['-', '--']:  # is not a run option?
+                executable = None
 
     if executable is None:
         executable = sys.argv[1]
@@ -170,22 +227,30 @@ def bootstrap_python():
     else:
         args = sys.argv[1:]
 
-    executable_path = spawn.find_executable(executable)
-    if executable_path is None:
-        raise Exception('`%s` is not a valid executable.' % (executable))
-
     log.debug(
         'Executing command = %s (executable=%s, args=%s)', cmd, executable, args
     )
 
+    executable_path = spawn.find_executable(executable)
+    if executable_path is None:
+        if executable == BLACKFIRE_CLI_EXEC:
+            print(
+                'Error: The "blackfire" CLI is not installed. It is needed for the "run" '
+                'command to work properly.\nPlease visit https://blackfire.io/docs/up-and-running/installation '
+                'to install it.'
+            )
+            sys.exit(1)
+
+        raise Exception('`%s` is not a valid executable.' % (executable))
+
     # execl(...) propagates current env. vars
-    os.execl(executable, executable, *args)
+    os.execl(executable_path, executable_path, *args)
 
 
 def bootstrap():
     try:
         patch_all()
-    except Exception as e:
+    except:
         traceback.print_exc()
 
     try:
@@ -197,7 +262,7 @@ def bootstrap():
 
             probe.initialize(query=query, method="bootstrap")
             probe.enable(end_at_exit=True)
-    except Exception as e:
+    except:
         traceback.print_exc()
 
 
