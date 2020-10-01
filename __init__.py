@@ -145,10 +145,38 @@ def bootstrap_python():
     if len(sys.argv) < 2:
         raise Exception("No command specified '%s'" % (sys.argv[1:]))
 
-    executable = spawn.find_executable(sys.argv[1])
+    # `blackfire-python` cmd has a run command that propagates the call to `blackfire run`.
+    # `blackfire run` arguments can either be passed as prefixes and/or suffixes.
+    # There are also commands like `blackfire-python python3 myapp.py run` which should
+    # not be propagated to `bf run`. To differentiate having a run command and not having
+    # it is: looking at the prefix of run and checking if the arguments are valid for
+    # `blackfire run`. Specifically: if they start with `-` or `--`. One more exception to
+    # this is: `blackfire-python help run`. `help` is also a valid prefix, too.
+    cmd = sys.argv[1:]
+    run_index = cmd.index('run') if 'run' in cmd else None
+    executable = None
+    if run_index is not None:
+        if run_index == 1 and cmd[0] == 'help':
+            executable = 'blackfire'
+        else:
+            executable = 'blackfire'
+            for i in range(run_index):
+                if not cmd[i][0] in ['-', '--']:  # is not a run option?
+                    executable = None
+
+    if executable is None:
+        executable = spawn.find_executable(sys.argv[1])
+        args = sys.argv[2:]
+    else:
+        executable = spawn.find_executable(executable)
+        args = sys.argv[1:]
+
+    log.debug(
+        'Executing command = %s (executable=%s, args=%s)', cmd, executable, args
+    )
 
     # execl(...) propagates current env. vars
-    os.execl(executable, executable, *sys.argv[2:])
+    os.execl(executable, executable, *args)
 
 
 def bootstrap():
