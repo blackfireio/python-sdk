@@ -66,6 +66,12 @@ class Connection(object):
         except:
             pass
 
+    def _contains_blackfireyaml_header(self, recv_wnd):
+        BFYAML_HDR = 'blackfire_yml=true'
+        if IS_PY3:
+            BFYAML_HDR = bytes(BFYAML_HDR, Protocol.ENCODING)
+        return BFYAML_HDR in recv_wnd
+
     def connect(self, config=None):
         log.debug("Connecting to agent at %s." % str(self._sock_addr))
         try:
@@ -98,7 +104,7 @@ class Connection(object):
                 'Agent send data failed.[%s][%s]' % (e, data)
             )
 
-    def recv(self, header_only=False):
+    def recv(self):
         result = ''
         if IS_PY3:
             result = bytes(result, Protocol.ENCODING)
@@ -111,7 +117,11 @@ class Connection(object):
                     raise Exception('Agent closed the connection.')
                 result += data
 
-                if header_only and result.endswith(Protocol.HEADER_MARKER):
+                # when blackfire_yaml header is present in the recv_window
+                # do not try to read until Protocol.MARKER found. This will
+                # be a header only msg
+                if self._contains_blackfireyaml_header(result) and \
+                    result.endswith(Protocol.HEADER_MARKER):
                     break
 
                 if result.endswith(Protocol.MARKER):
@@ -169,7 +179,7 @@ class Connection(object):
 
         log.debug("SEND hello_req ('%s')", hello_req.to_bytes())
 
-        response_raw = self.recv(header_only=bool(blackfire_yml_contents))
+        response_raw = self.recv()
         self.agent_response = BlackfireResponse().from_bytes(response_raw)
         if self.agent_response.status_code != BlackfireResponse.StatusCode.OK:
             raise BlackfireApiException(
