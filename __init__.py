@@ -135,8 +135,7 @@ def _add_bootstrap_to_pythonpath(bootstrap_dir):
 
 
 def _print_help():
-    help_string = '''
-Usage: blackfire-python <program>
+    help_string = '''Usage: blackfire-python <program>
        blackfire-python [options] run [options] <program>
        blackfire-python help <command>
 
@@ -157,8 +156,7 @@ For more information on blackfire-python, please visit https://blackfire.io/docs
 
 
 def _print_help_run():
-    help_string = '''
-Usage: blackfire-python <program>
+    help_string = '''Usage: blackfire-python <program>
        blackfire-python [options] run [options] <program>
        blackfire-python help <command>
 
@@ -177,7 +175,7 @@ For more information on blackfire-python, please visit https://blackfire.io/docs
 '''
 
     if spawn.find_executable(BLACKFIRE_CLI_EXEC) is None:
-        help_string += '\nWarning: The "blackfire" CLI is not installed. It is needed for the "run"' \
+        help_string += '\nWarning: The "blackfire" CLI is not installed. It is needed for the "run" ' \
             'command to work properly.\nPlease visit https://blackfire.io/docs/up-and-running/installation ' \
             'to install it.\n'
 
