@@ -101,7 +101,8 @@ def start_memory_profiler():
 
 
 def stop_memory_profiler():
-    _bfext.stop_memory_profiler()
+    if _MEMALLOCATOR_API_AVAILABLE:
+        _bfext.stop_memory_profiler()
     _RuntimeMetrics.reset()
 
     log.debug("APM memory profiler deactivated.")
