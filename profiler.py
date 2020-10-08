@@ -14,23 +14,22 @@ __all__ = ['start', 'stop', 'get_traces', 'clear_traces', 'run', 'is_running']
 log = get_logger(__name__, include_line_info=False)
 
 _max_prefix_cache = {}
-_timespan_selectors = {}
 MAX_TIMESPAN_THRESHOLD = 1000000000
 
 
-def _fn_matches_timespan_selector(name, name_formatted):
+def _fn_matches_timespan_selector(names, timespan_selectors):
     '''
     This function is called from the C extension to match the timespan_selectors
     with the fn. name of the pit. It is called one per-pit and cached on the C 
     extension.
     '''
-    global _timespan_selectors
+    name, name_formatted = names
 
-    eq_set = _timespan_selectors.get('=', set())
+    eq_set = timespan_selectors.get('=', set())
     if name in eq_set or name_formatted in eq_set:
         return 1
 
-    prefix_set = _timespan_selectors.get('^', set())
+    prefix_set = timespan_selectors.get('^', set())
 
     # search in prefix by name
     prefix = ''
@@ -408,6 +407,8 @@ class _BlackfireTracesBase(dict):
                 callee_rec_level=callee["rec_level"],
                 timeline_index=i)
 
+            # add the same trace dict twice with different metrics one for 
+            # Threshold-start and one for Threshold-End
             result.add_timeline(
                 **dict(trace_dict,
                     wall=te[2],
@@ -436,22 +437,22 @@ def start(
     timespan_selectors={},
     timespan_threshold=MAX_TIMESPAN_THRESHOLD,  # ms
 ):
-    global _max_prefix_cache, _timespan_selectors
+    global _max_prefix_cache
 
     if not isinstance(timespan_selectors, dict):
         raise BlackfireProfilerException(
             "timespan_selectors shall be an instance of 'dict'"
+        )
+    
+    if not isinstance(instrumented_funcs, dict):
+        raise BlackfireProfilerException(
+            "instrumented_funcs shall be an instance of 'dict'"
         )
 
     # in fact we can use this cache this forever but the idea is maybe the sys.path
     # changes in some way and it would be nice to see the effect between every
     # start/stop pair.
     _max_prefix_cache = {}
-
-    _timespan_selectors = {}
-
-    if profile_timespan:
-        _timespan_selectors = timespan_selectors
 
     if session_id is None:
         session_id = _default_session_id_callback()
@@ -463,6 +464,7 @@ def start(
         profile_memory,
         profile_timespan,
         instrumented_funcs,
+        timespan_selectors,
         timespan_threshold,
     )
 
