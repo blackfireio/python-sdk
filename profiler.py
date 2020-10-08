@@ -321,9 +321,8 @@ class _BlackfireTracesBase(dict):
             return False
 
         for trace in self._traces:
-            fname, fmodule, fname_formatted, flineno, fncall, fnactualcall, fbuiltin, \
-                fttot_wall, ftsub_wall, fttot_cpu, ftsub_cpu, findex, fchildren, fctxid, \
-                fmem_usage, fpeak_mem_usage, ffn_args, frec_level = trace
+            fname, fmodule, fname_formatted, flineno, fbuiltin, findex, fchildren, \
+            fctxid, ffn_args, frec_level = trace
 
             assert findex not in self, trace  # assert no duplicate index exists
 
@@ -345,17 +344,9 @@ class _BlackfireTracesBase(dict):
                 "module": fmodule,
                 "name_formatted": fname_formatted or '',
                 "lineno": flineno,
-                "ncall": fncall,
-                "nnonrecursivecall": fnactualcall,
                 "is_builtin": fbuiltin,
-                "twall": fttot_wall,
-                "sub_twall": ftsub_wall,
-                "tcpu": fttot_cpu,
-                "sub_tcpu": ftsub_cpu,
                 "children": fchildren,
                 "ctx_id": fctxid,
-                "mem_usage": fmem_usage,
-                "peak_mem_usage": fpeak_mem_usage,
                 "fn_args": ffn_args or '',
                 "rec_level": frec_level,
             }
@@ -367,49 +358,30 @@ class _BlackfireTracesBase(dict):
         """
         result = BlackfireTraces(self._omit_sys_path_dirs)
         for _, stat in self.items():
-            # is root function?
-            if stat["name"] == 'main()' and stat["module"] == '':
-                result.add(
-                    caller_module='',
-                    caller_name='',
-                    caller_fn_args='',
-                    caller_name_formatted='',
-                    caller_rec_level=1,
-                    callee_module=stat["module"],
-                    callee_name=stat["name"],
-                    callee_fn_args=stat["fn_args"],
-                    callee_name_formatted=stat["name_formatted"],
-                    callee_rec_level=1,
-                    call_count=stat["ncall"],
-                    wall_time=stat["twall"] * 1000000,
-                    cpu_time=stat["tcpu"] * 1000000,
-                    mem_usage=stat["mem_usage"],
-                    peak_mem_usage=stat["peak_mem_usage"],
-                )
-
             for child in stat["children"]:
                 # we check this as we might have prevented some functions to be
                 # shown in the output
                 if child[0] in self:
                     caller = stat
                     callee = self[child[0]]
+                    is_root = (caller == callee)
 
                     result.add(
-                        caller_module=caller['module'],
-                        caller_name=caller['name'],
-                        caller_fn_args=caller["fn_args"],
+                        caller_module=caller['module'] if not is_root else '',
+                        caller_name=caller['name'] if not is_root else '',
+                        caller_fn_args=caller["fn_args"] if not is_root else '',
                         caller_rec_level=caller["rec_level"],
-                        caller_name_formatted=caller["name_formatted"],
+                        caller_name_formatted=caller["name_formatted"] if not is_root else '',
                         callee_module=callee["module"],
                         callee_name=callee["name"],
                         callee_fn_args=callee["fn_args"],
                         callee_name_formatted=callee["name_formatted"],
                         callee_rec_level=callee["rec_level"],
                         call_count=child[1],
-                        wall_time=child[3] * 1000000,
-                        cpu_time=child[5] * 1000000,
-                        mem_usage=child[7],
-                        peak_mem_usage=child[8],
+                        wall_time=child[3],
+                        cpu_time=child[4],
+                        mem_usage=child[5],
+                        peak_mem_usage=child[6],
                         rec_level=callee["rec_level"],
                     )
 
@@ -424,8 +396,7 @@ class _BlackfireTracesBase(dict):
             caller = self[te[0]]
             callee = self[te[1]]
 
-            result.add_timeline(
-                caller_module=caller['module'],
+            trace_dict = dict(caller_module=caller['module'],
                 caller_name=caller['name'],
                 caller_fn_args=caller["fn_args"],
                 caller_rec_level=caller["rec_level"],
@@ -435,30 +406,22 @@ class _BlackfireTracesBase(dict):
                 callee_fn_args=callee["fn_args"],
                 callee_name_formatted=callee["name_formatted"],
                 callee_rec_level=callee["rec_level"],
-                wall=te[2] * 1000000,
-                cpu=te[3] * 1000000,
-                mu=te[6],
-                pmu=te[7],
-                timeline_index=i,
-            )
-            result.add_timeline(
-                caller_module=caller['module'],
-                caller_name=caller['name'],
-                caller_fn_args=caller["fn_args"],
-                caller_rec_level=caller["rec_level"],
-                caller_name_formatted=caller["name_formatted"],
-                callee_module=callee["module"],
-                callee_name=callee["name"],
-                callee_fn_args=callee["fn_args"],
-                callee_name_formatted=callee["name_formatted"],
-                callee_rec_level=callee["rec_level"],
-                wall=te[4] * 1000000,
-                cpu=te[5] * 1000000,
-                mu=te[8],
-                pmu=te[9],
-                timeline_index=i,
-            )
+                timeline_index=i)
 
+            result.add_timeline(
+                **dict(trace_dict,
+                    wall=te[2],
+                    cpu=te[3],
+                    mu=te[6],
+                    pmu=te[7])
+            )
+            result.add_timeline(
+                **dict(trace_dict,
+                    wall=te[4],
+                    cpu=te[5],
+                    mu=te[8],
+                    pmu=te[9])
+            )
             i += 1
         return result
 
