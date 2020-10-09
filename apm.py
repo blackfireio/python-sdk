@@ -59,8 +59,8 @@ class ApmConfig(object):
         self.sample_rate = 1.0
         self.extended_sample_rate = 0.0
         self.key_pages = ()
-        self.timespan_entries = ()
-        self.fn_arg_entries = ()
+        self.timespan_selectors = {}
+        self.instrumented_funcs = {}
 
 
 class ApmProbeConfig(object):
@@ -95,16 +95,17 @@ _MEMALLOCATOR_API_AVAILABLE = sys.version_info[
 
 
 def enable(extended=False):
+    global _apm_config
 
+    # TODO:
     # if extended:
     #     profiler.start(
     #         builtins=True,
     #         profile_cpu=True,
     #         profile_memory=True,
     #         profile_timespan=True,
-    #         instrumented_funcs=instrumented_funcs,
-    #         timespan_selectors=timespan_selectors,
-    #         timespan_threshold=timespan_threshold,
+    #         instrumented_funcs=_apm_config.instrumented_funcs,
+    #         timespan_selectors=_apm_config.timespan_selectors,
     #     )
 
     if _MEMALLOCATOR_API_AVAILABLE:
@@ -236,6 +237,8 @@ def _update_apm_config(response):
             pass
 
         new_apm_config.key_pages = tuple(agent_resp.key_pages)
+        new_apm_config.instrumented_funcs = agent_resp.get_instrumented_funcs()
+        new_apm_config.timespan_selectors = agent_resp.get_timespan_selectors()
 
         # update the process-wise global apm configuration. Once this is set
         # the new HTTP requests making initialize() will get this new config
