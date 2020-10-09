@@ -84,13 +84,13 @@ class BlackfireDjangoMiddleware(object):
         # TODO:
         #_ = apm.trigger_extended_trace()
 
-        apm.start_memory_profiler()
+        apm.enable()
         t0 = time.time()
         try:
             response = self.get_response(request)
         finally:
             mu, pmu = apm.get_traced_memory()
-            apm.stop_memory_profiler()
+            apm.disable()
             now = time.time()
             elapsed_wt_usec = int((now - t0) * 1000000)
             apm.send_trace(

@@ -89,7 +89,7 @@ class BlackfireFlaskMiddleware(object):
             #_ = apm.trigger_extended_trace()
 
             req_context.apm = True
-            apm.start_memory_profiler()
+            apm.enable()
 
     def _after_request(self, response):
         req_context = get_request_context()
@@ -135,7 +135,7 @@ class BlackfireFlaskMiddleware(object):
 
             if req_context.apm:
                 mu, pmu = apm.get_traced_memory()
-                apm.stop_memory_profiler()
+                apm.disable()
                 now = time.time()
                 elapsed_wt_usec = int((now - req_context.req_start) * 1000000)
                 apm.send_trace(
