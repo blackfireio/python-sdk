@@ -6,7 +6,7 @@ import re
 import sys
 import platform
 import _blackfire_profiler as _bfext
-from blackfire.utils import get_logger, IS_PY3, json_prettify, ConfigParser, is_testing, ThreadPool
+from blackfire.utils import get_logger, IS_PY3, json_prettify, ConfigParser, is_testing, ThreadPool, get_load_avg, get_cpu_count
 from blackfire import agent, DEFAULT_AGENT_SOCKET, DEFAULT_AGENT_TIMEOUT, DEFAULT_CONFIG_FILE, profiler
 from contextlib import contextmanager
 
@@ -92,6 +92,15 @@ log.debug(
 
 _MEMALLOCATOR_API_AVAILABLE = sys.version_info[
     0] == 3 and sys.version_info[1] >= 5
+
+
+# @contextmanager
+# def enabled(extended=False):
+#     try:
+#         enable(extended)
+#         yield
+#     finally:
+#         disable()
 
 
 def enable(extended=False):
@@ -294,8 +303,14 @@ def get_autoprofile_query(method, uri, key_page):
         return agent_resp.args['blackfire-query'][0]
 
 
-def send_trace(request, **kwargs):
+def send_trace(request, extended, **kwargs):
     global _apm_config
+
+    if extended:
+        kwargs['load'] = get_load_avg()
+        kwargs['nproc'] = get_cpu_count()
+        kwargs['cost-dimensions'] = 'wt cpu mu pmu',
+        kwargs['extended-sample-rate'] =  _apm_config.extended_sample_rate
 
     data = """file-format: BlackfireApm
         sample-rate: {}
@@ -305,6 +320,13 @@ def send_trace(request, **kwargs):
             # convert `_` to `-` in keys. e.g: controller_name -> controller-name
             k = k.replace('_', '-')
             data += "%s: %s\n" % (k, v)
+
+    if extended:
+        timeline_traces = profiler.get_traces(timeline_only=True)
+        if len(timeline_traces):
+            data += '\n'
+            data += str(timeline_traces)
+
     if IS_PY3:
         data = bytes(data, 'ascii')
     data += agent.Protocol.HEADER_MARKER
@@ -312,7 +334,3 @@ def send_trace(request, **kwargs):
     # We should not have a blocking call in APM path. Do agent connection setup
     # socket send in a separate thread.
     _thread_pool.apply(_send_trace, args=(data, ))
-
-
-def send_extended_trace(request, **kwargs):
-    pass

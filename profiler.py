@@ -350,39 +350,41 @@ class _BlackfireTracesBase(dict):
                 "rec_level": frec_level,
             }
 
-    def to_traceformat(self):
+    def to_traceformat(self, timeline_only=False):
         """
         Function calls represent a caller ==> callee call pair followed by
         its costs (ct, wt, cpu, mu, pmu, ....etc.).
         """
         result = BlackfireTraces(self._omit_sys_path_dirs)
-        for _, stat in self.items():
-            for child in stat["children"]:
-                # we check this as we might have prevented some functions to be
-                # shown in the output
-                if child[0] in self:
-                    caller = stat
-                    callee = self[child[0]]
-                    is_root = (caller == callee)
 
-                    result.add(
-                        caller_module=caller['module'] if not is_root else '',
-                        caller_name=caller['name'] if not is_root else '',
-                        caller_fn_args=caller["fn_args"] if not is_root else '',
-                        caller_rec_level=caller["rec_level"],
-                        caller_name_formatted=caller["name_formatted"] if not is_root else '',
-                        callee_module=callee["module"],
-                        callee_name=callee["name"],
-                        callee_fn_args=callee["fn_args"],
-                        callee_name_formatted=callee["name_formatted"],
-                        callee_rec_level=callee["rec_level"],
-                        call_count=child[1],
-                        wall_time=child[3],
-                        cpu_time=child[4],
-                        mem_usage=child[5],
-                        peak_mem_usage=child[6],
-                        rec_level=callee["rec_level"],
-                    )
+        if not timeline_only:
+            for _, stat in self.items():
+                for child in stat["children"]:
+                    # we check this as we might have prevented some functions to be
+                    # shown in the output
+                    if child[0] in self:
+                        caller = stat
+                        callee = self[child[0]]
+                        is_root = (caller == callee)
+
+                        result.add(
+                            caller_module=caller['module'] if not is_root else '',
+                            caller_name=caller['name'] if not is_root else '',
+                            caller_fn_args=caller["fn_args"] if not is_root else '',
+                            caller_rec_level=caller["rec_level"],
+                            caller_name_formatted=caller["name_formatted"] if not is_root else '',
+                            callee_module=callee["module"],
+                            callee_name=callee["name"],
+                            callee_fn_args=callee["fn_args"],
+                            callee_name_formatted=callee["name_formatted"],
+                            callee_rec_level=callee["rec_level"],
+                            call_count=child[1],
+                            wall_time=child[3],
+                            cpu_time=child[4],
+                            mem_usage=child[5],
+                            peak_mem_usage=child[6],
+                            rec_level=callee["rec_level"],
+                        )
 
         # add timeline traces
         i = 0
@@ -478,13 +480,13 @@ def stop(session_id=None):
     _bfext.stop(session_id)
 
 
-def get_traces(session_id=None, omit_sys_path_dirs=True):
+def get_traces(session_id=None, omit_sys_path_dirs=True, timeline_only=False):
     if session_id is None:
         session_id = _default_session_id_callback()
 
     traces, timeline_traces = _bfext.get_traces(session_id)
     traces = _BlackfireTracesBase(traces, timeline_traces, omit_sys_path_dirs)
-    return traces.to_traceformat()
+    return traces.to_traceformat(timeline_only)
 
 
 @contextmanager

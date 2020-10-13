@@ -74,17 +74,14 @@ class BlackfireDjangoMiddleware(object):
             return self._profiled_request(request, query)
 
         if apm.trigger_trace():
-            return self._apm_request(request)
+            return self._apm_trace(request, extended=apm.trigger_extended_trace())
 
         # no instrumentation
         response = self.get_response(request)
         return response
 
-    def _apm_request(self, request):
-        # TODO:
-        #_ = apm.trigger_extended_trace()
-
-        apm.enable()
+    def _apm_trace(self, request, extended=False):
+        apm.enable(extended)
         t0 = time.time()
         try:
             response = self.get_response(request)
@@ -95,6 +92,7 @@ class BlackfireDjangoMiddleware(object):
             elapsed_wt_usec = int((now - t0) * 1000000)
             apm.send_trace(
                 request,
+                extended,
                 controller_name=get_current_view_name(request),
                 wt=elapsed_wt_usec,
                 mu=mu,
