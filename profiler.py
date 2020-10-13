@@ -436,6 +436,7 @@ def start(
     instrumented_funcs={},
     timespan_selectors={},
     timespan_threshold=MAX_TIMESPAN_THRESHOLD,  # ms
+    apm_extended_trace=False,
 ):
     global _max_prefix_cache
 
@@ -466,6 +467,7 @@ def start(
         instrumented_funcs,
         timespan_selectors,
         timespan_threshold,
+        apm_extended_trace,
     )
 
 

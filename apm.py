@@ -97,30 +97,33 @@ _MEMALLOCATOR_API_AVAILABLE = sys.version_info[
 def enable(extended=False):
     global _apm_config
 
-    # TODO:
-    # if extended:
-    #     profiler.start(
-    #         builtins=True,
-    #         profile_cpu=True,
-    #         profile_memory=True,
-    #         profile_timespan=True,
-    #         instrumented_funcs=_apm_config.instrumented_funcs,
-    #         timespan_selectors=_apm_config.timespan_selectors,
-    #     )
+    if extended:
+        profiler.start(
+            builtins=True,
+            profile_cpu=True,
+            profile_memory=True,
+            profile_timespan=True,
+            instrumented_funcs=_apm_config.instrumented_funcs,
+            timespan_selectors=_apm_config.timespan_selectors,
+            apm_extended_trace=True,
+        )
 
     if _MEMALLOCATOR_API_AVAILABLE:
-        log.debug("APM memory profiler activated.")
-
         # starts memory profiling for the current thread and get_traced_memory()
         # will return per-thread used/peak memory
         _bfext.start_memory_profiler()
+
+    log.debug("APM profiler enabled.")
+
 
 def disable():
     if _MEMALLOCATOR_API_AVAILABLE:
         _bfext.stop_memory_profiler()
     _RuntimeMetrics.reset()
 
-    log.debug("APM memory profiler deactivated.")
+    profiler.stop()
+
+    log.debug("APM profiler disabled.")
 
 
 def get_traced_memory():
