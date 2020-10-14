@@ -94,15 +94,6 @@ _MEMALLOCATOR_API_AVAILABLE = sys.version_info[
     0] == 3 and sys.version_info[1] >= 5
 
 
-# @contextmanager
-# def enabled(extended=False):
-#     try:
-#         enable(extended)
-#         yield
-#     finally:
-#         disable()
-
-
 def enable(extended=False):
     global _apm_config
 
@@ -263,6 +254,7 @@ def _update_apm_config(response):
                 os.getpid(),
             )
 
+
 def get_autoprofile_query(method, uri, key_page):
     # TODO: blackfire-auth header?
     data = """file-format: BlackfireApmRequestProfileQuery
@@ -311,7 +303,7 @@ def send_trace(request, extended, **kwargs):
         kwargs['load'] = get_load_avg()
         kwargs['nproc'] = get_cpu_count()
         kwargs['cost-dimensions'] = 'wt cpu mu pmu',
-        kwargs['extended-sample-rate'] =  _apm_config.extended_sample_rate
+        kwargs['extended-sample-rate'] = _apm_config.extended_sample_rate
 
     headers = {}
     for k, v in kwargs.items():
@@ -324,8 +316,10 @@ def send_trace(request, extended, **kwargs):
     if extended:
         extended_traces = profiler.get_traces(timeline_only=True)
 
-    apm_trace_req = agent.BlackfireAPMRequest(headers=headers, data=extended_traces)
+    apm_trace_req = agent.BlackfireAPMRequest(
+        headers=headers, data=extended_traces
+    )
 
     # We should not have a blocking call in APM path. Do agent connection setup
     # socket send in a separate thread.
-    _thread_pool.apply(_send_trace, args=(apm_trace_req,))
+    _thread_pool.apply(_send_trace, args=(apm_trace_req, ))

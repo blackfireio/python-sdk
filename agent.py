@@ -230,26 +230,24 @@ class BlackfireMessage(object):
         with open(path, "wb") as f:
             f.write(self.to_bytes())
 
+
 class BlackfireResponseBase(BlackfireMessage):
     TIMESPAN_KEY = 'Blackfire-Timespan'
     FN_ARGS_KEY = 'Blackfire-Fn-Args'
 
     def get_timespan_selectors(self):
         result = {'^': set(), '=': set()}
-        
+
         ts_selectors = self.args.get(self.TIMESPAN_KEY, [])
 
         for ts_sel in ts_selectors:
             if ts_sel[0] not in ['^', '=']:
-                log.warning(
-                    "Ignoring invalid timespan selector '%s'.", ts_sel
-                )
+                log.warning("Ignoring invalid timespan selector '%s'.", ts_sel)
                 continue
 
             result[ts_sel[0]].add(ts_sel[1:])
 
         return result
-
 
     def get_instrumented_funcs(self):
         result = {}
@@ -288,13 +286,18 @@ class BlackfireRequest(BlackfireMessage):
         self.headers = headers
         self.data = data
 
-    def to_bytes(self):
+    def encode_headers(self):
         result = ''
 
         for k, v in self.headers.items():
             result += '%s: %s\n' % (k, v)
         if len(self.headers):
             result += '\n'  # add header marker
+
+        return result
+
+    def to_bytes(self):
+        result = self.encode_headers()
         if self.data:
             result += str(self.data)
 
@@ -331,19 +334,14 @@ class BlackfireRequest(BlackfireMessage):
 
 
 class BlackfireAPMRequest(BlackfireRequest):
-    # TODO: Better way
+
     def to_bytes(self):
         result = ''
 
         # APM protocol requires the first header to be FileFormat
         result += 'file-format: %s\n' % (self.headers.pop('file-format'))
-
-        # TODO: Encode headers method?
-        for k, v in self.headers.items():
-            result += '%s: %s\n' % (k, v)
-        if len(self.headers):
-            result += '\n'  # add header marker
-        if self.data:
+        result += self.encode_headers()
+        if self.data is not None:
             result += str(self.data)
 
         if IS_PY3:
@@ -372,7 +370,9 @@ class BlackfireAPMResponse(BlackfireResponseBase):
         resp_val = resp[1]
 
         if resp_type == 'Blackfire-Error':
-            raise BlackfireAPMException('Agent could not send APM trace. reason=%s' % (resp_val))
+            raise BlackfireAPMException(
+                'Agent could not send APM trace. reason=%s' % (resp_val)
+            )
 
         resp_type = resp_type.strip()
         self.status_val = resp_val.strip()

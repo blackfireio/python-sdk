@@ -74,7 +74,9 @@ class BlackfireDjangoMiddleware(object):
             return self._profiled_request(request, query)
 
         if apm.trigger_trace():
-            return self._apm_trace(request, extended=apm.trigger_extended_trace())
+            return self._apm_trace(
+                request, extended=apm.trigger_extended_trace()
+            )
 
         # no instrumentation
         response = self.get_response(request)

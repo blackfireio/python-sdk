@@ -52,6 +52,7 @@ class BlackfireFlaskMiddleware(object):
         req_context = get_request_context()
 
         req_context.apm = False
+        req_context.apm_extended = False
         req_context.profile = False
         req_context.req_start = time.time()
         req_context.probe_err = None
@@ -85,11 +86,9 @@ class BlackfireFlaskMiddleware(object):
             return
 
         if apm.trigger_trace():
-            # TODO:
-            #_ = apm.trigger_extended_trace()
-
             req_context.apm = True
-            apm.enable()
+            req_context.apm_extended = apm.trigger_extended_trace()
+            apm.enable(extended=req_context.apm_extended)
 
     def _after_request(self, response):
         req_context = get_request_context()
@@ -140,7 +139,7 @@ class BlackfireFlaskMiddleware(object):
                 elapsed_wt_usec = int((now - req_context.req_start) * 1000000)
                 apm.send_trace(
                     request,
-                    False,
+                    req_context.apm_extended,
                     controller_name=request.endpoint,
                     wt=elapsed_wt_usec,
                     mu=mu,

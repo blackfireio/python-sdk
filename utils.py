@@ -5,7 +5,6 @@ import traceback
 import logging
 import platform
 import importlib
-import psutil
 from threading import Thread
 
 IS_PY3 = sys.version_info > (3, 0)
@@ -75,9 +74,11 @@ def get_probed_runtime():
         platform.platform()
     )
 
+
 def get_cpu_count():
     # we don't want to use multiprocessing.cpu_count as it does not work well
     # with AWS lambda due to SHM initialization
+    import psutil
     return psutil.cpu_count()
 
 
