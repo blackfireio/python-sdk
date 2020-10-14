@@ -290,6 +290,7 @@ class BlackfireRequest(BlackfireMessage):
 
     def to_bytes(self):
         result = ''
+
         for k, v in self.headers.items():
             result += '%s: %s\n' % (k, v)
         if len(self.headers):
@@ -329,6 +330,27 @@ class BlackfireRequest(BlackfireMessage):
         print(json.dumps(container_dict, indent=4))
 
 
+class BlackfireAPMRequest(BlackfireRequest):
+    # TODO: Better way
+    def to_bytes(self):
+        result = ''
+
+        # APM protocol requires the first header to be FileFormat
+        result += 'file-format: %s\n' % (self.headers.pop('file-format'))
+
+        # TODO: Encode headers method?
+        for k, v in self.headers.items():
+            result += '%s: %s\n' % (k, v)
+        if len(self.headers):
+            result += '\n'  # add header marker
+        if self.data:
+            result += str(self.data)
+
+        if IS_PY3:
+            result = bytes(result, Protocol.ENCODING)
+        return result
+
+
 class BlackfireAPMResponse(BlackfireResponseBase):
     TIMESPAN_KEY = 'timespan'
     FN_ARGS_KEY = 'fn-args'
@@ -345,7 +367,13 @@ class BlackfireAPMResponse(BlackfireResponseBase):
         lines = self.raw_data.split('\n')
 
         # first line is the status line
-        resp_type, resp_val = lines[0].split(':')
+        resp = lines[0].split(':')
+        resp_type = resp[0]
+        resp_val = resp[1]
+
+        if resp_type == 'Blackfire-Error':
+            raise BlackfireAPMException('Agent could not send APM trace. reason=%s' % (resp_val))
+
         resp_type = resp_type.strip()
         self.status_val = resp_val.strip()
         self.status_val_dict = dict(parse_qsl(self.status_val))

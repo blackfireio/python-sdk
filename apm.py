@@ -122,7 +122,7 @@ def enable(extended=False):
         # will return per-thread used/peak memory
         _bfext.start_memory_profiler()
 
-    log.debug("APM profiler enabled.")
+    log.debug("APM profiler enabled. (extended=%s)" % (extended))
 
 
 def disable():
@@ -263,27 +263,6 @@ def _update_apm_config(response):
                 os.getpid(),
             )
 
-
-def _send_trace(data):
-    try:
-        with get_agent_connection() as agent_conn:
-            agent_conn.send(data)
-
-            response_raw = agent_conn.recv()
-            _update_apm_config(response_raw)
-
-            if log.isEnabledFor(logging.DEBUG):
-                log.debug(
-                    "APM trace sent. [%s]",
-                    json_prettify(data),
-                )
-
-    except Exception as e:
-        if is_testing():
-            raise e
-        log.error("APM message could not be sent. [reason:%s]" % (e))
-
-
 def get_autoprofile_query(method, uri, key_page):
     # TODO: blackfire-auth header?
     data = """file-format: BlackfireApmRequestProfileQuery
@@ -303,8 +282,30 @@ def get_autoprofile_query(method, uri, key_page):
         return agent_resp.args['blackfire-query'][0]
 
 
+def _send_trace(req):
+    try:
+        with get_agent_connection() as agent_conn:
+            agent_conn.send(req.to_bytes())
+
+            response_raw = agent_conn.recv()
+            _update_apm_config(response_raw)
+
+            if log.isEnabledFor(logging.DEBUG):
+                log.debug(
+                    "APM trace sent. [%s]",
+                    json_prettify(req),
+                )
+    except Exception as e:
+        if is_testing():
+            raise e
+        log.error("APM message could not be sent. [reason:%s]" % (e))
+
+
 def send_trace(request, extended, **kwargs):
     global _apm_config
+
+    kwargs['file-format'] = 'BlackfireApm'
+    kwargs['sample-rate'] = _apm_config.sample_rate
 
     if extended:
         kwargs['load'] = get_load_avg()
@@ -312,25 +313,19 @@ def send_trace(request, extended, **kwargs):
         kwargs['cost-dimensions'] = 'wt cpu mu pmu',
         kwargs['extended-sample-rate'] =  _apm_config.extended_sample_rate
 
-    data = """file-format: BlackfireApm
-        sample-rate: {}
-    """.format(_apm_config.sample_rate)
+    headers = {}
     for k, v in kwargs.items():
         if v:
             # convert `_` to `-` in keys. e.g: controller_name -> controller-name
             k = k.replace('_', '-')
-            data += "%s: %s\n" % (k, v)
+            headers[k] = v
 
+    extended_traces = None
     if extended:
-        timeline_traces = profiler.get_traces(timeline_only=True)
-        if len(timeline_traces):
-            data += '\n'
-            data += str(timeline_traces)
+        extended_traces = profiler.get_traces(timeline_only=True)
 
-    if IS_PY3:
-        data = bytes(data, 'ascii')
-    data += agent.Protocol.HEADER_MARKER
+    apm_trace_req = agent.BlackfireAPMRequest(headers=headers, data=extended_traces)
 
     # We should not have a blocking call in APM path. Do agent connection setup
     # socket send in a separate thread.
-    _thread_pool.apply(_send_trace, args=(data, ))
+    _thread_pool.apply(_send_trace, args=(apm_trace_req,))

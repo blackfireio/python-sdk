@@ -140,6 +140,7 @@ class BlackfireFlaskMiddleware(object):
                 elapsed_wt_usec = int((now - req_context.req_start) * 1000000)
                 apm.send_trace(
                     request,
+                    False,
                     controller_name=request.endpoint,
                     wt=elapsed_wt_usec,
                     mu=mu,
