@@ -286,18 +286,14 @@ class BlackfireRequest(BlackfireMessage):
         self.headers = headers
         self.data = data
 
-    def encode_headers(self):
+    def to_bytes(self):
         result = ''
 
         for k, v in self.headers.items():
             result += '%s: %s\n' % (k, v)
         if len(self.headers):
-            result += '\n'  # add header marker
+            result += '\n'
 
-        return result
-
-    def to_bytes(self):
-        result = self.encode_headers()
         if self.data:
             result += str(self.data)
 
@@ -340,9 +336,12 @@ class BlackfireAPMRequest(BlackfireRequest):
 
         # APM protocol requires the first header to be FileFormat
         result += 'file-format: %s\n' % (self.headers.pop('file-format'))
-        result += self.encode_headers()
+        for k, v in self.headers.items():
+            result += '%s: %s\n' % (k, v)
+
         if self.data is not None:
             result += str(self.data)
+        result += '\n\n'
 
         if IS_PY3:
             result = bytes(result, Protocol.ENCODING)

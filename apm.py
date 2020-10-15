@@ -302,7 +302,7 @@ def send_trace(request, extended, **kwargs):
     if extended:
         kwargs['load'] = get_load_avg()
         kwargs['nproc'] = get_cpu_count()
-        kwargs['cost-dimensions'] = 'wt cpu mu pmu',
+        kwargs['cost-dimensions'] = 'wt cpu mu pmu'
         kwargs['extended-sample-rate'] = _apm_config.extended_sample_rate
 
     headers = {}
@@ -315,9 +315,10 @@ def send_trace(request, extended, **kwargs):
     extended_traces = None
     if extended:
         extended_traces = profiler.get_traces(timeline_only=True)
+    profiler.clear_traces()  # we can clear the traces
 
     apm_trace_req = agent.BlackfireAPMRequest(
-        headers=headers, data=str(extended_traces)
+        headers=headers, data=str(extended_traces).strip()
     )
 
     # We should not have a blocking call in APM path. Do agent connection setup
