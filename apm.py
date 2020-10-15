@@ -101,7 +101,7 @@ def enable(extended=False):
         profiler.start(
             builtins=True,
             profile_cpu=True,
-            profile_memory=True,
+            profile_memory=False,
             profile_timespan=True,
             instrumented_funcs=_apm_config.instrumented_funcs,
             timespan_selectors=_apm_config.timespan_selectors,
