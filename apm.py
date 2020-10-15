@@ -307,14 +307,12 @@ def send_trace(request, extended, **kwargs):
 
     headers = {}
     for k, v in kwargs.items():
-        if v:
+        if v is not None:
             # convert `_` to `-` in keys. e.g: controller_name -> controller-name
             k = k.replace('_', '-')
             headers[k] = v
 
-    extended_traces = None
-    if extended:
-        extended_traces = profiler.get_traces(timeline_only=True)
+    extended_traces = profiler.get_traces(extended=True) if extended else None
     profiler.clear_traces()  # we can clear the traces
 
     apm_trace_req = agent.BlackfireAPMRequest(

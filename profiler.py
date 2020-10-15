@@ -220,9 +220,11 @@ def _generate_trace_key(omit_sys_path_dirs, trace):
 
 class BlackfireTraces(dict):
 
-    def __init__(self, omit_sys_path_dirs):
+    def __init__(self, omit_sys_path_dirs, extended):
         self._omit_sys_path_dirs = omit_sys_path_dirs
         self.timeline_traces = {}
+        self._extended = extended
+        self._timespan_key = 'Timespan' if extended else 'Threshold'
 
     def add(self, **kwargs):
         trace = BlackfireTrace(kwargs)
@@ -243,9 +245,11 @@ class BlackfireTraces(dict):
         _trace_key = _generate_trace_key(self._omit_sys_path_dirs, trace)
 
         if len(self.timeline_traces) % 2 == 0:
-            key = 'Threshold-%d-start: ' % trace.timeline_index
+            key = '%s-%d-start: ' % (self._timespan_key, trace.timeline_index)
         else:
-            key = 'Threshold-%d-end: %s' % (trace.timeline_index, _trace_key)
+            key = '%s-%d-end: %s' % (
+                self._timespan_key, trace.timeline_index, _trace_key
+            )
 
         self.timeline_traces[key] = trace
 
@@ -279,7 +283,9 @@ class BlackfireTraces(dict):
         return traces
 
     def __add__(self, other):
-        result = BlackfireTraces(self._omit_sys_path_dirs)
+        result = BlackfireTraces(
+            self._omit_sys_path_dirs, extended=self._extended
+        )
         for key, trace in self.items():
             try:
                 new_trace = trace.copy()
@@ -351,14 +357,14 @@ class _BlackfireTracesBase(dict):
                 "rec_level": frec_level,
             }
 
-    def to_traceformat(self, timeline_only=False):
+    def to_traceformat(self, extended=False):
         """
         Function calls represent a caller ==> callee call pair followed by
         its costs (ct, wt, cpu, mu, pmu, ....etc.).
         """
-        result = BlackfireTraces(self._omit_sys_path_dirs)
+        result = BlackfireTraces(self._omit_sys_path_dirs, extended)
 
-        if not timeline_only:
+        if not extended:
             for _, stat in self.items():
                 for child in stat["children"]:
                     # we check this as we might have prevented some functions to be
@@ -478,13 +484,13 @@ def stop(session_id=None):
     _bfext.stop(session_id)
 
 
-def get_traces(session_id=None, omit_sys_path_dirs=True, timeline_only=False):
+def get_traces(session_id=None, omit_sys_path_dirs=True, extended=False):
     if session_id is None:
         session_id = _default_session_id_callback()
 
     traces, timeline_traces = _bfext.get_traces(session_id)
     traces = _BlackfireTracesBase(traces, timeline_traces, omit_sys_path_dirs)
-    return traces.to_traceformat(timeline_only)
+    return traces.to_traceformat(extended)
 
 
 @contextmanager
