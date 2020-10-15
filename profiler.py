@@ -37,6 +37,7 @@ def _fn_matches_timespan_selector(names, timespan_selectors):
         prefix += c
         if prefix in prefix_set:
             return 1
+
     # search in prefix by name_formatted
     prefix = ''
     for c in name_formatted:
@@ -368,11 +369,14 @@ class _BlackfireTracesBase(dict):
                         is_root = (caller == callee)
 
                         result.add(
-                            caller_module=caller['module'] if not is_root else '',
+                            caller_module=caller['module']
+                            if not is_root else '',
                             caller_name=caller['name'] if not is_root else '',
-                            caller_fn_args=caller["fn_args"] if not is_root else '',
+                            caller_fn_args=caller["fn_args"]
+                            if not is_root else '',
                             caller_rec_level=caller["rec_level"],
-                            caller_name_formatted=caller["name_formatted"] if not is_root else '',
+                            caller_name_formatted=caller["name_formatted"]
+                            if not is_root else '',
                             callee_module=callee["module"],
                             callee_name=callee["name"],
                             callee_fn_args=callee["fn_args"],
@@ -397,7 +401,8 @@ class _BlackfireTracesBase(dict):
             caller = self[te[0]]
             callee = self[te[1]]
 
-            trace_dict = dict(caller_module=caller['module'],
+            trace_dict = dict(
+                caller_module=caller['module'],
                 caller_name=caller['name'],
                 caller_fn_args=caller["fn_args"],
                 caller_rec_level=caller["rec_level"],
@@ -407,23 +412,16 @@ class _BlackfireTracesBase(dict):
                 callee_fn_args=callee["fn_args"],
                 callee_name_formatted=callee["name_formatted"],
                 callee_rec_level=callee["rec_level"],
-                timeline_index=i)
+                timeline_index=i
+            )
 
-            # add the same trace dict twice with different metrics one for 
+            # add the same trace dict twice with different metrics one for
             # Threshold-start and one for Threshold-End
             result.add_timeline(
-                **dict(trace_dict,
-                    wall=te[2],
-                    cpu=te[3],
-                    mu=te[6],
-                    pmu=te[7])
+                **dict(trace_dict, wall=te[2], cpu=te[3], mu=te[6], pmu=te[7])
             )
             result.add_timeline(
-                **dict(trace_dict,
-                    wall=te[4],
-                    cpu=te[5],
-                    mu=te[8],
-                    pmu=te[9])
+                **dict(trace_dict, wall=te[4], cpu=te[5], mu=te[8], pmu=te[9])
             )
             i += 1
         return result
@@ -446,7 +444,7 @@ def start(
         raise BlackfireProfilerException(
             "timespan_selectors shall be an instance of 'dict'"
         )
-    
+
     if not isinstance(instrumented_funcs, dict):
         raise BlackfireProfilerException(
             "instrumented_funcs shall be an instance of 'dict'"

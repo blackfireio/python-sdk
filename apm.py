@@ -285,7 +285,7 @@ def _send_trace(req):
             if log.isEnabledFor(logging.DEBUG):
                 log.debug(
                     "APM trace sent. [%s]",
-                    json_prettify(req),
+                    req,
                 )
     except Exception as e:
         if is_testing():
@@ -317,7 +317,7 @@ def send_trace(request, extended, **kwargs):
         extended_traces = profiler.get_traces(timeline_only=True)
 
     apm_trace_req = agent.BlackfireAPMRequest(
-        headers=headers, data=extended_traces
+        headers=headers, data=str(extended_traces)
     )
 
     # We should not have a blocking call in APM path. Do agent connection setup

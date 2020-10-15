@@ -328,9 +328,9 @@ class BlackfireRequest(BlackfireMessage):
                 self.headers[line[:spos].strip()] = line[spos + 1:].strip()
         return self
 
-    def pretty_print(self):
+    def __repr__(self):
         container_dict = {"headers": self.headers, "data": self.data}
-        print(json.dumps(container_dict, indent=4))
+        return json.dumps(container_dict, indent=4)
 
 
 class BlackfireAPMRequest(BlackfireRequest):
