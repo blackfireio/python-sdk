@@ -231,6 +231,51 @@ class BlackfireMessage(object):
             f.write(self.to_bytes())
 
 
+class BlackfireResponseBase(BlackfireMessage):
+    TIMESPAN_KEY = 'Blackfire-Timespan'
+    FN_ARGS_KEY = 'Blackfire-Fn-Args'
+
+    def get_timespan_selectors(self):
+        result = {'^': set(), '=': set()}
+
+        ts_selectors = self.args.get(self.TIMESPAN_KEY, [])
+
+        for ts_sel in ts_selectors:
+            if ts_sel[0] not in ['^', '=']:
+                log.warning("Ignoring invalid timespan selector '%s'.", ts_sel)
+                continue
+
+            result[ts_sel[0]].add(ts_sel[1:])
+
+        return result
+
+    def get_instrumented_funcs(self):
+        result = {}
+        # convert the fn-args string to dict for faster lookups on C side
+        fn_args = self.args.get(self.FN_ARGS_KEY, [])
+        for fn_arg in fn_args:
+            fn_name, arg_ids_s = fn_arg.split()
+            fn_name = fn_name.strip()
+
+            if fn_name in result:
+                log.warning(
+                    "Function '%s' is already instrumented. Ignoring fn-args directive %s.",
+                    fn_name, fn_arg
+                )
+                continue
+
+            arg_ids = []
+            for arg_id in arg_ids_s.strip().split(','):
+                if arg_id.isdigit():
+                    arg_ids.append(int(arg_id))
+                else:
+                    arg_ids.append(arg_id)
+
+            result[fn_name] = arg_ids
+
+        return result
+
+
 class BlackfireRequest(BlackfireMessage):
 
     __slots__ = 'headers', 'data'
@@ -243,10 +288,12 @@ class BlackfireRequest(BlackfireMessage):
 
     def to_bytes(self):
         result = ''
+
         for k, v in self.headers.items():
             result += '%s: %s\n' % (k, v)
         if len(self.headers):
-            result += '\n'  # add header marker
+            result += '\n'
+
         if self.data:
             result += str(self.data)
 
@@ -277,12 +324,33 @@ class BlackfireRequest(BlackfireMessage):
                 self.headers[line[:spos].strip()] = line[spos + 1:].strip()
         return self
 
-    def pretty_print(self):
+    def __repr__(self):
         container_dict = {"headers": self.headers, "data": self.data}
-        print(json.dumps(container_dict, indent=4))
+        return json.dumps(container_dict, indent=4)
 
 
-class BlackfireAPMResponse(BlackfireMessage):
+class BlackfireAPMRequest(BlackfireRequest):
+
+    def to_bytes(self):
+        result = ''
+
+        # APM protocol requires the first header to be FileFormat
+        result += 'file-format: %s\n' % (self.headers.pop('file-format'))
+        for k, v in self.headers.items():
+            result += '%s: %s\n' % (k, v)
+
+        if self.data is not None:
+            result += str(self.data)
+        result += '\n\n'
+
+        if IS_PY3:
+            result = bytes(result, Protocol.ENCODING)
+        return result
+
+
+class BlackfireAPMResponse(BlackfireResponseBase):
+    TIMESPAN_KEY = 'timespan'
+    FN_ARGS_KEY = 'fn-args'
 
     def __init__(self):
         self.args = defaultdict(list)
@@ -296,7 +364,15 @@ class BlackfireAPMResponse(BlackfireMessage):
         lines = self.raw_data.split('\n')
 
         # first line is the status line
-        resp_type, resp_val = lines[0].split(':')
+        resp = lines[0].split(':')
+        resp_type = resp[0]
+        resp_val = resp[1]
+
+        if resp_type == 'Blackfire-Error':
+            raise BlackfireAPMException(
+                'Agent could not send APM trace. reason=%s' % (resp_val)
+            )
+
         resp_type = resp_type.strip()
         self.status_val = resp_val.strip()
         self.status_val_dict = dict(parse_qsl(self.status_val))
@@ -342,7 +418,7 @@ class BlackfireAPMResponse(BlackfireMessage):
         return self
 
 
-class BlackfireResponse(BlackfireMessage):
+class BlackfireResponse(BlackfireResponseBase):
 
     # TODO: Do this later
     #__slots__ = 'status_code', 'raw_data', 'err_reason', 'args', 'args_raw'

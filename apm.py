@@ -6,8 +6,8 @@ import re
 import sys
 import platform
 import _blackfire_profiler as _bfext
-from blackfire.utils import get_logger, IS_PY3, json_prettify, ConfigParser, is_testing, ThreadPool
-from blackfire import agent, DEFAULT_AGENT_SOCKET, DEFAULT_AGENT_TIMEOUT, DEFAULT_CONFIG_FILE
+from blackfire.utils import get_logger, IS_PY3, json_prettify, ConfigParser, is_testing, ThreadPool, get_load_avg, get_cpu_count
+from blackfire import agent, DEFAULT_AGENT_SOCKET, DEFAULT_AGENT_TIMEOUT, DEFAULT_CONFIG_FILE, profiler
 from contextlib import contextmanager
 
 _thread_pool = ThreadPool()
@@ -59,8 +59,8 @@ class ApmConfig(object):
         self.sample_rate = 1.0
         self.extended_sample_rate = 0.0
         self.key_pages = ()
-        self.timespan_entries = ()
-        self.fn_arg_entries = ()
+        self.timespan_selectors = {}
+        self.instrumented_funcs = {}
 
 
 class ApmProbeConfig(object):
@@ -94,17 +94,36 @@ _MEMALLOCATOR_API_AVAILABLE = sys.version_info[
     0] == 3 and sys.version_info[1] >= 5
 
 
-def start_memory_profiler():
+def enable(extended=False):
+    global _apm_config
+
+    if extended:
+        profiler.start(
+            builtins=True,
+            profile_cpu=True,
+            profile_memory=False,
+            profile_timespan=True,
+            instrumented_funcs=_apm_config.instrumented_funcs,
+            timespan_selectors=_apm_config.timespan_selectors,
+            apm_extended_trace=True,
+        )
+
     if _MEMALLOCATOR_API_AVAILABLE:
-        log.debug("APM memory profiler activated.")
+        # starts memory profiling for the current thread and get_traced_memory()
+        # will return per-thread used/peak memory
         _bfext.start_memory_profiler()
 
+    log.debug("APM profiler enabled. (extended=%s)" % (extended))
 
-def stop_memory_profiler():
-    _bfext.stop_memory_profiler()
+
+def disable():
+    if _MEMALLOCATOR_API_AVAILABLE:
+        _bfext.stop_memory_profiler()
     _RuntimeMetrics.reset()
 
-    log.debug("APM memory profiler deactivated.")
+    profiler.stop()
+
+    log.debug("APM profiler disabled.")
 
 
 def get_traced_memory():
@@ -221,6 +240,8 @@ def _update_apm_config(response):
             pass
 
         new_apm_config.key_pages = tuple(agent_resp.key_pages)
+        new_apm_config.instrumented_funcs = agent_resp.get_instrumented_funcs()
+        new_apm_config.timespan_selectors = agent_resp.get_timespan_selectors()
 
         # update the process-wise global apm configuration. Once this is set
         # the new HTTP requests making initialize() will get this new config
@@ -232,26 +253,6 @@ def _update_apm_config(response):
                 json_prettify(_apm_config.__dict__),
                 os.getpid(),
             )
-
-
-def _send_trace(data):
-    try:
-        with get_agent_connection() as agent_conn:
-            agent_conn.send(data)
-
-            response_raw = agent_conn.recv()
-            _update_apm_config(response_raw)
-
-            if log.isEnabledFor(logging.DEBUG):
-                log.debug(
-                    "APM trace sent. [%s]",
-                    json_prettify(data),
-                )
-
-    except Exception as e:
-        if is_testing():
-            raise e
-        log.error("APM message could not be sent. [reason:%s]" % (e))
 
 
 def get_autoprofile_query(method, uri, key_page):
@@ -273,25 +274,51 @@ def get_autoprofile_query(method, uri, key_page):
         return agent_resp.args['blackfire-query'][0]
 
 
-def send_trace(request, **kwargs):
+def _send_trace(req):
+    try:
+        with get_agent_connection() as agent_conn:
+            agent_conn.send(req.to_bytes())
+
+            response_raw = agent_conn.recv()
+            _update_apm_config(response_raw)
+
+            if log.isEnabledFor(logging.DEBUG):
+                log.debug(
+                    "APM trace sent. [%s]",
+                    req,
+                )
+    except Exception as e:
+        if is_testing():
+            raise e
+        log.error("APM message could not be sent. [reason:%s]" % (e))
+
+
+def send_trace(request, extended, **kwargs):
     global _apm_config
 
-    data = """file-format: BlackfireApm
-        sample-rate: {}
-    """.format(_apm_config.sample_rate)
+    kwargs['file-format'] = 'BlackfireApm'
+    kwargs['sample-rate'] = _apm_config.sample_rate
+
+    if extended:
+        kwargs['load'] = get_load_avg()
+        kwargs['nproc'] = get_cpu_count()
+        kwargs['cost-dimensions'] = 'wt cpu mu pmu'
+        kwargs['extended-sample-rate'] = _apm_config.extended_sample_rate
+
+    headers = {}
     for k, v in kwargs.items():
-        if v:
+        if v is not None:
             # convert `_` to `-` in keys. e.g: controller_name -> controller-name
             k = k.replace('_', '-')
-            data += "%s: %s\n" % (k, v)
-    if IS_PY3:
-        data = bytes(data, 'ascii')
-    data += agent.Protocol.HEADER_MARKER
+            headers[k] = v
+
+    extended_traces = profiler.get_traces(extended=True) if extended else None
+    profiler.clear_traces()  # we can clear the traces
+
+    apm_trace_req = agent.BlackfireAPMRequest(
+        headers=headers, data=str(extended_traces).strip()
+    )
 
     # We should not have a blocking call in APM path. Do agent connection setup
     # socket send in a separate thread.
-    _thread_pool.apply(_send_trace, args=(data, ))
-
-
-def send_extended_trace(request, **kwargs):
-    pass
+    _thread_pool.apply(_send_trace, args=(apm_trace_req, ))

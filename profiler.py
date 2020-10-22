@@ -14,23 +14,22 @@ __all__ = ['start', 'stop', 'get_traces', 'clear_traces', 'run', 'is_running']
 log = get_logger(__name__, include_line_info=False)
 
 _max_prefix_cache = {}
-_timespan_selectors = {}
 MAX_TIMESPAN_THRESHOLD = 1000000000
 
 
-def _fn_matches_timespan_selector(name, name_formatted):
+def _fn_matches_timespan_selector(names, timespan_selectors):
     '''
     This function is called from the C extension to match the timespan_selectors
     with the fn. name of the pit. It is called one per-pit and cached on the C 
     extension.
     '''
-    global _timespan_selectors
+    name, name_formatted = names
 
-    eq_set = _timespan_selectors.get('=', set())
+    eq_set = timespan_selectors.get('=', set())
     if name in eq_set or name_formatted in eq_set:
         return 1
 
-    prefix_set = _timespan_selectors.get('^', set())
+    prefix_set = timespan_selectors.get('^', set())
 
     # search in prefix by name
     prefix = ''
@@ -38,6 +37,7 @@ def _fn_matches_timespan_selector(name, name_formatted):
         prefix += c
         if prefix in prefix_set:
             return 1
+
     # search in prefix by name_formatted
     prefix = ''
     for c in name_formatted:
@@ -220,9 +220,11 @@ def _generate_trace_key(omit_sys_path_dirs, trace):
 
 class BlackfireTraces(dict):
 
-    def __init__(self, omit_sys_path_dirs):
+    def __init__(self, omit_sys_path_dirs, extended):
         self._omit_sys_path_dirs = omit_sys_path_dirs
         self.timeline_traces = {}
+        self._extended = extended
+        self._timespan_key = 'Timespan' if extended else 'Threshold'
 
     def add(self, **kwargs):
         trace = BlackfireTrace(kwargs)
@@ -243,9 +245,11 @@ class BlackfireTraces(dict):
         _trace_key = _generate_trace_key(self._omit_sys_path_dirs, trace)
 
         if len(self.timeline_traces) % 2 == 0:
-            key = 'Threshold-%d-start: ' % trace.timeline_index
+            key = '%s-%d-start: ' % (self._timespan_key, trace.timeline_index)
         else:
-            key = 'Threshold-%d-end: %s' % (trace.timeline_index, _trace_key)
+            key = '%s-%d-end: %s' % (
+                self._timespan_key, trace.timeline_index, _trace_key
+            )
 
         self.timeline_traces[key] = trace
 
@@ -279,7 +283,9 @@ class BlackfireTraces(dict):
         return traces
 
     def __add__(self, other):
-        result = BlackfireTraces(self._omit_sys_path_dirs)
+        result = BlackfireTraces(
+            self._omit_sys_path_dirs, extended=self._extended
+        )
         for key, trace in self.items():
             try:
                 new_trace = trace.copy()
@@ -321,9 +327,8 @@ class _BlackfireTracesBase(dict):
             return False
 
         for trace in self._traces:
-            fname, fmodule, fname_formatted, flineno, fncall, fnactualcall, fbuiltin, \
-                fttot_wall, ftsub_wall, fttot_cpu, ftsub_cpu, findex, fchildren, fctxid, \
-                fmem_usage, fpeak_mem_usage, ffn_args, frec_level = trace
+            fname, fmodule, fname_formatted, flineno, fbuiltin, findex, fchildren, \
+            fctxid, ffn_args, frec_level = trace
 
             assert findex not in self, trace  # assert no duplicate index exists
 
@@ -345,73 +350,51 @@ class _BlackfireTracesBase(dict):
                 "module": fmodule,
                 "name_formatted": fname_formatted or '',
                 "lineno": flineno,
-                "ncall": fncall,
-                "nnonrecursivecall": fnactualcall,
                 "is_builtin": fbuiltin,
-                "twall": fttot_wall,
-                "sub_twall": ftsub_wall,
-                "tcpu": fttot_cpu,
-                "sub_tcpu": ftsub_cpu,
                 "children": fchildren,
                 "ctx_id": fctxid,
-                "mem_usage": fmem_usage,
-                "peak_mem_usage": fpeak_mem_usage,
                 "fn_args": ffn_args or '',
                 "rec_level": frec_level,
             }
 
-    def to_traceformat(self):
+    def to_traceformat(self, extended=False):
         """
         Function calls represent a caller ==> callee call pair followed by
         its costs (ct, wt, cpu, mu, pmu, ....etc.).
         """
-        result = BlackfireTraces(self._omit_sys_path_dirs)
-        for _, stat in self.items():
-            # is root function?
-            if stat["name"] == 'main()' and stat["module"] == '':
-                result.add(
-                    caller_module='',
-                    caller_name='',
-                    caller_fn_args='',
-                    caller_name_formatted='',
-                    caller_rec_level=1,
-                    callee_module=stat["module"],
-                    callee_name=stat["name"],
-                    callee_fn_args=stat["fn_args"],
-                    callee_name_formatted=stat["name_formatted"],
-                    callee_rec_level=1,
-                    call_count=stat["ncall"],
-                    wall_time=stat["twall"] * 1000000,
-                    cpu_time=stat["tcpu"] * 1000000,
-                    mem_usage=stat["mem_usage"],
-                    peak_mem_usage=stat["peak_mem_usage"],
-                )
+        result = BlackfireTraces(self._omit_sys_path_dirs, extended)
 
-            for child in stat["children"]:
-                # we check this as we might have prevented some functions to be
-                # shown in the output
-                if child[0] in self:
-                    caller = stat
-                    callee = self[child[0]]
+        if not extended:
+            for _, stat in self.items():
+                for child in stat["children"]:
+                    # we check this as we might have prevented some functions to be
+                    # shown in the output
+                    if child[0] in self:
+                        caller = stat
+                        callee = self[child[0]]
+                        is_root = (caller == callee)
 
-                    result.add(
-                        caller_module=caller['module'],
-                        caller_name=caller['name'],
-                        caller_fn_args=caller["fn_args"],
-                        caller_rec_level=caller["rec_level"],
-                        caller_name_formatted=caller["name_formatted"],
-                        callee_module=callee["module"],
-                        callee_name=callee["name"],
-                        callee_fn_args=callee["fn_args"],
-                        callee_name_formatted=callee["name_formatted"],
-                        callee_rec_level=callee["rec_level"],
-                        call_count=child[1],
-                        wall_time=child[3] * 1000000,
-                        cpu_time=child[5] * 1000000,
-                        mem_usage=child[7],
-                        peak_mem_usage=child[8],
-                        rec_level=callee["rec_level"],
-                    )
+                        result.add(
+                            caller_module=caller['module']
+                            if not is_root else '',
+                            caller_name=caller['name'] if not is_root else '',
+                            caller_fn_args=caller["fn_args"]
+                            if not is_root else '',
+                            caller_rec_level=caller["rec_level"],
+                            caller_name_formatted=caller["name_formatted"]
+                            if not is_root else '',
+                            callee_module=callee["module"],
+                            callee_name=callee["name"],
+                            callee_fn_args=callee["fn_args"],
+                            callee_name_formatted=callee["name_formatted"],
+                            callee_rec_level=callee["rec_level"],
+                            call_count=child[1],
+                            wall_time=child[3],
+                            cpu_time=child[4],
+                            mem_usage=child[5],
+                            peak_mem_usage=child[6],
+                            rec_level=callee["rec_level"],
+                        )
 
         # add timeline traces
         i = 0
@@ -424,7 +407,7 @@ class _BlackfireTracesBase(dict):
             caller = self[te[0]]
             callee = self[te[1]]
 
-            result.add_timeline(
+            trace_dict = dict(
                 caller_module=caller['module'],
                 caller_name=caller['name'],
                 caller_fn_args=caller["fn_args"],
@@ -435,30 +418,17 @@ class _BlackfireTracesBase(dict):
                 callee_fn_args=callee["fn_args"],
                 callee_name_formatted=callee["name_formatted"],
                 callee_rec_level=callee["rec_level"],
-                wall=te[2] * 1000000,
-                cpu=te[3] * 1000000,
-                mu=te[6],
-                pmu=te[7],
-                timeline_index=i,
-            )
-            result.add_timeline(
-                caller_module=caller['module'],
-                caller_name=caller['name'],
-                caller_fn_args=caller["fn_args"],
-                caller_rec_level=caller["rec_level"],
-                caller_name_formatted=caller["name_formatted"],
-                callee_module=callee["module"],
-                callee_name=callee["name"],
-                callee_fn_args=callee["fn_args"],
-                callee_name_formatted=callee["name_formatted"],
-                callee_rec_level=callee["rec_level"],
-                wall=te[4] * 1000000,
-                cpu=te[5] * 1000000,
-                mu=te[8],
-                pmu=te[9],
-                timeline_index=i,
+                timeline_index=i
             )
 
+            # add the same trace dict twice with different metrics one for
+            # Threshold-start and one for Threshold-End
+            result.add_timeline(
+                **dict(trace_dict, wall=te[2], cpu=te[3], mu=te[6], pmu=te[7])
+            )
+            result.add_timeline(
+                **dict(trace_dict, wall=te[4], cpu=te[5], mu=te[8], pmu=te[9])
+            )
             i += 1
         return result
 
@@ -472,23 +442,24 @@ def start(
     instrumented_funcs={},
     timespan_selectors={},
     timespan_threshold=MAX_TIMESPAN_THRESHOLD,  # ms
+    apm_extended_trace=False,
 ):
-    global _max_prefix_cache, _timespan_selectors
+    global _max_prefix_cache
 
     if not isinstance(timespan_selectors, dict):
         raise BlackfireProfilerException(
             "timespan_selectors shall be an instance of 'dict'"
         )
 
+    if not isinstance(instrumented_funcs, dict):
+        raise BlackfireProfilerException(
+            "instrumented_funcs shall be an instance of 'dict'"
+        )
+
     # in fact we can use this cache this forever but the idea is maybe the sys.path
     # changes in some way and it would be nice to see the effect between every
     # start/stop pair.
     _max_prefix_cache = {}
-
-    _timespan_selectors = {}
-
-    if profile_timespan:
-        _timespan_selectors = timespan_selectors
 
     if session_id is None:
         session_id = _default_session_id_callback()
@@ -500,7 +471,9 @@ def start(
         profile_memory,
         profile_timespan,
         instrumented_funcs,
+        timespan_selectors,
         timespan_threshold,
+        apm_extended_trace,
     )
 
 
@@ -511,13 +484,13 @@ def stop(session_id=None):
     _bfext.stop(session_id)
 
 
-def get_traces(session_id=None, omit_sys_path_dirs=True):
+def get_traces(session_id=None, omit_sys_path_dirs=True, extended=False):
     if session_id is None:
         session_id = _default_session_id_callback()
 
     traces, timeline_traces = _bfext.get_traces(session_id)
     traces = _BlackfireTracesBase(traces, timeline_traces, omit_sys_path_dirs)
-    return traces.to_traceformat()
+    return traces.to_traceformat(extended)
 
 
 @contextmanager

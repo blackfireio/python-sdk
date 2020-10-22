@@ -87,47 +87,13 @@ class Probe(object):
             )
 
         # timespan_selectors is a dict of set of prefix/equal regex selectors.
-        timespan_selectors = {'^': set(), '=': set()}
-        if profile_timespan:
-            ts_selectors = self._agent_conn.agent_response.args.get(
-                'Blackfire-Timespan', []
-            )
-
-            for ts_sel in ts_selectors:
-                if ts_sel[0] not in ['^', '=']:
-                    log.warning(
-                        "Ignoring invalid timespan selector '%s'.", ts_sel
-                    )
-                    continue
-
-                timespan_selectors[ts_sel[0]].add(ts_sel[1:])
+        timespan_selectors = self._agent_conn.agent_response.get_timespan_selectors() \
+                if profile_timespan else {}
 
         # instrumented_funcs is a dict of {func_name:[list of argument IDs]}
         instrumented_funcs = {}
-        if fn_args_enabled:
-            # convert the fn-args string to dict for faster lookups on C side
-            fn_args = self._agent_conn.agent_response.args.get(
-                'Blackfire-Fn-Args', []
-            )
-            for fn_arg in fn_args:
-                fn_name, arg_ids_s = fn_arg.split()
-                fn_name = fn_name.strip()
-
-                if fn_name in instrumented_funcs:
-                    log.warning(
-                        "Function '%s' is already instrumented. Ignoring fn-args directive %s.",
-                        fn_name, fn_arg
-                    )
-                    continue
-
-                arg_ids = []
-                for arg_id in arg_ids_s.strip().split(','):
-                    if arg_id.isdigit():
-                        arg_ids.append(int(arg_id))
-                    else:
-                        arg_ids.append(arg_id)
-
-                instrumented_funcs[fn_name] = arg_ids
+        instrumented_funcs = self._agent_conn.agent_response.get_instrumented_funcs() \
+                if fn_args_enabled else {}
 
         profiler.start(
             builtins=builtins,
