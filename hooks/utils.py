@@ -1,7 +1,7 @@
 import os
 import sys
-from blackfire import probe, generate_config
-from blackfire.utils import get_logger
+from blackfire import probe, generate_config, agent
+from blackfire.utils import get_logger, read_blackfireyml_content
 
 log = get_logger(__name__)
 
@@ -11,6 +11,25 @@ def format_exc_for_display():
     _, exc_obj, exc_tb = sys.exc_info()
     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
     return "%s:%s %s" % (fname, exc_tb.tb_lineno, exc_obj)
+
+
+def try_validate_send_blackfireyml(config, blackfireyml_content):
+    try:
+        agent_conn = agent.Connection(config.agent_socket, config.agent_timeout)
+        agent_conn.connect(config=config)
+
+        if blackfireyml_content is None:
+            raise Exception('No .blackfire.yml file found.')
+    except:
+        return (
+            'X-Blackfire-Error',
+            '101 ' + format_exc_for_display() + '&no-blackfire-yaml'
+        )
+
+    return (
+        'X-Blackfire-Response', agent_conn.agent_response.status_val +
+        '&blackfire-yml-size=%d' % (len(blackfireyml_content))
+    )
 
 
 def try_enable_probe(query):

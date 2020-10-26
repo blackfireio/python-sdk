@@ -226,7 +226,7 @@ def generate_subprofile_query():
     args_copy['sub_profile'] = '%s:%s' % (parent_sid, sid)
 
     result = "%s&signature=%s&%s" % (
-        _config.challenge,
+        _config.challenge_raw,
         _config.signature,
         urlencode(args_copy),
     )
