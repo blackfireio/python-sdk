@@ -71,7 +71,7 @@ class BlackfireConfiguration(object):
         self.args = dict(parse_qsl(self.args_raw))
         self.challenge = dict(parse_qsl(self.challenge_raw))
 
-    def is_blackfireyaml_asked(self):
+    def is_blackfireyml_asked(self):
         return 'request-id-blackfire-yml' in self.challenge['agentIds']
 
     def __getattribute__(self, name):

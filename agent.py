@@ -151,7 +151,7 @@ class Connection(object):
 
         # blackfire.yaml asked from build&scenarios? Agent will not wait
         # for anymore data when noop is seen
-        if config.is_blackfireyaml_asked():
+        if config.is_blackfireyml_asked():
             bf_probe_header += ', noop'
 
         headers = {

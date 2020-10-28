@@ -1,8 +1,9 @@
 import time
 import platform
-from blackfire import apm, VERSION
-from blackfire.utils import get_logger, get_probed_runtime
-from blackfire.hooks.utils import try_enable_probe, try_end_probe, add_probe_response_header
+from blackfire import apm, VERSION, generate_config
+from blackfire.utils import get_logger, get_probed_runtime, read_blackfireyml_content
+from blackfire.hooks.utils import try_enable_probe, try_end_probe, add_probe_response_header, \
+    try_validate_send_blackfireyml
 
 log = get_logger(__name__)
 
@@ -54,6 +55,7 @@ class BlackfireFlaskMiddleware(object):
         req_context.apm = False
         req_context.apm_extended = False
         req_context.profile = False
+        req_context.blackfireyaml_asked = False
         req_context.req_start = time.time()
         req_context.probe_err = None
         req_context.probe = None
@@ -61,6 +63,25 @@ class BlackfireFlaskMiddleware(object):
         log.debug("FlaskMiddleware._before_request called.")
 
         request = get_current_request()
+
+        # bf yaml asked?
+        if request.method == 'POST':
+            if 'HTTP_X_BLACKFIRE_QUERY' in request.environ:
+                config = generate_config(
+                    query=request.environ['HTTP_X_BLACKFIRE_QUERY']
+                )
+                if config.is_blackfireyml_asked():
+                    blackfireyml_content = read_blackfireyml_content()
+                    agent_response = try_validate_send_blackfireyml(
+                        config, blackfireyml_content
+                    )
+
+                    from flask import Response
+
+                    response = Response(blackfireyml_content or '')
+                    add_probe_response_header(response.headers, agent_response)
+
+                    return response
 
         # When signal is registered we might received other events from other
         # requests. Look at the request object of the current response to determine

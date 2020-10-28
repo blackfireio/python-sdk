@@ -28,24 +28,6 @@ _DEFAULT_LOG_FILE = 'python-probe.log'
 
 
 def read_blackfireyml_content():
-
-    return '''scenarios: |
-    #!blackfire-player
-
-    scenario
-        name \'aaa1\'
-
-        visit url(\'/load-me\')
-            name \'load me page\'
-
-tests:
-    Pages are resources efficient:
-        path: /.*
-        assertions:
-            - main.memory < 4M
-            - main.peak_memory < 6M
-            - main.wall_time < 150ms'''
-
     bf_yaml_files = [".blackfire.yaml", ".blackfire.yml"]
     for fpath in bf_yaml_files:
         if os.path.exists(fpath):

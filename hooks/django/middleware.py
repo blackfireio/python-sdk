@@ -58,11 +58,21 @@ class BlackfireDjangoMiddleware(object):
     def __call__(self, request):
         # bf yaml asked?
         if request.method == 'POST':
-            query = request.META.get('HTTP_X_BLACKFIRE_QUERY')
-            if query:
-                config = generate_config(query=query)
-                if config.is_blackfireyaml_asked():
-                    return self._send_blackfireyml(config)
+            if 'HTTP_X_BLACKFIRE_QUERY' in request.META:
+                config = generate_config(
+                    query=request.META['HTTP_X_BLACKFIRE_QUERY']
+                )
+                if config.is_blackfireyml_asked():
+                    blackfireyml_content = read_blackfireyml_content()
+                    agent_response = try_validate_send_blackfireyml(
+                        config, blackfireyml_content
+                    )
+                    from django.http import HttpResponse
+
+                    response = HttpResponse(blackfireyml_content or '')
+                    add_probe_response_header(response, agent_response)
+
+                    return response
 
         # regular profile
         if 'HTTP_X_BLACKFIRE_QUERY' in request.META:
@@ -89,26 +99,6 @@ class BlackfireDjangoMiddleware(object):
 
         # no instrumentation
         response = self.get_response(request)
-        return response
-
-    def _send_blackfireyml(self, config):
-        log.debug("_send_blackfireyml called. [%s]" % (config))
-
-        from django.http import HttpResponse
-
-        blackfireyml_content = read_blackfireyml_content()
-        resp_formatted = try_validate_send_blackfireyml(
-            config, blackfireyml_content
-        )
-
-        response = HttpResponse()
-        add_probe_response_header(response, resp_formatted)
-
-        if blackfireyml_content is not None:
-            response.content = blackfireyml_content
-
-        log.debug("_send_blackfireyml ended. [%s]" % (response.items(), ))
-
         return response
 
     def _apm_trace(self, request, extended=False):

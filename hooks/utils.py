@@ -1,7 +1,7 @@
 import os
 import sys
 from blackfire import probe, generate_config, agent
-from blackfire.utils import get_logger, read_blackfireyml_content
+from blackfire.utils import get_logger
 
 log = get_logger(__name__)
 
