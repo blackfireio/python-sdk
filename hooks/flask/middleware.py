@@ -55,7 +55,6 @@ class BlackfireFlaskMiddleware(object):
         req_context.apm = False
         req_context.apm_extended = False
         req_context.profile = False
-        req_context.blackfireyaml_asked = False
         req_context.req_start = time.time()
         req_context.probe_err = None
         req_context.probe = None
