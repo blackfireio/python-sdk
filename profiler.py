@@ -517,6 +517,18 @@ def get_sessions():
     return _bfext._get_sessions()
 
 
+def is_session_active(session_id=None):
+    '''
+    Checks if the running session is already active
+    Maybe auto-instrumented code generated a session for the current thread and
+    user requests manual instrumentation.
+    '''
+    if session_id is None:
+        session_id = _default_session_id_callback()
+
+    return _bfext.is_session_active(session_id)
+
+
 # import time
 if __name__ != '__main__':
     initialize()

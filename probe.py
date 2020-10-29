@@ -48,8 +48,6 @@ class Probe(object):
         return self._agent_conn.agent_response
 
     def enable(self):
-        if self._enabled:
-            raise BlackfireApiException('Another probe is already profiling')
         self._enabled = True
 
         # connect agent
@@ -172,11 +170,21 @@ class Probe(object):
 
 
 def get_traces(omit_sys_path_dirs=_DEFAULT_OMIT_SYS_PATH):
-    return profiler.get_traces(omit_sys_path_dirs=omit_sys_path_dirs)
+    global _probe
+
+    if not _probe:
+        return
+
+    return _probe.get_traces(omit_sys_path_dirs=omit_sys_path_dirs)
 
 
 def clear_traces():
-    profiler.clear_traces()
+    global _probe
+
+    if not _probe:
+        return
+
+    _probe.clear_traces()
 
 
 # used from testing to set Probe state to a consistent state
@@ -286,7 +294,12 @@ def enable(end_at_exit=False):
             'No configuration set. initialize should be called first.'
         )
 
+    # this both checks manual+auto instrumentations
+    if profiler.is_session_active():
+        raise BlackfireApiException('Another probe is already profiling')
+
     log.debug("probe.enable() called.")
+
     _probe.enable()
 
     if end_at_exit:  # used for profiling CLI scripts
