@@ -294,7 +294,6 @@ def enable(end_at_exit=False):
             'No configuration set. initialize should be called first.'
         )
 
-    # this both checks manual+auto instrumentations
     if profiler.is_session_active():
         raise BlackfireApiException('Another probe is already profiling')
 
