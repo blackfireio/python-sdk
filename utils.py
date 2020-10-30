@@ -28,14 +28,23 @@ _DEFAULT_LOG_FILE = 'python-probe.log'
 
 
 def read_blackfireyml_content():
-    # TODO: use os.getcwd() get cur_dir os.pardir for going up and os.path.join
-    # to change filename + write a unittest for this maybe
     bf_yaml_files = [".blackfire.yaml", ".blackfire.yml"]
-    for fpath in bf_yaml_files:
-        if os.path.exists(fpath):
-            with open(fpath, "r") as f:
-                result = f.read()
-                return result
+
+    cwd = os.getcwd()
+    while True:
+        for fname in bf_yaml_files:
+            fpath = os.path.join(cwd, fname)
+            if os.path.exists(fpath):
+                with open(fpath, "r") as f:
+                    result = f.read()
+                    return result
+
+        # move up
+        prev_cwd = cwd
+        os.chdir("..")
+        cwd = os.getcwd()
+        if prev_cwd == cwd:  # root dir found
+            break
 
 
 def import_module(mod_name):
