@@ -18,6 +18,7 @@ def try_enable_probe(query):
     try:
         config = generate_config(query=query)
         new_probe = probe.Probe(config=config)
+        new_probe.clear_traces()
         new_probe.enable()
     except Exception as e:
         # TODO: Is this really quote or urlencode?
