@@ -29,9 +29,11 @@ _DEFAULT_LOG_FILE = 'python-probe.log'
 
 def read_blackfireyml_content():
     bf_yaml_files = [".blackfire.yaml", ".blackfire.yml"]
+    MAX_FOLDER_COUNT = 255  # be defensive
 
     cwd = os.getcwd()
-    while True:
+    i = 0
+    while i < MAX_FOLDER_COUNT:
         for fname in bf_yaml_files:
             fpath = os.path.join(cwd, fname)
             if os.path.exists(fpath):
@@ -41,10 +43,12 @@ def read_blackfireyml_content():
 
         # move up
         prev_cwd = cwd
-        os.chdir("..")
+        os.chdir(os.pardir)
         cwd = os.getcwd()
         if prev_cwd == cwd:  # root dir found
             break
+
+        i += 1
 
 
 def import_module(mod_name):
