@@ -31,20 +31,22 @@ def read_blackfireyml_content():
     bf_yaml_files = [".blackfire.yaml", ".blackfire.yml"]
     MAX_FOLDER_COUNT = 255  # be defensive
 
-    cwd = os.getcwd()
     i = 0
+    cwd = os.getcwd()
     while i < MAX_FOLDER_COUNT:
         for fname in bf_yaml_files:
             fpath = os.path.join(cwd, fname)
             if os.path.exists(fpath):
-                with open(fpath, "r") as f:
-                    result = f.read()
-                    return result
+                try:
+                    with open(fpath, "r") as f:
+                        result = f.read()
+                        return result
+                except IOError:
+                    pass  # suppress PermissionDenied
 
         # move up
         prev_cwd = cwd
-        os.chdir(os.pardir)
-        cwd = os.getcwd()
+        cwd = os.path.abspath(os.path.join(cwd, os.pardir))
         if prev_cwd == cwd:  # root dir found
             break
 
