@@ -77,8 +77,12 @@ class BlackfireFlaskMiddleware(object):
 
                     from flask import Response
 
-                    response = Response(blackfireyml_content or '')
-                    add_probe_response_header(response.headers, agent_response)
+                    response = Response()
+                    if agent_response:  # send response if signature is validated
+                        response.data = blackfireyml_content or ''
+                        add_probe_response_header(
+                            response.headers, agent_response
+                        )
 
                     return response
 

@@ -25,17 +25,14 @@ def try_validate_send_blackfireyml(config, blackfireyml_content):
         agent_conn.connect(config=config)
 
         if blackfireyml_content is None:
-            raise Exception('No .blackfire.yml file found.')
-    except Exception as e:
-        return (
-            'X-Blackfire-Error',
-            '101 ' + format_exc_for_display(e) + '&no-blackfire-yaml'
-        )
+            return ('X-Blackfire-Error', '101 ' '&no-blackfire-yaml')
 
-    return (
-        'X-Blackfire-Response', agent_conn.agent_response.status_val +
-        '&blackfire-yml-size=%d' % (len(blackfireyml_content))
-    )
+        return (
+            'X-Blackfire-Response', agent_conn.agent_response.status_val +
+            '&blackfire-yml-size=%d' % (len(blackfireyml_content))
+        )
+    except Exception as e:
+        log.exception(e)
 
 
 def try_enable_probe(query):

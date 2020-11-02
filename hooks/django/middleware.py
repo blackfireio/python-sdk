@@ -69,8 +69,10 @@ class BlackfireDjangoMiddleware(object):
                     )
                     from django.http import HttpResponse
 
-                    response = HttpResponse(blackfireyml_content or '')
-                    add_probe_response_header(response, agent_response)
+                    response = HttpResponse()
+                    if agent_response:  # send response if signature is validated
+                        response.content = blackfireyml_content or ''
+                        add_probe_response_header(response, agent_response)
 
                     return response
 
