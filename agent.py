@@ -451,7 +451,7 @@ class BlackfireResponse(BlackfireResponseBase):
             self.status_code = BlackfireResponse.StatusCode.ERR
 
         for line in lines[1:]:
-            resp_key, resp_val = line.split(':')
+            resp_key, resp_val = line.split(':', 1)
             resp_key = resp_key.strip()
             resp_val = resp_val.strip()
 
