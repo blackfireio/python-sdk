@@ -36,9 +36,10 @@ class Connection(object):
             family = socket.AF_UNIX
             self._sock_addr = sock_parsed.path
         elif sock_parsed.scheme == "tcp":
-            # TODO: Old probe used AF_UNSPEC here to support IPv6?
             family = socket.AF_INET
-            host, port = sock_parsed.netloc.split(':')
+            # there are some URLs like: tcp://[::]:10666 which might contain
+            # `:` in the host section. That is why we use rsplit(...) below
+            host, port = sock_parsed.netloc.rsplit(':', 1)
             self._sock_addr = (
                 host,
                 int(port),
