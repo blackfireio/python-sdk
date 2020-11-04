@@ -24,13 +24,14 @@ def try_validate_send_blackfireyml(config, blackfireyml_content):
         agent_conn = agent.Connection(config.agent_socket, config.agent_timeout)
         agent_conn.connect(config=config)
 
+        resp_line = str(agent_conn.agent_response.status_val)
         if blackfireyml_content is None:
-            return ('X-Blackfire-Error', '101 ' '&no-blackfire-yaml')
+            resp_line += '&no-blackfire-yaml'
+        else:
+            resp_line += '&blackfire-yml-size=%d' % (len(blackfireyml_content))
 
-        return (
-            'X-Blackfire-Response', agent_conn.agent_response.status_val +
-            '&blackfire-yml-size=%d' % (len(blackfireyml_content))
-        )
+        return ('X-Blackfire-Response', resp_line)
+
     except Exception as e:
         log.exception(e)
 
