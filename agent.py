@@ -4,7 +4,7 @@ import sys
 import json
 from blackfire.exceptions import BlackfireApiException, BlackfireAPMException
 from collections import defaultdict
-from blackfire.utils import urlparse, get_logger, IS_PY3, parse_qsl
+from blackfire.utils import urlparse, get_logger, IS_PY3, parse_qsl, read_blackfireyml_content
 
 log = get_logger(__name__)
 
@@ -135,15 +135,9 @@ class Connection(object):
 
     def _write_prolog(self, config):
         blackfire_yml = bool(int(config.args.get('flag_yml', '1')))
-        blackfire_yml_contents = None
+        blackfire_yml_content = None
         if blackfire_yml:
-            bf_yaml_files = [".blackfire.yaml", ".blackfire.yml"]
-            for fpath in bf_yaml_files:
-                if os.path.exists(fpath):
-                    with open(fpath, "r") as f:
-                        blackfire_yml_contents = f.read()
-                        break
-
+            blackfire_yml_content = read_blackfireyml_content()
         bf_probe_header = 'python-%s' % (sys.hexversion)
 
         # recv timespan entries if timespan enabled
@@ -153,13 +147,18 @@ class Connection(object):
 
         # it is an expected situation to not have the bf_yaml file in place
         # even it is defined as a flag
-        if blackfire_yml_contents:
+        if blackfire_yml_content:
             bf_probe_header += ', blackfire_yml'
+
+        # blackfire.yaml asked from build&scenarios? Agent will not wait
+        # for anymore data when noop is seen
+        if config.is_blackfireyml_asked():
+            bf_probe_header += ', noop'
 
         headers = {
             'Blackfire-Query':
             '%s&signature=%s&%s' % (
-                config.challenge,
+                config.challenge_raw,
                 config.signature,
                 config.args_raw,
             ),
@@ -192,8 +191,8 @@ class Connection(object):
 
         if self.agent_response.status_val_dict.get('blackfire_yml') == 'true':
             blackfire_yml_req = BlackfireRequest(
-                headers={'Blackfire-Yaml-Size': len(blackfire_yml_contents)},
-                data=blackfire_yml_contents,
+                headers={'Blackfire-Yaml-Size': len(blackfire_yml_content)},
+                data=blackfire_yml_content,
             )
             self.send(blackfire_yml_req.to_bytes())
 

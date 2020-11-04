@@ -1,8 +1,9 @@
 import time
 import platform
 from blackfire import probe, apm, VERSION, generate_config
-from blackfire.utils import get_logger, get_probed_runtime
-from blackfire.hooks.utils import try_enable_probe, try_end_probe, add_probe_response_header
+from blackfire.utils import get_logger, get_probed_runtime, read_blackfireyml_content
+from blackfire.hooks.utils import try_enable_probe, try_end_probe, \
+    add_probe_response_header, try_validate_send_blackfireyml
 from blackfire.hooks.django.utils import get_current_view_name
 
 log = get_logger(__name__)
@@ -55,6 +56,26 @@ class BlackfireDjangoMiddleware(object):
         # One-time configuration and initialization.
 
     def __call__(self, request):
+        # bf yaml asked?
+        if request.method == 'POST':
+            if 'HTTP_X_BLACKFIRE_QUERY' in request.META:
+                config = generate_config(
+                    query=request.META['HTTP_X_BLACKFIRE_QUERY']
+                )
+                if config.is_blackfireyml_asked():
+                    blackfireyml_content = read_blackfireyml_content()
+                    agent_response = try_validate_send_blackfireyml(
+                        config, blackfireyml_content
+                    )
+                    from django.http import HttpResponse
+
+                    response = HttpResponse()
+                    if agent_response:  # send response if signature is validated
+                        response.content = blackfireyml_content or ''
+                        add_probe_response_header(response, agent_response)
+
+                    return response
+
         # regular profile
         if 'HTTP_X_BLACKFIRE_QUERY' in request.META:
             return self._profiled_request(

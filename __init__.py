@@ -57,17 +57,22 @@ class BlackfireConfiguration(object):
         query: is the BLACKFIRE_QUERY url encoded string that contains the signed params
         signature ...etc.
         """
+        self.query_raw = query
 
         for k, v in kwargs.items():
             setattr(self, k, v)
 
         matches = re.split('(?:^|&)signature=(.+?)(?:&|$)', query, 2)
 
-        self.challenge = matches[0]
+        self.challenge_raw = matches[0]
         self.signature = matches[1]
         self.args_raw = matches[2]
 
         self.args = dict(parse_qsl(self.args_raw))
+        self.challenge = dict(parse_qsl(self.challenge_raw))
+
+    def is_blackfireyml_asked(self):
+        return 'request-id-blackfire-yml' in self.challenge['agentIds']
 
     def __getattribute__(self, name):
         value = None
