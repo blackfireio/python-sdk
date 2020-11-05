@@ -40,6 +40,12 @@ class Connection(object):
             # there are some URLs like: tcp://[::]:10666 which might contain
             # `:` in the host section. That is why we use rsplit(...) below
             host, port = sock_parsed.netloc.rsplit(':', 1)
+
+            # is this a IPv6 address?
+            if host.startswith('['):
+                host = host[1:-1]
+                family = socket.AF_INET6
+
             self._sock_addr = (
                 host,
                 int(port),
