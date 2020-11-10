@@ -125,7 +125,7 @@ class Probe(object):
         log.debug("probe.end() called.")
 
         self.disable()
-        traces = get_traces(omit_sys_path_dirs=omit_sys_path_dirs)
+        traces = self.get_traces(omit_sys_path_dirs=omit_sys_path_dirs)
         self.clear_traces()
 
         # write main prolog
