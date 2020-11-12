@@ -62,10 +62,8 @@ class Connection(object):
         # it is advised to disable NAGLE algorithm
         try:
             self._socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-        except Exception as e:
-            log.warning(
-                "Error happened while disabling NODELAY option. [%s]", e
-            )
+        except:
+            pass
 
     def __del__(self):
         try:
