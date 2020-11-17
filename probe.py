@@ -27,7 +27,7 @@ _DEFAULT_PROFILE_TITLE = 'unnamed profile'
 
 __all__ = [
     'get_traces', 'clear_traces', 'is_enabled', 'enable', 'end', 'reset',
-    'disable', 'run', 'initialize'
+    'disable', 'run', 'initialize', 'set_transaction_name'
 ]
 
 

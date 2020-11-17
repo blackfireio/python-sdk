@@ -64,7 +64,6 @@ def try_end_probe(
         # custom transaction name overrides controller name setting
         headers['controller-name'
                 ] = new_probe.transaction_name or controller_name
-
         headers['framework'] = framework
 
         context_dict = {}

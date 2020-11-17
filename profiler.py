@@ -519,6 +519,13 @@ def get_sessions():
     return _bfext._get_sessions()
 
 
+def get_current_probe(session_id=None):
+    if session_id is None:
+        session_id = _default_session_id_callback()
+
+    return _bfext.get_current_probe(session_id)
+
+
 def is_session_active(session_id=None):
     '''
     Checks if the running session is already active
