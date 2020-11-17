@@ -38,6 +38,8 @@ class Probe(object):
         self._agent_conn = None
         self._enabled = False
 
+        self.transaction_name = None
+
     def is_enabled(self):
         return self._enabled
 
@@ -101,6 +103,7 @@ class Probe(object):
             instrumented_funcs=instrumented_funcs,
             timespan_selectors=timespan_selectors,
             timespan_threshold=timespan_threshold,
+            probe=self,
         )
 
         # TODO: 'Blackfire-Error: 103 Samples quota is out'
@@ -364,3 +367,15 @@ def run(call_end=True):
         disable()
         if call_end:
             end()
+
+
+def set_transaction_name(name):
+    '''
+    Retrieves the current probe for the current session and sets transaction_name
+    property. transaction_name is the generic name for the name of the handler 
+    function. E.g: In Django terms it is the view_name whereas in PHP it is called
+    controller_name.
+    '''
+    curr_probe = profiler.get_current_probe()
+    if curr_probe:
+        curr_probe.transaction_name = name
