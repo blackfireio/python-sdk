@@ -87,7 +87,12 @@ class BlackfireConfiguration(object):
 
 
 def _get_signing_response(
-    signing_endpoint, client_id, client_token, urlopen=urlopen
+    signing_endpoint,
+    client_id,
+    client_token,
+    http_proxy,
+    https_proxy,
+    urlopen=urlopen
 ):
     _SIGNING_API_TIMEOUT = 5.0
 
@@ -98,6 +103,10 @@ def _get_signing_response(
     base64string = base64.b64encode(auth_hdr)
     if IS_PY3:
         base64string = base64string.decode("ascii")
+
+    if http_proxy or https_proxy:
+        install_proxy_handler(http_proxy, https_proxy)
+
     request.add_header("Authorization", "Basic %s" % base64string)
     result = urlopen(request, timeout=_SIGNING_API_TIMEOUT)
     if not (200 <= result.code < 400):
@@ -336,6 +345,7 @@ def generate_config(
     if query is None:
 
         c_client_id = c_client_token = None
+        http_proxy = https_proxy = None
 
         # read config params from config file
         if os.path.exists(config_file):
@@ -346,6 +356,9 @@ def generate_config(
 
                 c_client_id = bf_section.get('client-id', '').strip()
                 c_client_token = bf_section.get('client-token', '').strip()
+
+                http_proxy = bf_section.get('http-proxy', '').strip()
+                https_proxy = bf_section.get('https-proxy', '').strip()
 
         # read config params from Env. vars, these have precedence
         c_client_id = os.environ.get('BLACKFIRE_CLIENT_ID', c_client_id)
@@ -369,7 +382,7 @@ def generate_config(
 
         # make a /signing request to server
         resp_dict = _get_signing_response(
-            signing_endpoint, client_id, client_token
+            signing_endpoint, client_id, client_token, http_proxy, https_proxy
         )
 
         # tweak some options for manual profiling

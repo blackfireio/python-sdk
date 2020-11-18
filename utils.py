@@ -13,18 +13,29 @@ if IS_PY3:
     from urllib.parse import parse_qsl, quote, urlparse, urlencode, urljoin
     from configparser import ConfigParser
     console_input = input
-    from urllib.request import Request, urlopen
+    from urllib.request import Request, urlopen, ProxyHandler, build_opener, install_opener
     from queue import Queue
 else:
     from urlparse import parse_qsl, urlparse, urljoin
     from urllib import quote, urlencode
     from ConfigParser import ConfigParser
     console_input = raw_input
-    from urllib2 import Request, urlopen
+    from urllib2 import Request, urlopen, ProxyHandler, build_opener, install_opener
     from Queue import Queue
 
 _DEFAULT_LOG_LEVEL = 2
 _DEFAULT_LOG_FILE = 'python-probe.log'
+
+
+def install_proxy_handler(http_proxy, https_proxy):
+    proxies = {}
+    if http_proxy:
+        proxies['http'] = http_proxy
+    if https_proxy:
+        proxies['https'] = https_proxy
+    proxy_support = ProxyHandler()
+    opener = build_opener(proxy_support)
+    install_opener(opener)
 
 
 def read_blackfireyml_content():
