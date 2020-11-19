@@ -60,7 +60,10 @@ def try_end_probe(
         headers = {}
         headers['Response-Code'] = response_status_code
         headers['Response-Bytes'] = response_len
-        headers['controller-name'] = controller_name
+
+        # custom transaction name overrides controller name setting
+        headers['controller-name'
+                ] = new_probe.transaction_name or controller_name
         headers['framework'] = framework
 
         context_dict = {}
