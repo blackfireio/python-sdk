@@ -293,6 +293,16 @@ class BlackfireRequest(BlackfireMessage):
     def to_bytes(self):
         result = ''
 
+        # There are multiple BlackfireRequest messages between Agent->Probe. If this
+        # message contains file-format or Blackfire-Query header, we make sure it is the first line
+        # in the protocol. While this is not mandatory, this is to comply with PHP
+        # probe.
+        if 'file-format' in self.headers:
+            result += 'file-format: %s\n' % (self.headers.pop('file-format'))
+        if 'Blackfire-Query' in self.headers:
+            result += 'Blackfire-Query: %s\n' % (
+                self.headers.pop('Blackfire-Query')
+            )
         for k, v in self.headers.items():
             result += '%s: %s\n' % (k, v)
         if len(self.headers):
