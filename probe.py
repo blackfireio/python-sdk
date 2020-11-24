@@ -32,15 +32,15 @@ __all__ = [
 
 
 class _ProbeProxy(object):
+    '''
+    This class implements a proxy interface for the current probe object.
+    If probe does not exist, all calls are noops
+    '''
 
     def __init__(self, probe):
         self._probe = probe
 
     def _docall(self, method_name, *args, **kwargs):
-        '''
-        Call the function of the proxied Probe object.
-        If probe does not exists all calls are noops
-        '''
         if not self._probe:
             return
 
