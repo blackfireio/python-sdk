@@ -31,15 +31,6 @@ __all__ = [
 ]
 
 
-class _ProbeProxy(object):
-
-    def __init__(self, probe):
-        self._probe = probe
-
-    # todo: define same APIs as the probe object that will act as a proxy and noop
-    # if none
-
-
 class Probe(object):
 
     def __init__(self, config):
@@ -124,6 +115,9 @@ class Probe(object):
         )
 
     def disable(self):
+        if not self._enabled:
+            return
+
         self._enabled = False
         profiler.stop()
 
@@ -397,4 +391,6 @@ def get_current():
     global _probe
 
     curr_probe = profiler.get_current_probe() or _probe
-    return _ProbeProxy(curr_probe)
+
+    # TODO: Enable by default? if curr_probe does not exist? auto_enable flag?
+    return curr_probe
