@@ -392,5 +392,5 @@ def get_current():
 
     curr_probe = profiler.get_current_probe() or _probe
 
-    # TODO: Enable by default? if curr_probe does not exist? auto_enable flag?
+    # TODO: What if curr_probe does not exist?
     return curr_probe
