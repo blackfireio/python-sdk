@@ -31,6 +31,38 @@ __all__ = [
 ]
 
 
+class _ProbeProxy(object):
+
+    def __init__(self, probe):
+        self._probe = probe
+
+    def _docall(self, method_name, *args, **kwargs):
+        '''
+        Call the function of the proxied Probe object.
+        If probe does not exists all calls are noops
+        '''
+        if not self._probe:
+            return
+
+        fn = getattr(self._probe, method_name)
+        return fn(*args, **kwargs)
+
+    def enable(self):
+        self._docall("enable")
+
+    def disable(self):
+        self._docall("disable")
+
+    def clear_traces(self):
+        self._docall("clear_traces")
+
+    def get_traces(self, *args, **kwargs):
+        return self._docall("get_traces", *args, **kwargs)
+
+    def end(self, *args, **kwargs):
+        return self._docall("end", *args, **kwargs)
+
+
 class Probe(object):
 
     def __init__(self, config):
@@ -50,6 +82,9 @@ class Probe(object):
         return self._agent_conn.agent_response
 
     def enable(self):
+        if self._enabled:
+            return
+
         self._enabled = True
 
         # connect agent
@@ -391,6 +426,4 @@ def get_current():
     global _probe
 
     curr_probe = profiler.get_current_probe() or _probe
-
-    # TODO: What if curr_probe does not exist?
-    return curr_probe
+    return _ProbeProxy(curr_probe)
