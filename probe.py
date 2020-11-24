@@ -31,6 +31,15 @@ __all__ = [
 ]
 
 
+class _ProbeProxy(object):
+
+    def __init__(self, probe):
+        self._probe = probe
+
+    # todo: define same APIs as the probe object that will act as a proxy and noop
+    # if none
+
+
 class Probe(object):
 
     def __init__(self, config):
@@ -379,3 +388,13 @@ def set_transaction_name(name):
     curr_probe = profiler.get_current_probe()
     if curr_probe:
         curr_probe.transaction_name = name
+
+
+def get_current():
+    '''
+    Retrieves the current probe for the current session (including the CLI probe)
+    '''
+    global _probe
+
+    curr_probe = profiler.get_current_probe() or _probe
+    return _ProbeProxy(curr_probe)
