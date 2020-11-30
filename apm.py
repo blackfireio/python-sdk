@@ -4,9 +4,9 @@ import logging
 import time
 import re
 import sys
-import platform
 import _blackfire_profiler as _bfext
-from blackfire.utils import get_logger, IS_PY3, json_prettify, ConfigParser, is_testing, ThreadPool, get_load_avg, get_cpu_count
+from blackfire.utils import get_logger, IS_PY3, json_prettify, ConfigParser, is_testing, ThreadPool, get_load_avg, \
+    get_cpu_count, get_memory_usage
 from blackfire import agent, DEFAULT_AGENT_SOCKET, DEFAULT_AGENT_TIMEOUT, DEFAULT_CONFIG_FILE, profiler
 from contextlib import contextmanager
 
@@ -31,24 +31,7 @@ class _RuntimeMetrics(object):
         if time.time() - cls._last_collected <= cls.CACHE_INTERVAL:
             return cls._cache["memory"]
 
-        import psutil
-
-        usage = peak_usage = 0
-
-        mem_info = psutil.Process().memory_info()
-        usage = mem_info.rss  # this is platform independent
-        plat_sys = platform.system()
-        if plat_sys == 'Windows':
-            # psutil uses GetProcessMemoryInfo API to get PeakWorkingSet
-            # counter. It is in bytes.
-            peak_usage = mem_info.peak_wset
-        else:
-            import resource
-            peak_usage = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
-            if plat_sys == "Linux":
-                peak_usage = peak_usage * 1024
-
-        result = (usage, peak_usage)
+        result = get_memory_usage()
         cls._cache["memory"] = result
         return result
 

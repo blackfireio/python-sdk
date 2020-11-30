@@ -6,6 +6,7 @@ import logging
 import platform
 import importlib
 from threading import Thread
+import _blackfire_profiler as _bfext
 
 IS_PY3 = sys.version_info > (3, 0)
 
@@ -117,6 +118,41 @@ def get_cpu_count():
     # with AWS lambda due to SHM initialization
     import psutil
     return psutil.cpu_count()
+
+
+def get_memory_usage():
+    plat_sys = platform.system()
+    pid = os.getpid()
+    if plat_sys == "Linux":
+        with open("/proc/%s/statm" % (os.getpid(), ), "rb") as f:
+            _, rss, _, _, _, _, _ = \
+                [int(x) * os.sysconf("SC_PAGE_SIZE") for x in f.readline().split()[:7]]
+        import resource
+        peak_usage = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss * 1024
+        return rss, peak_usage
+    elif plat_sys == "Darwin":
+        usage, _ = _bfext.get_memory_usage(pid)
+        import resource
+        peak_usage = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+        return usage, peak_usage
+    elif plat_sys == "Windows":
+        return _bfext.get_memory_usage(pid)
+    '''
+    mem_info = psutil.Process().memory_info()
+    usage = mem_info.rss  # this is platform independent
+    plat_sys = platform.system()
+    if plat_sys == 'Windows':
+        # psutil uses GetProcessMemoryInfo API to get PeakWorkingSet
+        # counter. It is in bytes.
+        peak_usage = mem_info.peak_wset
+    else:
+        import resource
+        peak_usage = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+        if plat_sys == "Linux":
+            peak_usage = peak_usage * 1024
+
+    return (usage, peak_usage)
+    '''
 
 
 def get_load_avg():
