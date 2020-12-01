@@ -137,22 +137,6 @@ def get_memory_usage():
         return usage, peak_usage
     elif plat_sys == "Windows":
         return _bfext.get_memory_usage(pid)
-    '''
-    mem_info = psutil.Process().memory_info()
-    usage = mem_info.rss  # this is platform independent
-    plat_sys = platform.system()
-    if plat_sys == 'Windows':
-        # psutil uses GetProcessMemoryInfo API to get PeakWorkingSet
-        # counter. It is in bytes.
-        peak_usage = mem_info.peak_wset
-    else:
-        import resource
-        peak_usage = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
-        if plat_sys == "Linux":
-            peak_usage = peak_usage * 1024
-
-    return (usage, peak_usage)
-    '''
 
 
 def get_load_avg():
