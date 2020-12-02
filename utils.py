@@ -8,6 +8,12 @@ import importlib
 from threading import Thread
 import _blackfire_profiler as _bfext
 
+try:
+    # platform checks are done whenever we access resource module
+    import resource
+except:
+    pass
+
 IS_PY3 = sys.version_info > (3, 0)
 
 if IS_PY3:
@@ -141,12 +147,10 @@ def get_memory_usage():
         with open("/proc/%s/statm" % (os.getpid(), ), "rb") as f:
             _, rss, _, _, _, _, _ = \
                 [int(x) * os.sysconf("SC_PAGE_SIZE") for x in f.readline().split()[:7]]
-        import resource
         peak_usage = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss * 1024
         return rss, peak_usage
     elif plat_sys == "Darwin":
         usage, _ = _bfext.get_memory_usage(pid)
-        import resource
         peak_usage = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
         return usage, peak_usage
     elif plat_sys == "Windows":
