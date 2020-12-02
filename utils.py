@@ -114,10 +114,24 @@ def get_probed_runtime():
 
 
 def get_cpu_count():
-    # we don't want to use multiprocessing.cpu_count as it does not work well
-    # with AWS lambda due to SHM initialization
-    import psutil
-    return psutil.cpu_count()
+    """We don't want to use multiprocessing.cpu_count as it does not work well
+    with AWS lambda due to SHM initialization.
+
+    Returns the number of logical CPUs in the system (same as os.cpu_count() in Python 3.4).
+    """
+    plat_sys = platform.system()
+    if plat_sys == "Linux":
+        try:
+            return os.sysconf("SC_NPROCESSORS_ONLN")
+        except ValueError:
+            ncpus = 0
+            with open('/proc/cpuinfo') as f:
+                for line in f:
+                    if line.lower().startswith(b'processor'):
+                        ncpus += 1
+        return ncpus
+
+    return _bfext.get_cpu_count_logical()
 
 
 def get_memory_usage():
