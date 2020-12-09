@@ -17,7 +17,7 @@ Usage
 -----
 
 These examples and more can be found on the official `Blackfire Python
-SDK documentation <https://blackfire.io/docs/integrations/python/sdk>`_.
+SDK documentation <https://blackfire.io/docs/python/integrations/sdk>`_.
 
 Resources
 ---------
@@ -26,8 +26,8 @@ Resources
 -  `Blackfire Installation
    Guide <https://blackfire.io/docs/up-and-running/installation>`_
 -  `Blackfire Python SDK
-   documentation <https://blackfire.io/docs/integrations/python/sdk>`_
+   documentation <https://blackfire.io/docs/python/integrations/sdk>`_
 -  `Blackfire Django
-   Integration <https://blackfire.io/docs/integrations/python/django>`_
+   Integration <https://blackfire.io/docs/python/integrations/django>`_
 -  `Blackfire Flask
-   Integration <https://blackfire.io/docs/integrations/python/flask>`_
+   Integration <https://blackfire.io/docs/python/integrations/flask>`_
