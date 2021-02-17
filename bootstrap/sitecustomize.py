@@ -1,25 +1,28 @@
 import os
 import sys
-import imp
 import blackfire
 
 from blackfire.utils import get_logger
 
-log = get_logger(__name__)
+log = get_logger("blackfire.sitecustomize")
 
 blackfire.bootstrap()
 
 # Ensure other sitecustomize.py is called if available in sys.path
 bootstrap_dir = os.path.dirname(__file__)
-path = list(sys.path)
+if bootstrap_dir in sys.path:
+    index = sys.path.index(bootstrap_dir)
+    del sys.path[index]
 
-if bootstrap_dir in path:
-    path.remove(bootstrap_dir)
-
-try:
-    (f, path, description) = imp.find_module("sitecustomize", path)
-except ImportError:
-    pass
-else:
-    log.debug("sitecustomize from user found in: %s", path)
-    imp.load_module("sitecustomize", f, path, description)
+    # hold a reference
+    ref_sitecustomize = sys.modules["sitecustomize"]
+    del sys.modules["sitecustomize"]
+    try:
+        import sitecustomize
+    except ImportError:
+        sys.modules["sitecustomize"] = ref_sitecustomize
+    else:
+        log.debug("sitecustomize from user found in: %s", sys.path)
+    finally:
+        # reinsert the bootstrap_dir again
+        sys.path.insert(index, bootstrap_dir)
