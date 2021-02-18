@@ -295,7 +295,7 @@ def patch_all():
     log.info("Patched modules=%s", patched_modules)
 
 
-def profile(func=None, client_id=None, client_token=None):
+def profile(func=None, client_id=None, client_token=None, title=None):
     from blackfire.probe import enable, end, initialize
 
     def inner_func(func):
@@ -304,7 +304,8 @@ def profile(func=None, client_id=None, client_token=None):
             initialize(
                 client_id=client_id,
                 client_token=client_token,
-                method="decorator"
+                method="decorator",
+                title=title,
             )
             enable()
             try:
@@ -332,6 +333,7 @@ def generate_config(
     log_file=None,
     log_level=None,
     config_file=DEFAULT_CONFIG_FILE,
+    title=None,
 ):
     agent_socket = agent_socket or os.environ.get(
         'BLACKFIRE_AGENT_SOCKET', DEFAULT_AGENT_SOCKET
@@ -392,6 +394,8 @@ def generate_config(
 
         # tweak some options for manual profiling
         resp_dict['options']['aggreg_samples'] = 1
+        if title is not None:
+            resp_dict['options']['profile_title'] = title
 
         # generate the query string from the signing req.
         query = resp_dict['query_string'] + '&' + urlencode(
