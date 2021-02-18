@@ -285,6 +285,7 @@ def initialize(
     log_level=None,
     config_file=DEFAULT_CONFIG_FILE,
     method="manual",
+    title=None,
 ):
     global _config, log, _probe
 
@@ -308,6 +309,7 @@ def initialize(
         log_file,
         log_level,
         config_file,
+        title,
     )
 
     log.debug(
