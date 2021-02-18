@@ -295,12 +295,12 @@ def patch_all():
     log.info("Patched modules=%s", patched_modules)
 
 
-def profile(client_id=None, client_token=None):
+def profile(func=None, client_id=None, client_token=None):
     from blackfire.probe import enable, end, initialize
 
     def inner_func(func):
 
-        def wrapper():
+        def wrapper(*args, **kwargs):
             initialize(
                 client_id=client_id,
                 client_token=client_token,
@@ -308,13 +308,18 @@ def profile(client_id=None, client_token=None):
             )
             enable()
             try:
-                func()
+                func(*args, **kwargs)
             finally:
                 end()
 
         return wrapper
 
-    return inner_func
+    # return wrapper function if no parantheses and return decorator if arguments
+    # provided
+    if callable(func):
+        return inner_func(func)
+    else:
+        return inner_func
 
 
 def generate_config(
