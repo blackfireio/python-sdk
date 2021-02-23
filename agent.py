@@ -216,7 +216,8 @@ class Connection(object):
                     % (blackfire_yml_response)
                 )
 
-            # TODO: Can there be more data to merge other than args?
+            # There can be Blackfire-Fn-Args + Blackfire-Const, Blackfire-Keys all
+            # update the .args dict
             self.agent_response.args.update(blackfire_yml_response.args)
 
             log.debug(
@@ -238,6 +239,7 @@ class BlackfireMessage(object):
 class BlackfireResponseBase(BlackfireMessage):
     TIMESPAN_KEY = 'Blackfire-Timespan'
     FN_ARGS_KEY = 'Blackfire-Fn-Args'
+    CONSTANTS_KEY = 'Blackfire-Const'
 
     def get_timespan_selectors(self):
         result = {'^': set(), '=': set()}
@@ -252,6 +254,9 @@ class BlackfireResponseBase(BlackfireMessage):
             result[ts_sel[0]].add(ts_sel[1:])
 
         return result
+
+    def get_constants(self):
+        return self.args.get(self.CONSTANTS_KEY, [])
 
     def get_instrumented_funcs(self):
         result = {}

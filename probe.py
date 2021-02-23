@@ -126,7 +126,6 @@ class Probe(object):
                 if profile_timespan else {}
 
         # instrumented_funcs is a dict of {func_name:[list of argument IDs]}
-        instrumented_funcs = {}
         instrumented_funcs = self._agent_conn.agent_response.get_instrumented_funcs() \
                 if fn_args_enabled else {}
 
@@ -195,6 +194,15 @@ class Probe(object):
         if 'Context' in end_headers:
             context_dict.update(end_headers['Context'])
         end_headers['Context'] = urlencode(context_dict, doseq=True)
+
+        # add Constants header if provisioned
+        constants_dict = {}
+        for constant in self._agent_conn.agent_response.get_constants():
+            # TODO: BlackfireConstants.get()
+            pass
+
+        if len(constants_dict) > 0:
+            end_headers['Constants'] = urlencode(constants_dict, doseq=True)
 
         profile_data_req = agent.BlackfireRequest(
             headers=end_headers, data=traces
