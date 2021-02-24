@@ -56,7 +56,7 @@ class BlackfireConstants(object):
     def get(cls, val):
         fn = getattr(cls, val.lower(), None)
         if fn is None:
-            log.error("Unsupported Blackfire-Const value=%s", val)
+            log.error("Unsupported Blackfire-Const value. [%s]", val)
             return None
 
         return fn()
@@ -64,7 +64,7 @@ class BlackfireConstants(object):
     # Constant definitions
     @classmethod
     @_on_except(return_val="0.0.0")
-    def python_version(self):
+    def python_version(cls):
         return "%d.%d.%d" % (
             sys.version_info.major, sys.version_info.minor,
             sys.version_info.micro
@@ -72,19 +72,19 @@ class BlackfireConstants(object):
 
     @classmethod
     @_on_except(return_val=0.0)
-    def django_version(self):
+    def django_version(cls):
         import django
         return django.get_version()
 
     @classmethod
     @_on_except(return_val=0.0)
-    def flask_version(self):
+    def flask_version(cls):
         import flask
         return flask.__version__
 
     @classmethod
     @_on_except(return_val=False)
-    def django_debug_flag(self):
+    def django_debug_flag(cls):
         from django.conf import settings
         return settings.DEBUG
 
