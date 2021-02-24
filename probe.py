@@ -31,6 +31,64 @@ __all__ = [
 ]
 
 
+def _on_except(func=None, return_val=None):
+
+    def inner_func(func):
+
+        def _wrapper(*args, **kwargs):
+            try:
+                return func(*args, **kwargs)
+            except:
+                return return_val
+
+        return _wrapper
+
+    return inner_func
+
+
+class BlackfireConstants(object):
+    '''
+    This constants are sent back to the Agent in `Constants` headers and they appear
+    as runtime.constants metric defs./scenarios...etc
+    '''
+
+    @classmethod
+    def get(cls, val):
+        fn = getattr(cls, val.lower(), None)
+        if fn is None:
+            log.error("Unsupported Blackfire-Const value=%s", val)
+            return None
+
+        return fn()
+
+    # Constant definitions
+    @classmethod
+    @_on_except(return_val="0.0.0")
+    def python_version(self):
+        return "%d.%d.%d" % (
+            sys.version_info.major, sys.version_info.minor,
+            sys.version_info.micro
+        )
+
+    @classmethod
+    @_on_except(return_val=0.0)
+    def django_version(self):
+        import django
+        return django.get_version()
+
+    @classmethod
+    @_on_except(return_val=0.0)
+    def flask_version(self):
+        import flask
+        return flask.__version__
+
+    @classmethod
+    @_on_except(return_val=False)
+    def django_debug_flag(self):
+        from django.conf import settings
+        return settings.DEBUG
+
+
 class _ProbeProxy(object):
     '''
     This class implements a proxy interface for the current probe object.
@@ -198,8 +256,9 @@ class Probe(object):
         # add Constants header if provisioned
         constants_dict = {}
         for constant in self._agent_conn.agent_response.get_constants():
-            # TODO: BlackfireConstants.get()
-            pass
+            val = BlackfireConstants.get(constant)
+            if val is not None:
+                constants_dict[constant] = val
 
         if len(constants_dict) > 0:
             end_headers['Constants'] = urlencode(constants_dict, doseq=True)

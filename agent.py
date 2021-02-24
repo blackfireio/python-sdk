@@ -439,9 +439,6 @@ class BlackfireAPMResponse(BlackfireResponseBase):
 
 class BlackfireResponse(BlackfireResponseBase):
 
-    # TODO: Do this later
-    #__slots__ = 'status_code', 'raw_data', 'err_reason', 'args', 'args_raw'
-
     class StatusCode:
         OK = 0
         ERR = 1
