@@ -187,6 +187,12 @@ class Probe(object):
         instrumented_funcs = self._agent_conn.agent_response.get_instrumented_funcs() \
                 if fn_args_enabled else {}
 
+        log.debug(
+            "profiler started. [instrumented_funcs:%s, timespan_selectors:%s]",
+            json_prettify(instrumented_funcs),
+            json_prettify(timespan_selectors),
+        )
+
         profiler.start(
             builtins=builtins,
             profile_cpu=profile_cpu,
@@ -199,12 +205,6 @@ class Probe(object):
         )
 
         # TODO: 'Blackfire-Error: 103 Samples quota is out'
-
-        log.debug(
-            "profiler started. [instrumented_funcs:%s, timespan_selectors:%s]",
-            json_prettify(instrumented_funcs),
-            json_prettify(timespan_selectors),
-        )
 
     def disable(self):
         if not self._enabled:
@@ -220,11 +220,11 @@ class Probe(object):
         if not self._agent_conn:
             return
 
-        log.debug("probe.end() called.")
-
         self.disable()
         traces = self.get_traces(omit_sys_path_dirs=omit_sys_path_dirs)
         self.clear_traces()
+
+        log.debug("probe.end() called.")
 
         # write main prolog
         profile_title = self._config.args.get(
@@ -409,8 +409,6 @@ def enable(end_at_exit=False):
 
     log.debug("probe.enable() called.")
 
-    _probe.enable()
-
     if end_at_exit:  # used for profiling CLI scripts
 
         # patch sys module to get the exit code/stdout/stderr output lengths
@@ -439,6 +437,8 @@ def enable(end_at_exit=False):
         # internal error is detected, or when os._exit() is called.
         atexit.register(_deinitialize)
 
+    _probe.enable()
+
 
 def disable():
     global _probe
@@ -460,9 +460,11 @@ def end(headers={}, omit_sys_path_dirs=_DEFAULT_OMIT_SYS_PATH):
     if not _probe:
         return
 
+    r = _probe.end()
+
     log.debug("probe.end() called.")
 
-    return _probe.end()
+    return r
 
 
 @contextmanager
