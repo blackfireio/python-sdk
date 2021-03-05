@@ -189,7 +189,7 @@ def get_logger(name, log_file=None, log_level=None, include_line_info=True):
     level = _LOG_LEVELS.get(log_level, None)
     if level is None:
         logger.error(
-            "Invalid BLACKFIRE_LOG_LEVEL value=%d. BLACKFIRE_LOG_LEVEL value should be between 1 and 5. Default is %d." % \
+            "BLACKFIRE_LOG_LEVEL is set to %d however it should be between 1 and 5. Default is %d." % \
                 (log_level, _DEFAULT_LOG_LEVEL)
         )
         level = _LOG_LEVELS[_DEFAULT_LOG_LEVEL]
