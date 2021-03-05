@@ -165,6 +165,25 @@ def get_load_avg():
         pass  # os.getloadavg not available in Windows
 
 
+def _get_log_level(logger, level):
+    _LOG_LEVELS = {
+        5: logging.DEBUG,
+        4: logging.DEBUG,
+        3: logging.INFO,
+        2: logging.WARNING,
+        1: logging.ERROR
+    }
+
+    if not level.isdigit() or _LOG_LEVELS.get(int(level), None) is None:
+        logger.error(
+            "BLACKFIRE_LOG_LEVEL is set to %s however it should be a number between 1 and 5. Default is %d." % \
+                (level, _DEFAULT_LOG_LEVEL)
+        )
+        return _LOG_LEVELS[_DEFAULT_LOG_LEVEL]
+
+    return _LOG_LEVELS[int(level)]
+
+
 def get_logger(name, log_file=None, log_level=None, include_line_info=True):
     # Normally basicConfig initialized the root logger but we need to support PY2/PY3
     # in same code base, so we use a flag to determine if logger is initialized or not
@@ -175,25 +194,9 @@ def get_logger(name, log_file=None, log_level=None, include_line_info=True):
     log_level = log_level or os.environ.get(
         'BLACKFIRE_LOG_LEVEL', _DEFAULT_LOG_LEVEL
     )
-    log_level = int(log_level)  # make sure it is int
-
-    _LOG_LEVELS = {
-        5: logging.DEBUG,
-        4: logging.DEBUG,
-        3: logging.INFO,
-        2: logging.WARNING,
-        1: logging.ERROR
-    }
-
     logger = logging.getLogger(name)
-    level = _LOG_LEVELS.get(log_level, None)
-    if level is None:
-        logger.error(
-            "BLACKFIRE_LOG_LEVEL is set to %d however it should be between 1 and 5. Default is %d." % \
-                (log_level, _DEFAULT_LOG_LEVEL)
-        )
-        level = _LOG_LEVELS[_DEFAULT_LOG_LEVEL]
-    logger.setLevel(level)
+    log_level = _get_log_level(logger, log_level)
+    logger.setLevel(log_level)
 
     formatter_info = "%(asctime)s - %(name)s - %(levelname)s - "
 
