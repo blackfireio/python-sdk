@@ -174,14 +174,15 @@ def _get_log_level(logger, level):
         1: logging.ERROR
     }
 
-    if not level.isdigit() or _LOG_LEVELS.get(int(level), None) is None:
+    try:
+        level = int(level)
+        return _LOG_LEVELS[level]
+    except:
         logger.error(
-            "BLACKFIRE_LOG_LEVEL is set to %s however it should be a number between 1 and 5. Default is %d." % \
+            "BLACKFIRE_LOG_LEVEL is set to %s however it should be a number between 1 and 4 (1: error, 2: warning, 3: info, 4: debug). Default is '%d'." % \
                 (level, _DEFAULT_LOG_LEVEL)
         )
         return _LOG_LEVELS[_DEFAULT_LOG_LEVEL]
-
-    return _LOG_LEVELS[int(level)]
 
 
 def get_logger(name, log_file=None, log_level=None, include_line_info=True):
