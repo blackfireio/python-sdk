@@ -178,6 +178,7 @@ def get_logger(name, log_file=None, log_level=None, include_line_info=True):
     log_level = int(log_level)  # make sure it is int
 
     _LOG_LEVELS = {
+        5: logging.DEBUG,
         4: logging.DEBUG,
         3: logging.INFO,
         2: logging.WARNING,
@@ -185,7 +186,14 @@ def get_logger(name, log_file=None, log_level=None, include_line_info=True):
     }
 
     logger = logging.getLogger(name)
-    logger.setLevel(_LOG_LEVELS[log_level])
+    level = _LOG_LEVELS.get(log_level, None)
+    if level is None:
+        logger.error(
+            "Invalid BLACKFIRE_LOG_LEVEL value=%d. Defaulting to %d." % \
+                (log_level, _DEFAULT_LOG_LEVEL)
+        )
+        level = _LOG_LEVELS[_DEFAULT_LOG_LEVEL]
+    logger.setLevel(level)
 
     formatter_info = "%(asctime)s - %(name)s - %(levelname)s - "
 
