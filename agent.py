@@ -263,7 +263,7 @@ class BlackfireResponseBase(BlackfireMessage):
         # convert the fn-args string to dict for faster lookups on C side
         fn_args = self.args.get(self.FN_ARGS_KEY, [])
         for fn_arg in fn_args:
-            fn_name, arg_ids_s = fn_arg.split()
+            fn_name, arg_ids_s = fn_arg.rsplit(" ", 1)
             fn_name = fn_name.strip()
 
             if fn_name in result:
