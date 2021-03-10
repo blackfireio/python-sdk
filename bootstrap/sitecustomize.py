@@ -6,8 +6,6 @@ from blackfire.utils import get_logger
 
 log = get_logger("blackfire.sitecustomize")
 
-blackfire.bootstrap()
-
 # Ensure other sitecustomize.py is called if available in sys.path
 bootstrap_dir = os.path.dirname(__file__)
 if bootstrap_dir in sys.path:
@@ -26,3 +24,5 @@ if bootstrap_dir in sys.path:
     finally:
         # reinsert the bootstrap_dir again
         sys.path.insert(index, bootstrap_dir)
+
+blackfire.bootstrap()
