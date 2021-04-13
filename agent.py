@@ -159,6 +159,12 @@ class Connection(object):
         if config.is_blackfireyml_asked():
             bf_probe_header += ', noop'
 
+        if bool(int(config.args.get('no_pruning', '0'))):
+            bf_probe_header += ', no_pruning'
+
+        if bool(int(config.args.get('no_anon', '0'))):
+            bf_probe_header += ', no_anon'
+
         headers = {
             'Blackfire-Query':
             '%s&signature=%s&%s' % (
