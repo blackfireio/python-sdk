@@ -88,6 +88,12 @@ class BlackfireConstants(object):
         from django.conf import settings
         return settings.DEBUG
 
+    @classmethod
+    @_on_except(return_val=False)
+    def flask_debug_flag(cls):
+        from flask import current_app
+        return current_app.debug
+
 
 class _ProbeProxy(object):
     '''
