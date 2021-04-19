@@ -194,9 +194,11 @@ class Probe(object):
                 if fn_args_enabled else {}
 
         log.debug(
-            "profiler started. [instrumented_funcs:%s, timespan_selectors:%s]",
-            json_prettify(instrumented_funcs),
+            "profiler started. [instrumented_funcs:%s, timespan_selectors:%s, "
+            "timespan_threshold=%d, config.args=%s]", json_prettify(instrumented_funcs),
             json_prettify(timespan_selectors),
+            timespan_threshold,
+            self._config.args,
         )
 
         profiler.start(
@@ -273,7 +275,6 @@ class Probe(object):
             headers=end_headers, data=traces
         )
         self._agent_conn.send(profile_data_req.to_bytes())
-
         self._agent_conn.close()
         self._agent_conn = None
 

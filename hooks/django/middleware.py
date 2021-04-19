@@ -180,7 +180,8 @@ class BlackfireDjangoMiddleware(object):
             log.exception(e)
 
     def _profiled_request(self, request, query):
-        log.debug("DjangoMiddleware._profiled_request called.")
+        log.debug("DjangoMiddleware._profiled_request called. [query=%s]",
+            query)
 
         try:
             probe_err, new_probe = try_enable_probe(query)
