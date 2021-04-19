@@ -31,6 +31,7 @@ __all__ = [
     'disable', 'run', 'initialize', 'set_transaction_name'
 ]
 
+
 class _ProbeProxy(object):
     '''
     This class implements a proxy interface for the current probe object.
@@ -131,7 +132,8 @@ class Probe(object):
 
         log.debug(
             "profiler started. [instrumented_funcs:%s, timespan_selectors:%s, "
-            "timespan_threshold=%d, config.args=%s]", json_prettify(instrumented_funcs),
+            "timespan_threshold=%d, config.args=%s]",
+            json_prettify(instrumented_funcs),
             json_prettify(timespan_selectors),
             timespan_threshold,
             self._config.args,

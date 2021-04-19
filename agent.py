@@ -142,7 +142,7 @@ class Connection(object):
         blackfire_yml_content = None
         if blackfire_yml:
             blackfire_yml_content = read_blackfireyml_content()
-        bf_probe_header = 'python-%s' % (sys.hexversion)
+        bf_probe_header = 'python-%s, config' % (sys.hexversion)
 
         # recv timespan entries if timespan enabled
         recv_timespan = bool(int(config.args.get('flag_timespan', '0')))

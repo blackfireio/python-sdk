@@ -1,4 +1,8 @@
 import sys
+from blackfire.utils import get_logger
+
+log = get_logger(__name__)
+
 
 def _on_except(func=None, return_val=None):
 
@@ -58,7 +62,7 @@ class BlackfireConstants(object):
         return settings.DEBUG
 
     @classmethod
-    @_on_except(return_val=0)
+    @_on_except()
     def django_db_conn_max_age(cls):
         from django.db import connection
         return connection.settings_dict['CONN_MAX_AGE']
