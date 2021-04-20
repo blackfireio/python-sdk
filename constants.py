@@ -44,13 +44,13 @@ class BlackfireConstants(object):
         )
 
     @classmethod
-    @_on_except(return_val=0.0)
+    @_on_except()
     def django_version(cls):
         import django
         return django.get_version()
 
     @classmethod
-    @_on_except(return_val=0.0)
+    @_on_except()
     def flask_version(cls):
         import flask
         return flask.__version__
