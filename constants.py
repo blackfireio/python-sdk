@@ -56,7 +56,7 @@ class BlackfireConstants(object):
         return flask.__version__
 
     @classmethod
-    @_on_except(return_val=False)
+    @_on_except()
     def django_debug_flag(cls):
         from django.conf import settings
         return settings.DEBUG
@@ -68,7 +68,7 @@ class BlackfireConstants(object):
         return connection.settings_dict['CONN_MAX_AGE']
 
     @classmethod
-    @_on_except(return_val=False)
+    @_on_except()
     def flask_debug_flag(cls):
         from flask import current_app
         return current_app.debug
