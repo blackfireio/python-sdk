@@ -298,7 +298,7 @@ def initialize(
     method="manual",
     title=None,
 ):
-    global _config, log, _probe
+    global _config, _probe
 
     log.debug("probe.initialize called. [method:'%s']", method)
 
@@ -309,8 +309,6 @@ def initialize(
         agent_socket,
         agent_timeout,
         endpoint,
-        log_file,
-        log_level,
         config_file,
         title,
     )
