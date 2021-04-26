@@ -330,6 +330,8 @@ def generate_config(
     agent_socket=None,
     agent_timeout=None,
     endpoint=None,
+    log_file=None,
+    log_level=None,
     config_file=DEFAULT_CONFIG_FILE,
     title=None,
 ):
@@ -407,4 +409,6 @@ def generate_config(
         client_id=client_id,
         client_token=client_token,
         endpoint=endpoint,
+        log_file=log_file,
+        log_level=log_level,
     )
