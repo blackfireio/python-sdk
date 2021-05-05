@@ -279,13 +279,18 @@ def get_autoprofile_query(method, uri, key_page):
         data = bytes(data, 'ascii')
     data += agent.Protocol.HEADER_MARKER
 
-    with get_agent_connection() as agent_conn:
-        agent_conn.send(data)
+    try:
+        with get_agent_connection() as agent_conn:
+            agent_conn.send(data)
 
-        response_raw = agent_conn.recv()
-        agent_resp = agent.BlackfireAPMResponse().from_bytes(response_raw)
+            response_raw = agent_conn.recv()
+            agent_resp = agent.BlackfireAPMResponse().from_bytes(response_raw)
 
-        return agent_resp.args['blackfire-query'][0]
+            return agent_resp.args['blackfire-query'][0]
+    except Exception as e:
+        # Agent returns status=False when the endpoint is profiled and then when
+        # a new APM message is sent/received config is updated.
+        log.exception(e)
 
 
 def _send_trace(req):

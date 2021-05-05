@@ -538,6 +538,5 @@ def is_session_active(session_id=None):
     return _bfext.is_session_active(session_id)
 
 
-# import time
 if __name__ != '__main__':
     initialize()

@@ -91,8 +91,8 @@ class BlackfireDjangoMiddleware(object):
             query = apm.get_autoprofile_query(
                 request.method, request.path, key_page
             )
-
-            return self._profiled_request(request, query)
+            if query:
+                return self._profiled_request(request, query)
 
         if apm.trigger_trace():
             return self._apm_trace(
@@ -180,8 +180,9 @@ class BlackfireDjangoMiddleware(object):
             log.exception(e)
 
     def _profiled_request(self, request, query):
-        log.debug("DjangoMiddleware._profiled_request called. [query=%s]",
-            query)
+        log.debug(
+            "DjangoMiddleware._profiled_request called. [query=%s]", query
+        )
 
         try:
             probe_err, new_probe = try_enable_probe(query)

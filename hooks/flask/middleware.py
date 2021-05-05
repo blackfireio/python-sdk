@@ -105,9 +105,12 @@ class BlackfireFlaskMiddleware(object):
             query = apm.get_autoprofile_query(
                 request.method, request.path, key_page
             )
-            req_context.probe_err, req_context.probe = try_enable_probe(query)
-            req_context.profile = True
-            return
+            if query:
+                req_context.probe_err, req_context.probe = try_enable_probe(
+                    query
+                )
+                req_context.profile = True
+                return
 
         if apm.trigger_trace():
             req_context.apm = True
