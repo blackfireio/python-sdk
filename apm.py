@@ -5,14 +5,44 @@ import time
 import re
 import sys
 import _blackfire_profiler as _bfext
-from blackfire.utils import get_logger, IS_PY3, json_prettify, ConfigParser, is_testing, ThreadPool, get_load_avg, \
-    get_cpu_count, get_memory_usage
+from threading import Thread
+from blackfire.utils import get_logger, IS_PY3, json_prettify, ConfigParser, is_testing, get_load_avg, \
+    get_cpu_count, get_memory_usage, Queue
 from blackfire import agent, DEFAULT_AGENT_SOCKET, DEFAULT_AGENT_TIMEOUT, DEFAULT_CONFIG_FILE, profiler
 from contextlib import contextmanager
 
-_thread_pool = ThreadPool()
-
 log = get_logger(__name__)
+
+
+class _ApmWorker(Thread):
+
+    def __init__(self):
+        Thread.__init__(self)
+        # infinite Queue, put() should not block
+        self._tasks = Queue(0)
+        self.daemon = True
+        self.start()
+
+    def add_task(self, fn, args=(), kwargs={}):
+        if is_testing():
+            fn(*args, **kwargs)
+        else:
+            self._tasks.put((fn, args, kwargs))
+
+    def run(self):
+        while True:
+            func, args, kwargs = self._tasks.get()
+            try:
+                if func is None:
+                    break
+                func(*args, **kwargs)
+            except Exception as e:
+                print(e)
+            finally:
+                self._tasks.task_done()
+
+    def close(self):
+        self._tasks.put((None, None, None))
 
 
 class _RuntimeMetrics(object):
@@ -63,11 +93,12 @@ class ApmProbeConfig(object):
 
 _apm_config = ApmConfig()
 _apm_probe_config = ApmProbeConfig()
+_apm_worker = _ApmWorker()
 
 # do not even evaluate the params if DEBUG is not set in APM path
 
 log.debug(
-    "APM Configuration initialized. [%s] [%s] [%s]",
+    "APM Configuration initialized1. [%s] [%s] [%s]",
     json_prettify(_apm_config.__dict__),
     json_prettify(_apm_probe_config.__dict__),
     os.getpid(),
@@ -277,7 +308,7 @@ def _send_trace(req):
 
 
 def send_trace(request, extended, **kwargs):
-    global _apm_config
+    global _apm_config, _apm_worker
 
     kwargs['file-format'] = 'BlackfireApm'
     kwargs['sample-rate'] = _apm_config.sample_rate
@@ -304,4 +335,4 @@ def send_trace(request, extended, **kwargs):
 
     # We should not have a blocking call in APM path. Do agent connection setup
     # socket send in a separate thread.
-    _thread_pool.apply(_send_trace, args=(apm_trace_req, ))
+    _apm_worker.add_task(_send_trace, args=(apm_trace_req, ))
