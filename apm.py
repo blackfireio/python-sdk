@@ -7,7 +7,7 @@ import sys
 import _blackfire_profiler as _bfext
 from threading import Thread
 from blackfire.utils import get_logger, IS_PY3, json_prettify, ConfigParser, is_testing, get_load_avg, \
-    get_cpu_count, get_memory_usage, Queue
+    get_cpu_count, get_os_memory_usage, Queue
 from blackfire import agent, DEFAULT_AGENT_SOCKET, DEFAULT_AGENT_TIMEOUT, DEFAULT_CONFIG_FILE, profiler
 from contextlib import contextmanager
 
@@ -57,11 +57,11 @@ class _RuntimeMetrics(object):
         cls._cache = {}
 
     @classmethod
-    def memory(cls):
+    def memory(cls, *args, **kwargs):
         if time.time() - cls._last_collected <= cls.CACHE_INTERVAL:
             return cls._cache["memory"]
 
-        result = get_memory_usage()
+        result = get_os_memory_usage()
         cls._cache["memory"] = result
         return result
 
@@ -104,14 +104,12 @@ log.debug(
     os.getpid(),
 )
 
-_MEMALLOCATOR_API_AVAILABLE = sys.version_info[
-    0] == 3 and sys.version_info[1] >= 5
-
 
 def enable(extended=False):
     global _apm_config
 
     if extended:
+        profiler.initialize(memory_usage_callback=_RuntimeMetrics.memory)
         profiler.start(
             builtins=True,
             profile_cpu=True,
@@ -122,17 +120,10 @@ def enable(extended=False):
             apm_extended_trace=True,
         )
 
-    if _MEMALLOCATOR_API_AVAILABLE:
-        # starts memory profiling for the current thread and get_traced_memory()
-        # will return per-thread used/peak memory
-        _bfext.start_memory_profiler()
-
     log.debug("APM profiler enabled. (extended=%s)" % (extended))
 
 
 def disable():
-    if _MEMALLOCATOR_API_AVAILABLE:
-        _bfext.stop_memory_profiler()
     _RuntimeMetrics.reset()
 
     profiler.stop()
@@ -141,10 +132,7 @@ def disable():
 
 
 def get_traced_memory():
-    if _MEMALLOCATOR_API_AVAILABLE:
-        return _bfext.get_traced_memory()
-    else:
-        return _RuntimeMetrics.memory()
+    return _RuntimeMetrics.memory()
 
 
 def reset():

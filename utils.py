@@ -139,7 +139,7 @@ def get_cpu_count():
     return _bfext.get_cpu_count_logical()
 
 
-def get_memory_usage():
+def get_os_memory_usage():
     plat_sys = platform.system()
     pid = os.getpid()
     if plat_sys == "Linux":
@@ -149,11 +149,11 @@ def get_memory_usage():
         peak_usage = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss * 1024
         return rss, peak_usage
     elif plat_sys == "Darwin":
-        usage, _ = _bfext.get_memory_usage(pid)
+        usage, _ = _bfext.get_os_memory_usage(pid)
         peak_usage = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
         return usage, peak_usage
     elif plat_sys == "Windows":
-        return _bfext.get_memory_usage(pid)
+        return _bfext.get_os_memory_usage(pid)
 
 
 def get_load_avg():

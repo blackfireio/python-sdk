@@ -151,6 +151,7 @@ def initialize(
     timespan_selector=_fn_matches_timespan_selector,
     set_threading_profile=_set_threading_profile,
     session_id_callback=_default_session_id_callback,
+    memory_usage_callback=None,
 ):
     _bfext._initialize(locals(), log)
 
