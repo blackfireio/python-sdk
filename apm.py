@@ -98,7 +98,7 @@ _apm_worker = _ApmWorker()
 # do not even evaluate the params if DEBUG is not set in APM path
 
 log.debug(
-    "APM Configuration initialized1. [%s] [%s] [%s]",
+    "APM Configuration initialized. [%s] [%s] [%s]",
     json_prettify(_apm_config.__dict__),
     json_prettify(_apm_probe_config.__dict__),
     os.getpid(),
