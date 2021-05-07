@@ -160,8 +160,8 @@ class BlackfireFlaskMiddleware(object):
                 return response
 
             if req_context.apm:
-                mu, pmu = apm.get_traced_memory()
                 apm.disable()
+                mu, pmu = apm.get_traced_memory()
                 now = time.time()
                 elapsed_wt_usec = int((now - req_context.req_start) * 1000000)
                 apm.send_trace(
