@@ -37,22 +37,26 @@ _DEFAULT_LOG_FILE = 'python-probe.log'
 class RuntimeMetrics(object):
 
     CACHE_INTERVAL = 1.0
-    _last_collected = 0
-    _cache = {}
 
-    @classmethod
-    def reset(cls):
-        cls._last_collected = 0
-        cls._cache = {}
+    def __init__(self):
+        self.reset()
 
-    @classmethod
-    def memory(cls, *args, **kwargs):
-        if time.time() - cls._last_collected <= cls.CACHE_INTERVAL:
-            print("cached")
-            return cls._cache["memory"]
+    def reset(self):
+        self._last_collected = 0
+        self._cache = {}
+        self._nhits = 0
+        self._nmisses = 0
 
+    def memory(self, *args, **kwargs):
+        now = time.time()
+        if now - self._last_collected <= self.CACHE_INTERVAL:
+            self._nhits += 1
+            return self._cache["memory"]
+
+        self._nmisses += 1
         result = get_os_memory_usage()
-        cls._cache["memory"] = result
+        self._cache["memory"] = result
+        self._last_collected = now
         return result
 
 
