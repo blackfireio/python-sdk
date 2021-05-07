@@ -25,6 +25,8 @@ class _DjangoCursorWrapper:
         sql_formatted = sql
         sql_formatted = sql_formatted.replace('"', '')
         sql_formatted = sql_formatted.replace('\'', '')
+        sql_formatted = sql_formatted.replace('%s', '?')
+
         self.on_query(method, sql, params, sql_formatted)
 
     def callproc(self, procname, params=None):
@@ -180,8 +182,9 @@ class BlackfireDjangoMiddleware(object):
             log.exception(e)
 
     def _profiled_request(self, request, query):
-        log.debug("DjangoMiddleware._profiled_request called. [query=%s]",
-            query)
+        log.debug(
+            "DjangoMiddleware._profiled_request called. [query=%s]", query
+        )
 
         try:
             probe_err, new_probe = try_enable_probe(query)

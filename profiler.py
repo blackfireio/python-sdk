@@ -188,6 +188,7 @@ def _generate_trace_key(omit_sys_path_dirs, trace):
             fn_args = '?' + urlencode(fn_args)
             fn_args = fn_args.replace('+', ' ')
             fn_args = fn_args.replace('%3A', ':')
+            fn_args = fn_args.replace('%2C', ',')
 
         rec_level_suffix = ''
         if rec_level > 1:
