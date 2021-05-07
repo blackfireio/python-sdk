@@ -1,13 +1,12 @@
 import random
 import os
 import logging
-import time
 import re
 import sys
 import _blackfire_profiler as _bfext
 from threading import Thread
 from blackfire.utils import get_logger, IS_PY3, json_prettify, ConfigParser, is_testing, get_load_avg, \
-    get_cpu_count, get_os_memory_usage, Queue
+    get_cpu_count, get_os_memory_usage, Queue, RuntimeMetrics
 from blackfire import agent, DEFAULT_AGENT_SOCKET, DEFAULT_AGENT_TIMEOUT, DEFAULT_CONFIG_FILE, profiler
 from contextlib import contextmanager
 
@@ -45,27 +44,6 @@ class _ApmWorker(Thread):
         self._tasks.put((None, None, None))
 
 
-class _RuntimeMetrics(object):
-
-    CACHE_INTERVAL = 1.0
-    _last_collected = 0
-    _cache = {}
-
-    @classmethod
-    def reset(cls):
-        cls._last_collected = 0
-        cls._cache = {}
-
-    @classmethod
-    def memory(cls, *args, **kwargs):
-        if time.time() - cls._last_collected <= cls.CACHE_INTERVAL:
-            return cls._cache["memory"]
-
-        result = get_os_memory_usage()
-        cls._cache["memory"] = result
-        return result
-
-
 class ApmConfig(object):
 
     def __init__(self):
@@ -74,6 +52,16 @@ class ApmConfig(object):
         self.key_pages = ()
         self.timespan_selectors = {}
         self.instrumented_funcs = {}
+
+        self.sample_rate = float(
+            os.environ.get('BLACKFIRE_APM_SAMPLE_RATE_TEST', self.sample_rate)
+        )
+        self.extended_sample_rate = float(
+            os.environ.get(
+                'BLACKFIRE_APM_EXTENDED_SAMPLE_RATE_TEST',
+                self.extended_sample_rate
+            )
+        )
 
 
 class ApmProbeConfig(object):
@@ -109,7 +97,6 @@ def enable(extended=False):
     global _apm_config
 
     if extended:
-        profiler.initialize(memory_usage_callback=_RuntimeMetrics.memory)
         profiler.start(
             builtins=True,
             profile_cpu=True,
@@ -120,19 +107,19 @@ def enable(extended=False):
             apm_extended_trace=True,
         )
 
-    log.debug("APM profiler enabled. (extended=%s)" % (extended))
+        log.debug("APM profiler enabled. (extended=%s)" % (extended))
 
 
 def disable():
-    _RuntimeMetrics.reset()
+    RuntimeMetrics.reset()
 
     profiler.stop()
 
-    log.debug("APM profiler disabled.")
+    log.error("APM profiler disabled.")
 
 
 def get_traced_memory():
-    return _RuntimeMetrics.memory()
+    return RuntimeMetrics.memory()
 
 
 def reset():
@@ -141,7 +128,7 @@ def reset():
     _apm_config = ApmConfig()
     # init config for the APM for communicating with the Agent
     _apm_probe_config = ApmProbeConfig()
-    _RuntimeMetrics.reset()
+    RuntimeMetrics.reset()
 
 
 def trigger_trace():

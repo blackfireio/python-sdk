@@ -6,7 +6,7 @@ import threading
 import _blackfire_profiler as _bfext
 from contextlib import contextmanager
 from collections import Counter
-from blackfire.utils import urlencode, IS_PY3, get_logger
+from blackfire.utils import urlencode, IS_PY3, get_logger, RuntimeMetrics
 from blackfire.exceptions import *
 
 __all__ = ['start', 'stop', 'get_traces', 'clear_traces', 'run']
@@ -151,7 +151,7 @@ def initialize(
     timespan_selector=_fn_matches_timespan_selector,
     set_threading_profile=_set_threading_profile,
     session_id_callback=_default_session_id_callback,
-    memory_usage_callback=None,
+    memory_usage_callback=RuntimeMetrics.memory,
 ):
     _bfext._initialize(locals(), log)
 

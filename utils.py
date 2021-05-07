@@ -1,6 +1,7 @@
 import os
 import sys
 import json
+import time
 import traceback
 import logging
 import platform
@@ -31,6 +32,28 @@ else:
 
 _DEFAULT_LOG_LEVEL = 2
 _DEFAULT_LOG_FILE = 'python-probe.log'
+
+
+class RuntimeMetrics(object):
+
+    CACHE_INTERVAL = 1.0
+    _last_collected = 0
+    _cache = {}
+
+    @classmethod
+    def reset(cls):
+        cls._last_collected = 0
+        cls._cache = {}
+
+    @classmethod
+    def memory(cls, *args, **kwargs):
+        if time.time() - cls._last_collected <= cls.CACHE_INTERVAL:
+            print("cached")
+            return cls._cache["memory"]
+
+        result = get_os_memory_usage()
+        cls._cache["memory"] = result
+        return result
 
 
 def install_proxy_handler(http_proxy, https_proxy):
