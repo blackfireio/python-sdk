@@ -52,6 +52,8 @@ class ApmConfig(object):
         self.key_pages = ()
         self.timespan_selectors = {}
         self.instrumented_funcs = {}
+        self.config_version = None
+        self.timespan_time_threshold = 0  #ms
 
         self.sample_rate = float(
             os.environ.get('BLACKFIRE_APM_SAMPLE_RATE_TEST', self.sample_rate)
@@ -208,38 +210,43 @@ def get_agent_connection():
 def _update_apm_config(response):
     global _apm_config
 
-    agent_resp = agent.BlackfireAPMResponse().from_bytes(response)
+    new_apm_config = ApmConfig()
+    try:
+        new_apm_config.sample_rate = float(response.args['sample-rate'][0])
+    except:
+        pass
+    try:
+        new_apm_config.extended_sample_rate = float(
+            response.args['extended-sample-rate'][0]
+        )
+    except:
+        pass
+    try:
+        new_apm_config.timespan_time_threshold = float(
+            response.args['timespan_time_threshold'][0]
+        )
+    except:
+        pass
+    try:
+        new_apm_config.config_version = response.args['config-version'][0]
+    except:
+        pass
 
-    # Update config if any configuration update received
-    if len(agent_resp.args) or len(agent_resp.key_pages):
-        new_apm_config = ApmConfig()
-        try:
-            new_apm_config.sample_rate = float(
-                agent_resp.args['sample-rate'][0]
-            )
-        except:
-            pass
-        try:
-            new_apm_config.extended_sample_rate = float(
-                agent_resp.args['extended-sample-rate'][0]
-            )
-        except:
-            pass
+    new_apm_config.key_pages = tuple(response.key_pages)
+    new_apm_config.instrumented_funcs = response.get_instrumented_funcs()
+    new_apm_config.timespan_selectors = response.get_timespan_selectors()
 
-        new_apm_config.key_pages = tuple(agent_resp.key_pages)
-        new_apm_config.instrumented_funcs = agent_resp.get_instrumented_funcs()
-        new_apm_config.timespan_selectors = agent_resp.get_timespan_selectors()
+    # update the process-wise global apm configuration. Once this is set
+    # the new HTTP requests making initialize() will get this new config
+    # No need to make this thread-safe
+    _apm_config = new_apm_config
 
-        # update the process-wise global apm configuration. Once this is set
-        # the new HTTP requests making initialize() will get this new config
-        _apm_config = new_apm_config
-
-        if log.isEnabledFor(logging.DEBUG):
-            log.debug(
-                "APM Configuration updated. [%s] [%s]",
-                json_prettify(_apm_config.__dict__),
-                os.getpid(),
-            )
+    if log.isEnabledFor(logging.DEBUG):
+        log.debug(
+            "APM Configuration updated. [%s] [%s]",
+            json_prettify(_apm_config.__dict__),
+            os.getpid(),
+        )
 
 
 def get_autoprofile_query(method, uri, key_page):
@@ -272,7 +279,16 @@ def _send_trace(req):
             agent_conn.send(req.to_bytes())
 
             response_raw = agent_conn.recv()
-            _update_apm_config(response_raw)
+            agent_resp = agent.BlackfireAPMResponse().from_bytes(response_raw)
+
+            if log.isEnabledFor(logging.DEBUG):
+                log.debug(
+                    "Agent APM response received. [%s]",
+                    agent_resp,
+                )
+
+            if agent_resp.update_config:
+                _update_apm_config(agent_resp)
 
             if log.isEnabledFor(logging.DEBUG):
                 log.debug(
@@ -290,6 +306,8 @@ def send_trace(request, extended, **kwargs):
 
     kwargs['file-format'] = 'BlackfireApm'
     kwargs['sample-rate'] = _apm_config.sample_rate
+    if _apm_config.config_version:
+        kwargs['config-version'] = _apm_config.config_version
 
     if extended:
         kwargs['load'] = get_load_avg()
