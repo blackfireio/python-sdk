@@ -93,8 +93,8 @@ class BlackfireDjangoMiddleware(object):
             query = apm.get_autoprofile_query(
                 request.method, request.path, key_page
             )
-
-            return self._profiled_request(request, query)
+            if query:
+                return self._profiled_request(request, query)
 
         if apm.trigger_trace():
             return self._apm_trace(
@@ -111,8 +111,8 @@ class BlackfireDjangoMiddleware(object):
         try:
             response = self.get_response(request)
         finally:
-            mu, pmu = apm.get_traced_memory()
             apm.disable()
+            mu, pmu = apm.get_traced_memory()
             now = time.time()
             elapsed_wt_usec = int((now - t0) * 1000000)
             apm.send_trace(

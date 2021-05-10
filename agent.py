@@ -309,12 +309,14 @@ class BlackfireRequest(BlackfireMessage):
         # in the protocol. While this is not mandatory, this is to comply with PHP
         # probe.
         if 'file-format' in self.headers:
-            result += 'file-format: %s\n' % (self.headers.pop('file-format'))
+            result += 'file-format: %s\n' % (self.headers['file-format'])
         if 'Blackfire-Query' in self.headers:
             result += 'Blackfire-Query: %s\n' % (
-                self.headers.pop('Blackfire-Query')
+                self.headers['Blackfire-Query']
             )
         for k, v in self.headers.items():
+            if k in ['Blackfire-Query', 'file-format']:
+                continue
             result += '%s: %s\n' % (k, v)
         if len(self.headers):
             result += '\n'
@@ -360,8 +362,10 @@ class BlackfireAPMRequest(BlackfireRequest):
         result = ''
 
         # APM protocol requires the first header to be FileFormat
-        result += 'file-format: %s\n' % (self.headers.pop('file-format'))
+        result += 'file-format: %s\n' % (self.headers['file-format'])
         for k, v in self.headers.items():
+            if k == 'file-format':
+                continue
             result += '%s: %s\n' % (k, v)
 
         if self.data is not None:

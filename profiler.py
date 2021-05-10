@@ -6,7 +6,7 @@ import threading
 import _blackfire_profiler as _bfext
 from contextlib import contextmanager
 from collections import Counter
-from blackfire.utils import urlencode, IS_PY3, get_logger
+from blackfire.utils import urlencode, IS_PY3, get_logger, RuntimeMetrics
 from blackfire.exceptions import *
 
 __all__ = ['start', 'stop', 'get_traces', 'clear_traces', 'run']
@@ -15,6 +15,7 @@ log = get_logger(__name__, include_line_info=False)
 
 _max_prefix_cache = {}
 MAX_TIMESPAN_THRESHOLD = 1000000000
+runtime_metrics = RuntimeMetrics()
 
 
 def _fn_matches_timespan_selector(names, timespan_selectors):
@@ -151,6 +152,7 @@ def initialize(
     timespan_selector=_fn_matches_timespan_selector,
     set_threading_profile=_set_threading_profile,
     session_id_callback=_default_session_id_callback,
+    memory_usage_callback=runtime_metrics.memory,
 ):
     _bfext._initialize(locals(), log)
 
@@ -539,6 +541,5 @@ def is_session_active(session_id=None):
     return _bfext.is_session_active(session_id)
 
 
-# import time
 if __name__ != '__main__':
     initialize()

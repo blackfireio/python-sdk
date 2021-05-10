@@ -1,11 +1,11 @@
 import os
 import sys
 import json
+import time
 import traceback
 import logging
 import platform
 import importlib
-from threading import Thread
 import _blackfire_profiler as _bfext
 
 try:
@@ -32,6 +32,32 @@ else:
 
 _DEFAULT_LOG_LEVEL = 2
 _DEFAULT_LOG_FILE = 'python-probe.log'
+
+
+class RuntimeMetrics(object):
+
+    CACHE_INTERVAL = 1.0
+
+    def __init__(self):
+        self.reset()
+
+    def reset(self):
+        self._last_collected = 0
+        self._cache = {}
+        self._nhits = 0
+        self._nmisses = 0
+
+    def memory(self, *args, **kwargs):
+        now = time.time()
+        if now - self._last_collected <= self.CACHE_INTERVAL:
+            self._nhits += 1
+            return self._cache["memory"]
+
+        self._nmisses += 1
+        result = get_os_memory_usage()
+        self._cache["memory"] = result
+        self._last_collected = now
+        return result
 
 
 def install_proxy_handler(http_proxy, https_proxy):
@@ -140,7 +166,7 @@ def get_cpu_count():
     return _bfext.get_cpu_count_logical()
 
 
-def get_memory_usage():
+def get_os_memory_usage():
     plat_sys = platform.system()
     pid = os.getpid()
     if plat_sys == "Linux":
@@ -150,11 +176,11 @@ def get_memory_usage():
         peak_usage = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss * 1024
         return rss, peak_usage
     elif plat_sys == "Darwin":
-        usage, _ = _bfext.get_memory_usage(pid)
+        usage, _ = _bfext.get_os_memory_usage(pid)
         peak_usage = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
         return usage, peak_usage
     elif plat_sys == "Windows":
-        return _bfext.get_memory_usage(pid)
+        return _bfext.get_os_memory_usage(pid)
 
 
 def get_load_avg():
@@ -251,48 +277,3 @@ def json_prettify(obj):
 
 def is_testing():
     return 'BLACKFIRE_TESTING' in os.environ
-
-
-class _PoolWorker(Thread):
-
-    def __init__(self, tasks):
-        Thread.__init__(self)
-        self.tasks = tasks
-        self.daemon = True
-        self.start()
-
-    def run(self):
-        while True:
-            func, args, kwargs = self.tasks.get()
-            try:
-                if func is None:
-                    break
-                func(*args, **kwargs)
-            except Exception as e:
-                print(e)
-            finally:
-                self.tasks.task_done()
-
-    def shutdown(self):
-        self.tasks.put((None, None, None))
-
-
-class ThreadPool(object):
-
-    def __init__(self, size=16):
-        self.tasks = Queue(size)
-        self._workers = []
-        for _ in range(size):
-            self._workers.append(_PoolWorker(self.tasks))
-
-    def apply(self, fn, args=(), kwargs={}):
-        if is_testing():
-            fn(*args, **kwargs)
-        else:
-            self.tasks.put((fn, args, kwargs))
-
-    def close(self):
-        for w in self._workers:
-            w.shutdown()
-        for w in self._workers:
-            w.join()

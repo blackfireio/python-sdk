@@ -1,39 +1,47 @@
 import random
 import os
 import logging
-import time
 import re
 import sys
 import _blackfire_profiler as _bfext
-from blackfire.utils import get_logger, IS_PY3, json_prettify, ConfigParser, is_testing, ThreadPool, get_load_avg, \
-    get_cpu_count, get_memory_usage
+from threading import Thread
+from blackfire.utils import get_logger, IS_PY3, json_prettify, ConfigParser, is_testing, get_load_avg, \
+    get_cpu_count, get_os_memory_usage, Queue
 from blackfire import agent, DEFAULT_AGENT_SOCKET, DEFAULT_AGENT_TIMEOUT, DEFAULT_CONFIG_FILE, profiler
 from contextlib import contextmanager
-
-_thread_pool = ThreadPool()
 
 log = get_logger(__name__)
 
 
-class _RuntimeMetrics(object):
+class _ApmWorker(Thread):
 
-    CACHE_INTERVAL = 1.0
-    _last_collected = 0
-    _cache = {}
+    def __init__(self):
+        Thread.__init__(self)
+        # infinite Queue, put() should not block
+        self._tasks = Queue(0)
+        self.daemon = True
+        self.start()
 
-    @classmethod
-    def reset(cls):
-        cls._last_collected = 0
-        cls._cache = {}
+    def add_task(self, fn, args=(), kwargs={}):
+        if is_testing():
+            fn(*args, **kwargs)
+        else:
+            self._tasks.put((fn, args, kwargs))
 
-    @classmethod
-    def memory(cls):
-        if time.time() - cls._last_collected <= cls.CACHE_INTERVAL:
-            return cls._cache["memory"]
+    def run(self):
+        while True:
+            func, args, kwargs = self._tasks.get()
+            try:
+                if func is None:
+                    break
+                func(*args, **kwargs)
+            except Exception as e:
+                print(e)
+            finally:
+                self._tasks.task_done()
 
-        result = get_memory_usage()
-        cls._cache["memory"] = result
-        return result
+    def close(self):
+        self._tasks.put((None, None, None))
 
 
 class ApmConfig(object):
@@ -44,6 +52,16 @@ class ApmConfig(object):
         self.key_pages = ()
         self.timespan_selectors = {}
         self.instrumented_funcs = {}
+
+        self.sample_rate = float(
+            os.environ.get('BLACKFIRE_APM_SAMPLE_RATE_TEST', self.sample_rate)
+        )
+        self.extended_sample_rate = float(
+            os.environ.get(
+                'BLACKFIRE_APM_EXTENDED_SAMPLE_RATE_TEST',
+                self.extended_sample_rate
+            )
+        )
 
 
 class ApmProbeConfig(object):
@@ -63,6 +81,7 @@ class ApmProbeConfig(object):
 
 _apm_config = ApmConfig()
 _apm_probe_config = ApmProbeConfig()
+_apm_worker = _ApmWorker()
 
 # do not even evaluate the params if DEBUG is not set in APM path
 
@@ -72,9 +91,6 @@ log.debug(
     json_prettify(_apm_probe_config.__dict__),
     os.getpid(),
 )
-
-_MEMALLOCATOR_API_AVAILABLE = sys.version_info[
-    0] == 3 and sys.version_info[1] >= 5
 
 
 def enable(extended=False):
@@ -91,38 +107,26 @@ def enable(extended=False):
             apm_extended_trace=True,
         )
 
-    if _MEMALLOCATOR_API_AVAILABLE:
-        # starts memory profiling for the current thread and get_traced_memory()
-        # will return per-thread used/peak memory
-        _bfext.start_memory_profiler()
-
     log.debug("APM profiler enabled. (extended=%s)" % (extended))
 
 
 def disable():
-    if _MEMALLOCATOR_API_AVAILABLE:
-        _bfext.stop_memory_profiler()
-    _RuntimeMetrics.reset()
-
     profiler.stop()
 
     log.debug("APM profiler disabled.")
 
 
 def get_traced_memory():
-    if _MEMALLOCATOR_API_AVAILABLE:
-        return _bfext.get_traced_memory()
-    else:
-        return _RuntimeMetrics.memory()
+    return profiler.runtime_metrics.memory()
 
 
 def reset():
-    global _apm_config, _apm_probe_config, _runtime_metrics
+    global _apm_config, _apm_probe_config
 
     _apm_config = ApmConfig()
     # init config for the APM for communicating with the Agent
     _apm_probe_config = ApmProbeConfig()
-    _RuntimeMetrics.reset()
+    profiler.runtime_metrics.reset()
 
 
 def trigger_trace():
@@ -248,13 +252,18 @@ def get_autoprofile_query(method, uri, key_page):
         data = bytes(data, 'ascii')
     data += agent.Protocol.HEADER_MARKER
 
-    with get_agent_connection() as agent_conn:
-        agent_conn.send(data)
+    try:
+        with get_agent_connection() as agent_conn:
+            agent_conn.send(data)
 
-        response_raw = agent_conn.recv()
-        agent_resp = agent.BlackfireAPMResponse().from_bytes(response_raw)
+            response_raw = agent_conn.recv()
+            agent_resp = agent.BlackfireAPMResponse().from_bytes(response_raw)
 
-        return agent_resp.args['blackfire-query'][0]
+            return agent_resp.args['blackfire-query'][0]
+    except Exception as e:
+        # Agent returns status=False when the endpoint is profiled and then when
+        # a new APM message is sent/received config is updated.
+        log.exception(e)
 
 
 def _send_trace(req):
@@ -277,7 +286,7 @@ def _send_trace(req):
 
 
 def send_trace(request, extended, **kwargs):
-    global _apm_config
+    global _apm_config, _apm_worker
 
     kwargs['file-format'] = 'BlackfireApm'
     kwargs['sample-rate'] = _apm_config.sample_rate
@@ -304,4 +313,4 @@ def send_trace(request, extended, **kwargs):
 
     # We should not have a blocking call in APM path. Do agent connection setup
     # socket send in a separate thread.
-    _thread_pool.apply(_send_trace, args=(apm_trace_req, ))
+    _apm_worker.add_task(_send_trace, args=(apm_trace_req, ))
