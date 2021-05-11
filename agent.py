@@ -2,7 +2,7 @@ import socket
 import os
 import sys
 import json
-from blackfire.exceptions import BlackfireApiException, BlackfireAPMException
+from blackfire.exceptions import *
 from collections import defaultdict
 from blackfire.utils import urlparse, get_logger, IS_PY3, parse_qsl, read_blackfireyml_content
 

@@ -107,6 +107,7 @@ def enable(extended=False):
             instrumented_funcs=_apm_config.instrumented_funcs,
             timespan_selectors=_apm_config.timespan_selectors,
             apm_extended_trace=True,
+            timespan_threshold=_apm_config.timespan_time_threshold,
         )
 
     log.debug("APM profiler enabled. (extended=%s)" % (extended))
