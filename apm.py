@@ -267,9 +267,11 @@ def get_autoprofile_query(method, uri, key_page):
             agent_resp = agent.BlackfireAPMResponse().from_bytes(response_raw)
 
             return agent_resp.args['blackfire-query'][0]
-    except Exception as e:
+    except BlackfireAPMStatusFalseException:
         # Agent returns status=False when the endpoint is profiled and then when
         # a new APM message is sent/received config is updated.
+        log.exception(e)
+    except Exception as e:
         log.exception(e)
 
 

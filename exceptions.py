@@ -8,3 +8,7 @@ class BlackfireProfilerException(Exception):
 
 class BlackfireAPMException(Exception):
     pass
+
+
+class BlackfireAPMStatusFalseException(BlackfireAPMException):
+    pass

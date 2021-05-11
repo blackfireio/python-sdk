@@ -412,7 +412,7 @@ class BlackfireAPMResponse(BlackfireResponseBase):
         self.status_val_dict = dict(parse_qsl(self.status_val))
 
         if 'false' in self.status_val_dict['success']:
-            raise BlackfireAPMException(
+            raise BlackfireAPMStatusFalseException(
                 self.status_val_dict.get(
                     'error', "status=False and no error received from Agent."
                 )
