@@ -1,7 +1,5 @@
-import time
-import platform
-from blackfire import apm, VERSION, generate_config
-from blackfire.utils import get_logger, get_probed_runtime, read_blackfireyml_content
+from blackfire import apm, generate_config
+from blackfire.utils import get_logger, read_blackfireyml_content, get_time
 from blackfire.hooks.utils import try_enable_probe, try_end_probe, add_probe_response_header, \
     try_validate_send_blackfireyml
 
@@ -55,7 +53,7 @@ class BlackfireFlaskMiddleware(object):
         req_context.apm = False
         req_context.apm_extended = False
         req_context.profile = False
-        req_context.req_start = time.time()
+        req_context.req_start = get_time()
         req_context.probe_err = None
         req_context.probe = None
 
@@ -162,28 +160,21 @@ class BlackfireFlaskMiddleware(object):
             if req_context.apm:
                 apm.disable()
                 mu, pmu = apm.get_traced_memory()
-                now = time.time()
-                elapsed_wt_usec = int((now - req_context.req_start) * 1000000)
+                now = get_time()
                 apm.send_trace(
                     request,
                     req_context.apm_extended,
                     controller_name=request.endpoint,
-                    wt=elapsed_wt_usec,
+                    wt=now - req_context.req_start,  # usec
                     mu=mu,
                     pmu=pmu,
-                    timestamp=now,
+                    timestamp=now / 1000000,
                     uri=request.path,
                     framework="flask",
-                    capabilities="trace, profile",
                     http_host=request.environ.get('HTTP_HOST'),
                     method=request.method,
-                    os=platform.system(),
-                    language="python",
-                    runtime=get_probed_runtime(),
                     response_code=response.status_code,
                     stdout=response.headers['Content-Length'],
-                    http_method=request.method,
-                    version=VERSION,
                 )
         except Exception as e:
             # signals run in the context of app. Do not fail app code on any error

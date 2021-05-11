@@ -60,6 +60,10 @@ class RuntimeMetrics(object):
         return result
 
 
+def get_time():
+    return int(_bfext.now())
+
+
 def install_proxy_handler(http_proxy, https_proxy):
     proxies = {}
     if http_proxy:

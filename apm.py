@@ -1,13 +1,16 @@
 import random
 import os
 import logging
+import platform
 import re
 import sys
 import _blackfire_profiler as _bfext
 from threading import Thread
-from blackfire.utils import get_logger, IS_PY3, json_prettify, ConfigParser, is_testing, get_load_avg, \
-    get_cpu_count, get_os_memory_usage, Queue
-from blackfire import agent, DEFAULT_AGENT_SOCKET, DEFAULT_AGENT_TIMEOUT, DEFAULT_CONFIG_FILE, profiler
+from blackfire.utils import get_logger, IS_PY3, json_prettify, ConfigParser, \
+    is_testing, get_load_avg, get_cpu_count, get_os_memory_usage, Queue, \
+        get_probed_runtime
+from blackfire import agent, DEFAULT_AGENT_SOCKET, DEFAULT_AGENT_TIMEOUT, \
+    DEFAULT_CONFIG_FILE, profiler, VERSION
 from contextlib import contextmanager
 
 log = get_logger(__name__)
@@ -311,6 +314,12 @@ def send_trace(request, extended, **kwargs):
     kwargs['sample-rate'] = _apm_config.sample_rate
     if _apm_config.config_version:
         kwargs['config-version'] = _apm_config.config_version
+    kwargs['capabilities'] = "trace, profile"
+    kwargs['os'] = platform.system()
+    kwargs['host'] = platform.node()  # faster than socket.gethostbyname (Linux)
+    kwargs['language'] = "python"
+    kwargs['runtime'] = get_probed_runtime()
+    kwargs['version'] = VERSION
 
     if extended:
         kwargs['load'] = get_load_avg()

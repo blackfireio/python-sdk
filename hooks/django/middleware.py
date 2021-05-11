@@ -1,7 +1,5 @@
-import time
-import platform
-from blackfire import probe, apm, VERSION, generate_config
-from blackfire.utils import get_logger, get_probed_runtime, read_blackfireyml_content
+from blackfire import probe, apm, generate_config
+from blackfire.utils import get_logger, read_blackfireyml_content, get_time
 from blackfire.hooks.utils import try_enable_probe, try_end_probe, \
     add_probe_response_header, try_validate_send_blackfireyml
 from blackfire.hooks.django.utils import get_current_view_name
@@ -107,34 +105,27 @@ class BlackfireDjangoMiddleware(object):
 
     def _apm_trace(self, request, extended=False):
         apm.enable(extended)
-        t0 = time.time()
+        t0 = get_time()
         try:
             response = self.get_response(request)
         finally:
             apm.disable()
             mu, pmu = apm.get_traced_memory()
-            now = time.time()
-            elapsed_wt_usec = int((now - t0) * 1000000)
+            now = get_time()
             apm.send_trace(
                 request,
                 extended,
                 controller_name=get_current_view_name(request),
-                wt=elapsed_wt_usec,
+                wt=now - t0,  # usec
                 mu=mu,
                 pmu=pmu,
-                timestamp=now,
+                timestamp=now / 1000000,
                 uri=request.path,
                 framework="django",
-                capabilities="trace, profile",
                 http_host=request.META.get('HTTP_HOST'),
                 method=request.method,
-                os=platform.system(),
-                language="python",
-                runtime=get_probed_runtime(),
                 response_code=response.status_code,
                 stdout=len(response.content),
-                http_method=request.method,
-                version=VERSION,
             )
         return response
 
