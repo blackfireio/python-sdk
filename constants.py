@@ -72,3 +72,18 @@ class BlackfireConstants(object):
     def flask_debug_flag(cls):
         from flask import current_app
         return current_app.debug
+
+    @classmethod
+    @_on_except()
+    def is_flask_app(cls):
+        # current_app will throw an error if not called from a context a request
+        from flask import current_app
+        return True
+
+    @classmethod
+    @_on_except()
+    def is_django_app(cls):
+        from django.conf import settings
+        # configure() will throw error if Django app is configured properly
+        settings.configure()
+        return True
