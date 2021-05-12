@@ -478,6 +478,8 @@ def start(
         timespan_selectors,
         timespan_threshold,
         apm_extended_trace,
+        1111110,
+        1111110,
         probe,
     )
 
