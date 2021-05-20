@@ -116,8 +116,8 @@ def enable(extended=False):
             timespan_selectors=_apm_config.timespan_selectors,
             apm_extended_trace=True,
             timespan_threshold=_apm_config.timespan_time_threshold,
-            apm_timespan_threshold_per_rule=_apm_config
-            .timespan_threshold_per_rule,
+            apm_timespan_threshold_per_rule=_apm_config.\
+                timespan_threshold_per_rule,
             apm_timespan_threshold_global=_apm_config.timespan_threshold_global,
         )
 
