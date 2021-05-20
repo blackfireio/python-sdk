@@ -2,7 +2,7 @@ import socket
 import os
 import sys
 import json
-from blackfire.exceptions import BlackfireApiException, BlackfireAPMException
+from blackfire.exceptions import *
 from collections import defaultdict
 from blackfire.utils import urlparse, get_logger, IS_PY3, parse_qsl, read_blackfireyml_content
 
@@ -384,6 +384,11 @@ class BlackfireAPMResponse(BlackfireResponseBase):
     def __init__(self):
         self.args = defaultdict(list)
         self.key_pages = []
+        self.raw_data = ''
+        self.update_config = False
+
+    def __repr__(self):
+        return self.raw_data
 
     def from_bytes(self, data):
         if IS_PY3:
@@ -407,11 +412,15 @@ class BlackfireAPMResponse(BlackfireResponseBase):
         self.status_val_dict = dict(parse_qsl(self.status_val))
 
         if 'false' in self.status_val_dict['success']:
-            raise BlackfireAPMException(
+            raise BlackfireAPMStatusFalseException(
                 self.status_val_dict.get(
                     'error', "status=False and no error received from Agent."
                 )
             )
+
+        self.update_config = False if self.status_val_dict.get(
+            'update_config', 'false'
+        ) == 'false' else True
 
         key_page = None
         for line in lines[1:]:

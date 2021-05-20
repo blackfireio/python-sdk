@@ -446,6 +446,8 @@ def start(
     timespan_selectors={},
     timespan_threshold=MAX_TIMESPAN_THRESHOLD,  # ms
     apm_extended_trace=False,
+    apm_timespan_threshold_per_rule=0,
+    apm_timespan_threshold_global=0,
     probe=None,
 ):
     global _max_prefix_cache
@@ -478,6 +480,8 @@ def start(
         timespan_selectors,
         timespan_threshold,
         apm_extended_trace,
+        apm_timespan_threshold_per_rule,
+        apm_timespan_threshold_global,
         probe,
     )
 
@@ -527,6 +531,13 @@ def get_current_probe(session_id=None):
         session_id = _default_session_id_callback()
 
     return _bfext.get_current_probe(session_id)
+
+
+def get_apm_timespan_dropped(session_id=None):
+    if session_id is None:
+        session_id = _default_session_id_callback()
+
+    return _bfext.get_apm_timespan_dropped(session_id)
 
 
 def is_session_active(session_id=None):
