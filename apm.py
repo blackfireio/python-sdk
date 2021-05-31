@@ -55,6 +55,7 @@ class ApmConfig(object):
     def __init__(self):
         self.sample_rate = 1.0
         self.extended_sample_rate = 0.0
+        self.disable_config_update = 0
         self.key_pages = ()
         self.timespan_selectors = {}
         self.instrumented_funcs = {}
@@ -63,6 +64,7 @@ class ApmConfig(object):
         self.timespan_threshold_per_rule = 100
         self.timespan_threshold_global = 200
 
+        # some env. vars used in testing
         self.sample_rate = float(
             os.environ.get('BLACKFIRE_APM_SAMPLE_RATE_TEST', self.sample_rate)
         )
@@ -71,6 +73,13 @@ class ApmConfig(object):
                 'BLACKFIRE_APM_EXTENDED_SAMPLE_RATE_TEST',
                 self.extended_sample_rate
             )
+        )
+        self.disable_config_update = bool(int(os.environ.get(
+                'BLACKFIRE_APM_DISABLE_CONFIG_UPDATE_TEST',
+                self.disable_config_update)))
+
+        self.timespan_time_threshold = int(
+            os.environ.get('BLACKFIRE_APM_TIMESPAN_TIME_THRESHOLD_TEST', self.timespan_time_threshold)
         )
 
 
@@ -221,6 +230,9 @@ def get_agent_connection():
 
 def _update_apm_config(response):
     global _apm_config
+
+    if _apm_config.disable_config_update:
+        return
 
     new_apm_config = ApmConfig()
     try:

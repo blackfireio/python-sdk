@@ -83,75 +83,14 @@ def _format_funcname(module, name):
     return "%s.%s" % (module, name)
 
 
-def _set_threading_profile(on, _):
-
-    def _profile_thread_callback(frame, event, arg):
-        """
-        _profile_thread_callback will only be called once per-thread.
-        """
-        _bfext._profile_event(frame, event, arg)
-
-    if on:
-        threading.setprofile(_profile_thread_callback)
-    else:
-        threading.setprofile(None)
-
-
-# SessionIDManagers should derive from this class.
-class BaseSessionIDManager(object):
-
-    @classmethod
-    def get(cls):
-        pass
-
-    @classmethod
-    def reset(cls):
-        pass
-
-
-class _DefaultSessionIDManager(BaseSessionIDManager):
-
-    _tlocal = threading.local()
-    _counter = 0  # monotonic
-    _counter_lock = threading.Lock()
-    MAX_COUNTER_SIZE = (2**32) - 1  # counter should not be greater than uint32
-
-    @classmethod
-    def get(cls):
-        try:
-            return cls._tlocal._session_id
-        except AttributeError:
-            with cls._counter_lock:
-                if cls._counter == cls.MAX_COUNTER_SIZE:
-                    cls._counter = 0  # restart
-                cls._counter += 1
-                cls._tlocal._session_id = cls._counter
-
-        return cls._tlocal._session_id
-
-    @classmethod
-    def reset(cls):
-        cls._counter = 0
-        cls._tlocal = threading.local()
-
-
 # used from testing to set Probe state to a consistent state
 def reset():
-    _DefaultSessionIDManager.reset()
-
     initialize()
-
-
-# the default session ID callback used when there is no session_id callback available
-def _default_session_id_callback(*args):
-    return _DefaultSessionIDManager.get()
 
 
 def initialize(
     format_funcname=_format_funcname,
     timespan_selector=_fn_matches_timespan_selector,
-    set_threading_profile=_set_threading_profile,
-    session_id_callback=_default_session_id_callback,
     memory_usage_callback=runtime_metrics.memory,
 ):
     _bfext._initialize(locals(), log)
@@ -437,7 +376,6 @@ class _BlackfireTracesBase(dict):
 
 
 def start(
-    session_id=None,
     builtins=True,
     profile_cpu=True,
     profile_memory=True,
@@ -467,11 +405,7 @@ def start(
     # start/stop pair.
     _max_prefix_cache = {}
 
-    if session_id is None:
-        session_id = _default_session_id_callback()
-
     _bfext.start(
-        session_id,
         builtins,
         profile_cpu,
         profile_memory,
@@ -486,18 +420,12 @@ def start(
     )
 
 
-def stop(session_id=None):
-    if session_id is None:
-        session_id = _default_session_id_callback()
-
-    _bfext.stop(session_id)
+def stop():
+    _bfext.stop()
 
 
-def get_traces(session_id=None, omit_sys_path_dirs=True, extended=False):
-    if session_id is None:
-        session_id = _default_session_id_callback()
-
-    traces, timeline_traces = _bfext.get_traces(session_id)
+def get_traces(omit_sys_path_dirs=True, extended=False):
+    traces, timeline_traces = _bfext.get_traces()
     traces = _BlackfireTracesBase(traces, timeline_traces, omit_sys_path_dirs)
     return traces.to_traceformat(extended)
 
@@ -511,45 +439,29 @@ def run(builtins=False):
         stop()
 
 
-def clear_traces(session_id=None):
-    if session_id is None:
-        session_id = _default_session_id_callback()
-
-    _bfext.clear_traces(session_id)
+def clear_traces():
+    _bfext.clear_traces()
 
 
 def get_traced_memory():
     return _bfext.get_traced_memory()
 
 
-def get_sessions():
-    return _bfext._get_sessions()
+def get_current_probe():
+    return _bfext.get_current_probe()
 
 
-def get_current_probe(session_id=None):
-    if session_id is None:
-        session_id = _default_session_id_callback()
-
-    return _bfext.get_current_probe(session_id)
+def get_apm_timespan_dropped():
+    return _bfext.get_apm_timespan_dropped()
 
 
-def get_apm_timespan_dropped(session_id=None):
-    if session_id is None:
-        session_id = _default_session_id_callback()
-
-    return _bfext.get_apm_timespan_dropped(session_id)
-
-
-def is_session_active(session_id=None):
+def is_session_active():
     '''
     Checks if the running session is already active
     Maybe auto-instrumented code generated a session for the current thread and
     user requests manual instrumentation.
     '''
-    if session_id is None:
-        session_id = _default_session_id_callback()
-
-    return _bfext.is_session_active(session_id)
+    return _bfext.is_session_active()
 
 
 if __name__ != '__main__':

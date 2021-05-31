@@ -106,6 +106,7 @@ class BlackfireDjangoMiddleware(object):
     def _apm_trace(self, request, extended=False):
         apm.enable(extended)
         t0 = get_time()
+        response = None
         try:
             response = self.get_response(request)
         finally:
@@ -124,8 +125,8 @@ class BlackfireDjangoMiddleware(object):
                 framework="django",
                 http_host=request.META.get('HTTP_HOST'),
                 method=request.method,
-                response_code=response.status_code,
-                stdout=len(response.content),
+                response_code=response.status_code if response else 500,
+                stdout=len(response.content) if response else 0,
             )
         return response
 
