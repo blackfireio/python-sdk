@@ -6,6 +6,7 @@ import re
 import sys
 import _blackfire_profiler as _bfext
 from threading import Thread
+from blackfire.exceptions import *
 from blackfire.utils import get_logger, IS_PY3, json_prettify, ConfigParser, \
     is_testing, get_load_avg, get_cpu_count, get_os_memory_usage, Queue, \
         get_probed_runtime
@@ -294,7 +295,7 @@ def get_autoprofile_query(method, uri, key_page):
     except BlackfireAPMStatusFalseException:
         # Agent returns status=False when the endpoint is profiled and then when
         # a new APM message is sent/received config is updated.
-        log.exception(e)
+        pass
     except Exception as e:
         log.exception(e)
 
