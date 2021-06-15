@@ -16,8 +16,8 @@ from contextlib import contextmanager
 
 log = get_logger(__name__)
 
-DEFAULT_TIMESPAN_LIMIT_RULE = 100
-DEFAULT_TIMESPAN_LIMIT_GLOBAL = 200
+_DEFAULT_TIMESPAN_LIMIT_RULE = 100
+_DEFAULT_TIMESPAN_LIMIT_GLOBAL = 200
 
 
 class _ApmWorker(Thread):
@@ -62,8 +62,8 @@ class ApmConfig(object):
         self.instrumented_funcs = {}
         self.config_version = None
         self.timespan_time_threshold = 0  #ms
-        self.timespan_limit_rule = DEFAULT_TIMESPAN_LIMIT_RULE
-        self.timespan_limit_global = DEFAULT_TIMESPAN_LIMIT_GLOBAL
+        self.timespan_limit_rule = _DEFAULT_TIMESPAN_LIMIT_RULE
+        self.timespan_limit_global = _DEFAULT_TIMESPAN_LIMIT_GLOBAL
 
         # some env. vars used in testing
         self.sample_rate = float(
