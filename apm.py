@@ -16,8 +16,8 @@ from contextlib import contextmanager
 
 log = get_logger(__name__)
 
-DEFAULT_TIMESPAN_THRESHOLD_PER_RULE = 100
-DEFAULT_TIMESPAN_THRESHOLD_GLOBAL = 200
+DEFAULT_TIMESPAN_LIMIT_RULE = 100
+DEFAULT_TIMESPAN_LIMIT_GLOBAL = 200
 
 
 class _ApmWorker(Thread):
@@ -62,8 +62,8 @@ class ApmConfig(object):
         self.instrumented_funcs = {}
         self.config_version = None
         self.timespan_time_threshold = 0  #ms
-        self.timespan_threshold_per_rule = 100
-        self.timespan_threshold_global = 200
+        self.timespan_limit_rule = DEFAULT_TIMESPAN_LIMIT_RULE
+        self.timespan_limit_global = DEFAULT_TIMESPAN_LIMIT_GLOBAL
 
         # some env. vars used in testing
         self.sample_rate = float(
@@ -126,9 +126,8 @@ def enable(extended=False):
             timespan_selectors=_apm_config.timespan_selectors,
             apm_extended_trace=True,
             timespan_threshold=_apm_config.timespan_time_threshold,
-            apm_timespan_threshold_per_rule=_apm_config.\
-                timespan_threshold_per_rule,
-            apm_timespan_threshold_global=_apm_config.timespan_threshold_global,
+            apm_timespan_limit_rule=_apm_config.timespan_limit_rule,
+            apm_timespan_limit_global=_apm_config.timespan_limit_global,
         )
 
     log.debug("APM profiler enabled. (extended=%s)" % (extended))
@@ -348,10 +347,8 @@ def send_trace(request, extended, **kwargs):
         kwargs['cost-dimensions'] = 'wt cpu mu pmu'
         kwargs['extended-sample-rate'] = _apm_config.extended_sample_rate
         kwargs['timespan_dropped'] = profiler.get_apm_timespan_dropped()
-        kwargs['timespan_threshold_per_rule'
-               ] = _apm_config.timespan_threshold_per_rule
-        kwargs['timespan_threshold_global'
-               ] = _apm_config.timespan_threshold_global
+        kwargs['timespan_limit_rule'] = _apm_config.timespan_limit_rule
+        kwargs['timespan_limit_global'] = _apm_config.timespan_limit_global
 
     headers = {}
     for k, v in kwargs.items():
