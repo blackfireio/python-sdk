@@ -384,7 +384,7 @@ def start(
     timespan_selectors={},
     timespan_threshold=MAX_TIMESPAN_THRESHOLD,  # ms
     apm_extended_trace=False,
-    apm_timespan_limit_rule=0,
+    apm_timespan_limit_per_rule=0,
     apm_timespan_limit_global=0,
     probe=None,
 ):
@@ -414,7 +414,7 @@ def start(
         timespan_selectors,
         timespan_threshold,
         apm_extended_trace,
-        apm_timespan_limit_rule,
+        apm_timespan_limit_per_rule,
         apm_timespan_limit_global,
         probe,
     )

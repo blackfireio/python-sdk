@@ -16,7 +16,7 @@ from contextlib import contextmanager
 
 log = get_logger(__name__)
 
-_DEFAULT_TIMESPAN_LIMIT_RULE = 100
+_DEFAULT_TIMESPAN_LIMIT_PER_RULE = 100
 _DEFAULT_TIMESPAN_LIMIT_GLOBAL = 200
 
 
@@ -62,7 +62,7 @@ class ApmConfig(object):
         self.instrumented_funcs = {}
         self.config_version = None
         self.timespan_time_threshold = 0  #ms
-        self.timespan_limit_rule = _DEFAULT_TIMESPAN_LIMIT_RULE
+        self.timespan_limit_per_rule = _DEFAULT_TIMESPAN_LIMIT_PER_RULE
         self.timespan_limit_global = _DEFAULT_TIMESPAN_LIMIT_GLOBAL
 
         # some env. vars used in testing
@@ -126,7 +126,7 @@ def enable(extended=False):
             timespan_selectors=_apm_config.timespan_selectors,
             apm_extended_trace=True,
             timespan_threshold=_apm_config.timespan_time_threshold,
-            apm_timespan_limit_rule=_apm_config.timespan_limit_rule,
+            apm_timespan_limit_per_rule=_apm_config.timespan_limit_per_rule,
             apm_timespan_limit_global=_apm_config.timespan_limit_global,
         )
 
@@ -347,7 +347,7 @@ def send_trace(request, extended, **kwargs):
         kwargs['cost-dimensions'] = 'wt cpu mu pmu'
         kwargs['extended-sample-rate'] = _apm_config.extended_sample_rate
         kwargs['timespan_dropped'] = profiler.get_apm_timespan_dropped()
-        kwargs['timespan_limit_rule'] = _apm_config.timespan_limit_rule
+        kwargs['timespan_limit_per_rule'] = _apm_config.timespan_limit_per_rule
         kwargs['timespan_limit_global'] = _apm_config.timespan_limit_global
 
     headers = {}
