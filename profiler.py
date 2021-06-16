@@ -3,10 +3,12 @@ import sys
 import json
 import warnings
 import threading
+import logging
 import _blackfire_profiler as _bfext
 from contextlib import contextmanager
 from collections import Counter
-from blackfire.utils import urlencode, IS_PY3, get_logger, RuntimeMetrics
+from blackfire.utils import urlencode, IS_PY3, get_logger, RuntimeMetrics, \
+    get_time, json_prettify
 from blackfire.exceptions import *
 
 __all__ = ['start', 'stop', 'get_traces', 'clear_traces', 'run']
@@ -425,9 +427,19 @@ def stop():
 
 
 def get_traces(omit_sys_path_dirs=True, extended=False):
+    t0 = get_time()
     traces, timeline_traces = _bfext.get_traces()
     traces = _BlackfireTracesBase(traces, timeline_traces, omit_sys_path_dirs)
-    return traces.to_traceformat(extended)
+    result = traces.to_traceformat(extended)
+
+    if log.isEnabledFor(logging.DEBUG):
+        internal_stats = _bfext._get_internal_stats()
+        internal_stats['get_traces_overhead_usec'] = get_time() - t0
+        internal_stats['ntraces'] = len(traces)
+        internal_stats['ntimeline_traces'] = len(timeline_traces)
+        log.debug("\n\nInternal Stats:\n%s", json_prettify(internal_stats))
+
+    return result
 
 
 @contextmanager
