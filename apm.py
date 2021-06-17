@@ -75,12 +75,20 @@ class ApmConfig(object):
                 self.extended_sample_rate
             )
         )
-        self.disable_config_update = bool(int(os.environ.get(
-                'BLACKFIRE_APM_DISABLE_CONFIG_UPDATE_TEST',
-                self.disable_config_update)))
+        self.disable_config_update = bool(
+            int(
+                os.environ.get(
+                    'BLACKFIRE_APM_DISABLE_CONFIG_UPDATE_TEST',
+                    self.disable_config_update
+                )
+            )
+        )
 
         self.timespan_time_threshold = int(
-            os.environ.get('BLACKFIRE_APM_TIMESPAN_TIME_THRESHOLD_TEST', self.timespan_time_threshold)
+            os.environ.get(
+                'BLACKFIRE_APM_TIMESPAN_TIME_THRESHOLD_TEST',
+                self.timespan_time_threshold
+            )
         )
 
 
@@ -105,12 +113,13 @@ _apm_worker = _ApmWorker()
 
 # do not even evaluate the params if DEBUG is not set in APM path
 
-log.debug(
-    "APM Configuration initialized. [%s] [%s] [%s]",
-    json_prettify(_apm_config.__dict__),
-    json_prettify(_apm_probe_config.__dict__),
-    os.getpid(),
-)
+if _apm_probe_config.apm_enabled:
+    log.debug(
+        "APM Configuration initialized. [%s] [%s] [%s]",
+        json_prettify(_apm_config.__dict__),
+        json_prettify(_apm_probe_config.__dict__),
+        os.getpid(),
+    )
 
 
 def enable(extended=False):
