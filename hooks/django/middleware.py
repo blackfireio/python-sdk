@@ -104,30 +104,31 @@ class BlackfireDjangoMiddleware(object):
         return response
 
     def _apm_trace(self, request, extended=False):
-        apm.enable(extended)
-        t0 = get_time()
+        curr_transaction = apm.enable(extended)
         response = None
         try:
             response = self.get_response(request)
         finally:
             apm.disable()
-            mu, pmu = apm.get_traced_memory()
-            now = get_time()
-            apm.send_trace(
-                request,
-                extended,
-                controller_name=get_current_view_name(request),
-                wt=now - t0,  # usec
-                mu=mu,
-                pmu=pmu,
-                timestamp=now / 1000000,
-                uri=request.path,
-                framework="django",
-                http_host=request.META.get('HTTP_HOST'),
-                method=request.method,
-                response_code=response.status_code if response else 500,
-                stdout=len(response.content) if response else 0,
-            )
+            if not curr_transaction.ignored:
+                mu, pmu = apm.get_traced_memory()
+                now = get_time()
+                apm.send_trace(
+                    request,
+                    extended,
+                    controller_name=curr_transaction.name
+                    or get_current_view_name(request),
+                    wt=now - curr_transaction.t0,  # usec
+                    mu=mu,
+                    pmu=pmu,
+                    timestamp=now / 1000000,
+                    uri=request.path,
+                    framework="django",
+                    http_host=request.META.get('HTTP_HOST'),
+                    method=request.method,
+                    response_code=response.status_code if response else 500,
+                    stdout=len(response.content) if response else 0,
+                )
         return response
 
     def _enable_sql_instrumentation(self):

@@ -53,9 +53,9 @@ class BlackfireFlaskMiddleware(object):
         req_context.apm = False
         req_context.apm_extended = False
         req_context.profile = False
-        req_context.req_start = get_time()
         req_context.probe_err = None
         req_context.probe = None
+        req_context.curr_transaction = None
 
         log.debug("FlaskMiddleware._before_request called.")
 
@@ -113,7 +113,9 @@ class BlackfireFlaskMiddleware(object):
         if apm.trigger_trace():
             req_context.apm = True
             req_context.apm_extended = apm.trigger_extended_trace()
-            apm.enable(extended=req_context.apm_extended)
+            req_context.curr_transaction = apm.enable(
+                extended=req_context.apm_extended
+            )
 
     def _after_request(self, response):
         req_context = get_request_context()
@@ -159,23 +161,25 @@ class BlackfireFlaskMiddleware(object):
 
             if req_context.apm:
                 apm.disable()
-                mu, pmu = apm.get_traced_memory()
-                now = get_time()
-                apm.send_trace(
-                    request,
-                    req_context.apm_extended,
-                    controller_name=request.endpoint,
-                    wt=now - req_context.req_start,  # usec
-                    mu=mu,
-                    pmu=pmu,
-                    timestamp=now / 1000000,
-                    uri=request.path,
-                    framework="flask",
-                    http_host=request.environ.get('HTTP_HOST'),
-                    method=request.method,
-                    response_code=response.status_code,
-                    stdout=response.headers['Content-Length'],
-                )
+                if not req_context.curr_transaction.ignored:
+                    mu, pmu = apm.get_traced_memory()
+                    now = get_time()
+                    apm.send_trace(
+                        request,
+                        req_context.apm_extended,
+                        controller_name=req_context.curr_transaction.name
+                        or request.endpoint,
+                        wt=now - req_context.curr_transaction.t0,  # usec
+                        mu=mu,
+                        pmu=pmu,
+                        timestamp=now / 1000000,
+                        uri=request.path,
+                        framework="flask",
+                        http_host=request.environ.get('HTTP_HOST'),
+                        method=request.method,
+                        response_code=response.status_code,
+                        stdout=response.headers['Content-Length'],
+                    )
         except Exception as e:
             # signals run in the context of app. Do not fail app code on any error
             log.exception(e)

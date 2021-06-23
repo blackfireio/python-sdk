@@ -4,12 +4,15 @@ import logging
 import platform
 import re
 import sys
+import threading
+
+from django.db.backends.base.base import NO_DB_ALIAS
 import _blackfire_profiler as _bfext
 from threading import Thread
 from blackfire.exceptions import *
 from blackfire.utils import get_logger, IS_PY3, json_prettify, ConfigParser, \
     is_testing, get_load_avg, get_cpu_count, get_os_memory_usage, Queue, \
-        get_probed_runtime
+        get_probed_runtime, get_time
 from blackfire import agent, DEFAULT_AGENT_SOCKET, DEFAULT_AGENT_TIMEOUT, \
     DEFAULT_CONFIG_FILE, profiler, VERSION
 from contextlib import contextmanager
@@ -111,6 +114,9 @@ _apm_config = ApmConfig()
 _apm_probe_config = ApmProbeConfig()
 _apm_worker = _ApmWorker()
 
+# TODO: Comment
+_curr_transaction = threading.local()
+
 # do not even evaluate the params if DEBUG is not set in APM path
 
 if _apm_probe_config.apm_enabled:
@@ -122,8 +128,30 @@ if _apm_probe_config.apm_enabled:
     )
 
 
+class _ApmTransaction(object):
+
+    def __init__(self):
+        self.ignored = False
+        self.name = None
+        self.t0 = get_time()
+
+    def ignore(self):
+        self.ignored = True
+
+    def set_name(self, v):
+        self.name = v
+
+
+def get_current_transaction():
+    global _curr_transaction
+
+    # is there an ongoing transaction?
+    if isinstance(_curr_transaction, _ApmTransaction):
+        return _curr_transaction
+
+
 def enable(extended=False):
-    global _apm_config
+    global _apm_config, _curr_transaction
 
     if extended:
         profiler.start(
@@ -141,9 +169,15 @@ def enable(extended=False):
 
     log.debug("APM profiler enabled. (extended=%s)" % (extended))
 
+    _curr_transaction = _ApmTransaction()
+    return _curr_transaction
+
 
 def disable():
+    global _curr_transaction
+
     profiler.stop()
+    _curr_transaction = None
 
     log.debug("APM profiler disabled.")
 
@@ -153,12 +187,13 @@ def get_traced_memory():
 
 
 def reset():
-    global _apm_config, _apm_probe_config
+    global _apm_config, _apm_probe_config, _curr_transaction
 
     _apm_config = ApmConfig()
     # init config for the APM for communicating with the Agent
     _apm_probe_config = ApmProbeConfig()
     profiler.runtime_metrics.reset()
+    _curr_transaction = None
 
 
 def trigger_trace():
