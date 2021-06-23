@@ -104,21 +104,21 @@ class BlackfireDjangoMiddleware(object):
         return response
 
     def _apm_trace(self, request, extended=False):
-        curr_transaction = apm.enable(extended)
+        transaction = apm.start_transaction(extended)
         response = None
         try:
             response = self.get_response(request)
         finally:
-            apm.disable()
-            if not curr_transaction.ignored:
+            apm.stop_transaction()
+            if not transaction.ignored:
                 mu, pmu = apm.get_traced_memory()
                 now = get_time()
                 apm.send_trace(
                     request,
                     extended,
-                    controller_name=curr_transaction.name
+                    controller_name=transaction.name
                     or get_current_view_name(request),
-                    wt=now - curr_transaction.t0,  # usec
+                    wt=now - transaction.t0,  # usec
                     mu=mu,
                     pmu=pmu,
                     timestamp=now / 1000000,

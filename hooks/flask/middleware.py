@@ -113,7 +113,7 @@ class BlackfireFlaskMiddleware(object):
         if apm.trigger_trace():
             req_context.apm = True
             req_context.apm_extended = apm.trigger_extended_trace()
-            req_context.curr_transaction = apm.enable(
+            req_context.transaction = apm.start_transaction(
                 extended=req_context.apm_extended
             )
 
@@ -160,16 +160,16 @@ class BlackfireFlaskMiddleware(object):
                 return response
 
             if req_context.apm:
-                apm.disable()
-                if not req_context.curr_transaction.ignored:
+                apm.stop_transaction()
+                if not req_context.transaction.ignored:
                     mu, pmu = apm.get_traced_memory()
                     now = get_time()
                     apm.send_trace(
                         request,
                         req_context.apm_extended,
-                        controller_name=req_context.curr_transaction.name
+                        controller_name=req_context.transaction.name
                         or request.endpoint,
-                        wt=now - req_context.curr_transaction.t0,  # usec
+                        wt=now - req_context.transaction.t0,  # usec
                         mu=mu,
                         pmu=pmu,
                         timestamp=now / 1000000,

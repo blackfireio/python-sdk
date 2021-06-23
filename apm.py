@@ -114,9 +114,6 @@ _apm_config = ApmConfig()
 _apm_probe_config = ApmProbeConfig()
 _apm_worker = _ApmWorker()
 
-# TODO: Comment
-_curr_transaction = threading.local()
-
 # do not even evaluate the params if DEBUG is not set in APM path
 
 if _apm_probe_config.apm_enabled:
@@ -128,31 +125,38 @@ if _apm_probe_config.apm_enabled:
     )
 
 
-class _ApmTransaction(object):
+class ApmTransaction(object):
 
-    def __init__(self):
+    def __init__(self, extended):
         self.ignored = False
         self.name = None
         self.t0 = get_time()
-
-    def ignore(self):
-        self.ignored = True
-
-    def set_name(self, v):
-        self.name = v
+        self.extended = extended
 
 
-def get_current_transaction():
+# TODO: Comment
+_curr_transaction = threading.local()
+
+
+def set_transaction_name(name):
     global _curr_transaction
 
-    # is there an ongoing transaction?
-    if isinstance(_curr_transaction, _ApmTransaction):
-        return _curr_transaction
+    if _curr_transaction:
+        _curr_transaction.name = name
 
 
-def enable(extended=False):
-    global _apm_config, _curr_transaction
+def ignore_transaction():
+    global _curr_transaction
 
+    if _curr_transaction:
+        _curr_transaction.ignored = True
+
+
+def start_transaction(extended=False):
+    global _curr_transaction
+    # TODO: What is there is an:
+    #  - ongoing profile
+    #  - ongoing APM transaction
     if extended:
         profiler.start(
             builtins=True,
@@ -167,19 +171,19 @@ def enable(extended=False):
             apm_timespan_limit_global=_apm_config.timespan_limit_global,
         )
 
-    log.debug("APM profiler enabled. (extended=%s)" % (extended))
+    log.debug("APM transaction started. (extended=%s)" % (extended))
 
-    _curr_transaction = _ApmTransaction()
+    _curr_transaction = ApmTransaction(extended)
     return _curr_transaction
 
 
-def disable():
+def stop_transaction():
     global _curr_transaction
 
     profiler.stop()
     _curr_transaction = None
 
-    log.debug("APM profiler disabled.")
+    log.debug("APM transaction stopped.")
 
 
 def get_traced_memory():
