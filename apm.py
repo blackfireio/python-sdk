@@ -134,7 +134,9 @@ class ApmTransaction(object):
         self.extended = extended
 
 
-# TODO: Comment
+# _curr_transaction holds the current executing APM transaction. It is currently
+# implemented as a thread local variable. If 1:1 mapping of HTTP request:Thread
+# changes, this needs to change as well.
 _curr_transaction = threading.local()
 
 
