@@ -154,9 +154,19 @@ def ignore_transaction():
 
 def start_transaction(extended=False):
     global _curr_transaction
-    # TODO: What is there is an:
-    #  - ongoing profile
-    #  - ongoing APM transaction
+
+    # do nothing if there is an ongoing APM transaction or a profiling session
+    if _curr_transaction:
+        log.debug(
+            "APM transaction cannot be started as another transaction is in progress."
+        )
+        return
+    if profiler.is_session_active():
+        log.debug(
+            "APM transaction cannot be started as a profile is in progress."
+        )
+        return
+
     if extended:
         profiler.start(
             builtins=True,
