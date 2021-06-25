@@ -138,6 +138,7 @@ class ApmTransaction(object):
 # implemented as a thread local variable. If 1:1 mapping of HTTP request:Thread
 # changes, this needs to change as well.
 _curr_transaction = threading.local()
+_curr_transaction = None
 
 
 def set_transaction_name(name):
