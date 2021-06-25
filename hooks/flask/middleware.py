@@ -55,7 +55,7 @@ class BlackfireFlaskMiddleware(object):
         req_context.profile = False
         req_context.probe_err = None
         req_context.probe = None
-        req_context.curr_transaction = None
+        req_context.transaction = None
 
         log.debug("FlaskMiddleware._before_request called.")
 
