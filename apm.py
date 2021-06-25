@@ -6,7 +6,6 @@ import re
 import sys
 import threading
 
-from django.db.backends.base.base import NO_DB_ALIAS
 import _blackfire_profiler as _bfext
 from threading import Thread
 from blackfire.exceptions import *
