@@ -226,7 +226,6 @@ class Probe(object):
         return traces
 
     def get_traces(self, omit_sys_path_dirs=_DEFAULT_OMIT_SYS_PATH):
-        print("kubu")
         return profiler.get_traces(omit_sys_path_dirs=omit_sys_path_dirs)
 
 

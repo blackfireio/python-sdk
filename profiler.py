@@ -432,9 +432,6 @@ def get_traces(omit_sys_path_dirs=True, extended=False):
     traces = _BlackfireTracesBase(traces, timeline_traces, omit_sys_path_dirs)
     result = traces.to_traceformat(extended)
 
-    print("libi")
-    print(result, "dd")
-
     if log.isEnabledFor(logging.DEBUG):
         internal_stats = _bfext._get_internal_stats()
         internal_stats['get_traces_overhead_usec'] = get_time() - t0
