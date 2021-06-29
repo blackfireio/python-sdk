@@ -21,6 +21,7 @@ log = get_logger(__name__)
 
 # globals
 _config = None
+_probe = None
 
 _DEFAULT_OMIT_SYS_PATH = True
 _DEFAULT_PROFILE_TITLE = 'unnamed profile'
