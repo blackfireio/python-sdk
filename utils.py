@@ -117,11 +117,15 @@ def wrap(f, pre_func=None, post_func=None, orig=None):
     def wrapper(*args, **kwargs):
         if pre_func:
             pre_func(*args, **kwargs)
+        result = None
         try:
-            return f(*args, **kwargs)
+            result = f(*args, **kwargs)
         finally:
             if post_func:
+                kwargs["_result"] = result
                 post_func(*args, **kwargs)
+
+        return result
 
     if orig is not None:
         wrapper._orig = orig
