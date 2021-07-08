@@ -295,3 +295,7 @@ def json_prettify(obj):
 
 def is_testing():
     return 'BLACKFIRE_TESTING' in os.environ
+
+
+def is_nw_dimension_enabled():
+    return 'BLACKFIRE_NW_ENABLED' in os.environ

@@ -1,11 +1,9 @@
 import ssl
 import socket
-import threading
 from blackfire.utils import wrap, unwrap, get_logger, IS_PY3
+from blackfire.hooks import nw
 
 log = get_logger(__name__)
-
-_nw = threading.local()
 
 _orig_socket_class = None
 
@@ -19,22 +17,13 @@ else:
     WRAP_BASE_CLASS = socket._socket.socket
 
 
-def get_nw_counters():
-    if not getattr(_nw, 'in_bytes', None):
-        _nw.in_bytes = 0
-    if not getattr(_nw, 'out_bytes', None):
-        _nw.out_bytes = 0
-    return _nw
-
-
-# TODO: Refactor? lots of repetition
 class _WrappedSocket(WRAP_BASE_CLASS):
 
     def recv(self, *args, **kwargs):
         result = super(_WrappedSocket, self).recv(*args, **kwargs)
 
         try:  # defensive
-            get_nw_counters().in_bytes += len(result)
+            nw.get_counters().in_bytes += len(result)
         except:
             pass
         return result
@@ -43,7 +32,7 @@ class _WrappedSocket(WRAP_BASE_CLASS):
         result = super(_WrappedSocket, self).recv_into(*args, **kwargs)
 
         try:  # defensive
-            get_nw_counters().in_bytes += int(result)
+            nw.get_counters().in_bytes += int(result)
         except:
             pass
         return result
@@ -53,7 +42,7 @@ class _WrappedSocket(WRAP_BASE_CLASS):
 
         try:  # defensive
             # first item is a string or bytes representing the data received
-            get_nw_counters().in_bytes += len(result[0])
+            nw.get_counters().in_bytes += len(result[0])
         except:
             pass
         return result
@@ -63,7 +52,7 @@ class _WrappedSocket(WRAP_BASE_CLASS):
 
         # update nw_out after socket operation finished successfully
         try:  # defensive
-            get_nw_counters().out_bytes += len(args[0])
+            nw.get_counters().out_bytes += len(args[0])
         except:
             pass
         return result
@@ -72,7 +61,7 @@ class _WrappedSocket(WRAP_BASE_CLASS):
         result = super(_WrappedSocket, self).sendto(*args, **kwargs)
 
         try:  # defensive
-            get_nw_counters().out_bytes += int(result)
+            nw.get_counters().out_bytes += int(result)
         except:
             pass
         return result
@@ -81,7 +70,7 @@ class _WrappedSocket(WRAP_BASE_CLASS):
         result = super(_WrappedSocket, self).send(*args, **kwargs)
 
         try:  # defensive
-            get_nw_counters().out_bytes += int(result)
+            nw.get_counters().out_bytes += int(result)
         except:
             pass
         return result
@@ -99,9 +88,9 @@ def _ssl_sock_read(*args, **kwargs):
     try:
         result = kwargs.pop("_result")
         if isinstance(result, int):
-            get_nw_counters().in_bytes += result
+            nw.get_counters().in_bytes += result
         else:
-            get_nw_counters().in_bytes += len(result)
+            nw.get_counters().in_bytes += len(result)
     except:
         pass
 
@@ -109,7 +98,7 @@ def _ssl_sock_read(*args, **kwargs):
 def _ssl_sock_write(*args, **kwargs):
     # ssl.SSLSocket.write returns the number of bytes written
     try:
-        get_nw_counters().out_bytes += kwargs.pop("_result")
+        nw.get_counters().out_bytes += kwargs.pop("_result")
     except:
         pass
 
@@ -123,9 +112,10 @@ def patch():
 
     try:
         # Although we could choose to use wrap() to monkey patch individual
-        # socket functions, we did not go that way. Py 2.7, use a Wrapper class
-        # for socket class which defines socket methods as __slots__. This makes
-        # socket methods read-only. So, that is why we chose to wrap the class.
+        # socket functions, we did not go that way. Py 2.7 uses a Wrapper class
+        # for the socket class which defines socket methods as __slots__. This makes
+        # socket methods read-only. That is the reason why we chose to wrap the
+        # class, instead
         if IS_PY3:
             _orig_socket_class = socket.socket
             socket.socket = _WrappedSocket
@@ -148,6 +138,8 @@ def patch():
         )
 
         setattr(socket, '_blackfire_patch', True)
+
+        log.debug('nw modules patched.')
 
         return True
     except Exception as e:

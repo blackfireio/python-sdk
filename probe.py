@@ -114,6 +114,7 @@ class Probe(object):
         profile_cpu = bool(int(self._config.args.get('flag_cpu', '0')))
         profile_memory = bool(int(self._config.args.get('flag_memory', '0')))
         fn_args_enabled = bool(int(self._config.args.get('flag_fn_args', '0')))
+        profile_nw = bool(int(self._config.args.get('flag_nw', '0')))
 
         # only enable timespan if this is the last profile of multiple sample profiles.
         # we look at 'continue': 'false' from the agent response
@@ -150,6 +151,7 @@ class Probe(object):
             builtins=builtins,
             profile_cpu=profile_cpu,
             profile_memory=profile_memory,
+            profile_nw=profile_nw,
             profile_timespan=profile_timespan,
             instrumented_funcs=instrumented_funcs,
             timespan_selectors=timespan_selectors,

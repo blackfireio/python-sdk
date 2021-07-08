@@ -10,6 +10,7 @@ from collections import Counter
 from blackfire.utils import urlencode, IS_PY3, get_logger, RuntimeMetrics, \
     get_time, json_prettify
 from blackfire.exceptions import *
+from blackfire.hooks import nw
 
 __all__ = ['start', 'stop', 'get_traces', 'clear_traces', 'run']
 
@@ -381,6 +382,7 @@ def start(
     builtins=True,
     profile_cpu=True,
     profile_memory=True,
+    profile_nw=False,
     profile_timespan=False,
     instrumented_funcs={},
     timespan_selectors={},
@@ -411,6 +413,7 @@ def start(
         builtins,
         profile_cpu,
         profile_memory,
+        profile_nw,
         profile_timespan,
         instrumented_funcs,
         timespan_selectors,
@@ -419,6 +422,7 @@ def start(
         apm_timespan_limit_per_rule,
         apm_timespan_limit_global,
         probe,
+        nw.get_counters(),
     )
 
 
