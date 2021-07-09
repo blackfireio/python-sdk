@@ -147,6 +147,11 @@ class Probe(object):
             self._config.args,
         )
 
+        # enable just before profiling starts to exclude Blackfire related `nw` activity
+        # e.g: prologue with Agent
+        from blackfire.hooks import nw
+        nw.enable()
+
         profiler.start(
             builtins=builtins,
             profile_cpu=profile_cpu,
@@ -164,6 +169,11 @@ class Probe(object):
     def disable(self):
         if not self._enabled:
             return
+
+        # there might be multiple start/stop. Again: we want to have `nw` hooks
+        # enabled just before profiler starts
+        from blackfire.hooks import nw
+        nw.disable()
 
         self._enabled = False
         profiler.stop()
@@ -195,6 +205,7 @@ class Probe(object):
             'Request-Start': self._req_start,
             'Request-End': time.time(),
             'Profile-Title': profile_title,
+            'cost-dimensions': "wt cpu mu pmu nw_in nw_out",
         }
         load_avg = get_load_avg()
         if load_avg:

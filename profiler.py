@@ -201,24 +201,28 @@ class BlackfireTraces(dict):
     def __str__(self):
         result = ''
         for trace_key, trace in self.items():
-            result += '%s//%d %d %d %d %d\n' % ( \
+            result += '%s//%d %d %d %d %d %d %d\n' % ( \
                         trace_key,
                         trace.call_count,
                         trace.wall_time,
                         trace.cpu_time,
                         trace.mem_usage,
-                        trace.peak_mem_usage,)
+                        trace.peak_mem_usage,
+                        trace.nw_in,
+                        trace.nw_out)
 
         # add timeline entries
         if len(self.timeline_traces):
             result += '\n'
         for trace_key, trace in self.timeline_traces.items():
-            result += '%s//%d %d %d %d\n' % ( \
+            result += '%s//%d %d %d %d %d %d\n' % ( \
                         trace_key,
                         trace.wall,
                         trace.cpu,
                         trace.mu,
-                        trace.pmu)
+                        trace.pmu,
+                        trace.nw_in,
+                        trace.nw_out)
         return result
 
     def to_bytes(self):
@@ -338,6 +342,8 @@ class _BlackfireTracesBase(dict):
                             cpu_time=child[4],
                             mem_usage=child[5],
                             peak_mem_usage=child[6],
+                            nw_in=child[7],
+                            nw_out=child[8],
                             rec_level=callee["rec_level"],
                         )
 
@@ -369,10 +375,26 @@ class _BlackfireTracesBase(dict):
             # add the same trace dict twice with different metrics one for
             # Threshold-start and one for Threshold-End
             result.add_timeline(
-                **dict(trace_dict, wall=te[2], cpu=te[3], mu=te[6], pmu=te[7])
+                **dict(
+                    trace_dict,
+                    wall=te[2],
+                    cpu=te[3],
+                    mu=te[6],
+                    pmu=te[7],
+                    nw_in=te[10],
+                    nw_out=te[11]
+                )
             )
             result.add_timeline(
-                **dict(trace_dict, wall=te[4], cpu=te[5], mu=te[8], pmu=te[9])
+                **dict(
+                    trace_dict,
+                    wall=te[4],
+                    cpu=te[5],
+                    mu=te[8],
+                    pmu=te[9],
+                    nw_in=te[12],
+                    nw_out=te[13]
+                )
             )
             i += 1
         return result

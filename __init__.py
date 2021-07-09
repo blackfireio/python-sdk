@@ -295,7 +295,7 @@ def patch_all():
         if r:
             patched_modules.append(mod_name)
 
-    log.info("Patched modules=%s", patched_modules)
+    log.error("Patched modules=%s", patched_modules)
 
 
 def profile(func=None, client_id=None, client_token=None, title=None):
