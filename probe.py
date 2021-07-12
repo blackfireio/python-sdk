@@ -57,8 +57,15 @@ class _ProbeProxy(object):
     def clear_traces(self):
         self._docall("clear_traces")
 
+    def is_enabled(self):
+        r = self._docall("is_enabled")
+        return r is not None
+
     def get_traces(self, *args, **kwargs):
-        return self._docall("get_traces", *args, **kwargs)
+        r = self._docall("get_traces", *args, **kwargs)
+        if r is None:
+            return ""
+        return r
 
     def end(self, *args, **kwargs):
         return self._docall("end", *args, **kwargs)
@@ -224,21 +231,11 @@ class Probe(object):
 
 
 def get_traces(omit_sys_path_dirs=_DEFAULT_OMIT_SYS_PATH):
-    global _probe
-
-    if not _probe:
-        return
-
-    return _probe.get_traces(omit_sys_path_dirs=omit_sys_path_dirs)
+    return get_current().get_traces(omit_sys_path_dirs=omit_sys_path_dirs)
 
 
 def clear_traces():
-    global _probe
-
-    if not _probe:
-        return
-
-    _probe.clear_traces()
+    get_current().clear_traces()
 
 
 # used from testing to set Probe state to a consistent state
@@ -334,12 +331,7 @@ def initialize(
 
 
 def is_enabled():
-    global _probe
-
-    if not _probe:
-        return False
-
-    return _probe.is_enabled()
+    return get_current().is_enabled()
 
 
 def enable(end_at_exit=False):
@@ -387,12 +379,7 @@ def enable(end_at_exit=False):
 
 
 def disable():
-    global _probe
-
-    if not _probe:
-        return
-
-    _probe.disable()
+    get_current().disable()
 
     log.debug("probe.disable() called.")
 
@@ -401,12 +388,7 @@ def end(headers={}, omit_sys_path_dirs=_DEFAULT_OMIT_SYS_PATH):
     '''
     headers: additional headers to send along with the final profile data.
     '''
-    global _probe
-
-    if not _probe:
-        return
-
-    r = _probe.end()
+    r = get_current().end()
 
     log.debug("probe.end() called.")
 
@@ -440,7 +422,5 @@ def get_current():
     '''
     Retrieves the current probe for the current session (including the CLI probe)
     '''
-    global _probe
-
-    curr_probe = profiler.get_current_probe() or _probe
+    curr_probe = profiler.get_current_probe()
     return _ProbeProxy(curr_probe)
