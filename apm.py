@@ -192,7 +192,8 @@ def start_transaction(extended=False):
 def stop_transaction():
     global _curr_transaction
 
-    profiler.stop()
+    if _curr_transaction:
+        profiler.stop()
     _curr_transaction = None
 
     log.debug("APM transaction stopped.")
