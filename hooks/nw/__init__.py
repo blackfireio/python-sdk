@@ -14,7 +14,9 @@ def get_counters():
 
 def enable():
     """
-    TODO: Comment why we need this
+    We need an API to explicitly enable() the `nw` hooks because BF itself uses
+    socket APIs to communicate with the Agent. With this API, we make sure those
+    happen after Agent communication and just before profiled application starts.
     """
     _nw.enabled = True
 
