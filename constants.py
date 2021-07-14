@@ -1,7 +1,17 @@
 import sys
+import sysconfig
 from blackfire.utils import get_logger
 
 log = get_logger(__name__)
+
+
+def _get_sys_config_params(*args):
+    result = []
+    for arg in args:
+        v = sysconfig.get_config_var(arg)
+        if v:
+            result += [v.strip()]
+    return result
 
 
 def _on_except(func=None, return_val=None):
@@ -41,6 +51,18 @@ class BlackfireConstants(object):
         return "%d.%d.%d" % (
             sys.version_info.major, sys.version_info.minor,
             sys.version_info.micro
+        )
+
+    @classmethod
+    @_on_except()
+    def python_debug_flag(cls):
+        return bool(sysconfig.get_config_var('Py_DEBUG'))
+
+    @classmethod
+    @_on_except()
+    def python_pgo_flag(cls):
+        return '-fprofile-use' in _get_sys_config_params(
+            'PY_CFLAGS', 'PY_CFLAGS_NODIST'
         )
 
     @classmethod
