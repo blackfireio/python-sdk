@@ -23,7 +23,7 @@ class _WrappedSocket(WRAP_BASE_CLASS):
         result = super(_WrappedSocket, self).recv(*args, **kwargs)
 
         try:  # defensive
-            nw.get_counters().in_bytes += len(result)
+            nw.get_counters().i += len(result)
         except:
             pass
         return result
@@ -32,7 +32,7 @@ class _WrappedSocket(WRAP_BASE_CLASS):
         result = super(_WrappedSocket, self).recv_into(*args, **kwargs)
 
         try:  # defensive
-            nw.get_counters().in_bytes += int(result)
+            nw.get_counters().i += int(result)
         except:
             pass
         return result
@@ -42,7 +42,7 @@ class _WrappedSocket(WRAP_BASE_CLASS):
 
         try:  # defensive
             # first item is a string or bytes representing the data received
-            nw.get_counters().in_bytes += len(result[0])
+            nw.get_counters().i += len(result[0])
         except:
             pass
         return result
@@ -52,7 +52,7 @@ class _WrappedSocket(WRAP_BASE_CLASS):
 
         # update nw_out after socket operation finished successfully
         try:  # defensive
-            nw.get_counters().out_bytes += len(args[0])
+            nw.get_counters().o += len(args[0])
         except:
             pass
         return result
@@ -61,7 +61,7 @@ class _WrappedSocket(WRAP_BASE_CLASS):
         result = super(_WrappedSocket, self).sendto(*args, **kwargs)
 
         try:  # defensive
-            nw.get_counters().out_bytes += int(result)
+            nw.get_counters().o += int(result)
         except:
             pass
         return result
@@ -70,7 +70,7 @@ class _WrappedSocket(WRAP_BASE_CLASS):
         result = super(_WrappedSocket, self).send(*args, **kwargs)
 
         try:  # defensive
-            nw.get_counters().out_bytes += int(result)
+            nw.get_counters().o += int(result)
         except:
             pass
         return result
@@ -88,9 +88,9 @@ def _ssl_sock_read(*args, **kwargs):
     try:
         result = kwargs.pop("_result")
         if isinstance(result, int):
-            nw.get_counters().in_bytes += result
+            nw.get_counters().i += result
         else:
-            nw.get_counters().in_bytes += len(result)
+            nw.get_counters().i += len(result)
     except:
         pass
 
@@ -98,7 +98,7 @@ def _ssl_sock_read(*args, **kwargs):
 def _ssl_sock_write(*args, **kwargs):
     # ssl.SSLSocket.write returns the number of bytes written
     try:
-        nw.get_counters().out_bytes += kwargs.pop("_result")
+        nw.get_counters().o += kwargs.pop("_result")
     except:
         pass
 

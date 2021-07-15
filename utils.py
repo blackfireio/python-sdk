@@ -33,6 +33,8 @@ else:
 _DEFAULT_LOG_LEVEL = 2
 _DEFAULT_LOG_FILE = 'python-probe.log'
 
+from blackfire.hooks import nw
+
 
 class RuntimeMetrics(object):
 
