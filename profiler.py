@@ -92,9 +92,9 @@ def reset():
 
 
 def initialize(
-    format_funcname=_format_funcname,
-    timespan_selector=_fn_matches_timespan_selector,
-    memory_usage_callback=runtime_metrics.memory,
+    f=_format_funcname,
+    s=_fn_matches_timespan_selector,
+    m=runtime_metrics.memory,
 ):
     _bfext._initialize(locals(), log)
 
