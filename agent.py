@@ -298,7 +298,7 @@ class BlackfireRequest(BlackfireMessage):
     def __init__(self, headers=None, data=None):
         if not headers:
             headers = {}
-        self.headers = headers
+        self.headers = {k.lower(): v for k, v in headers.items()}
         self.data = data
 
     def to_bytes(self):
