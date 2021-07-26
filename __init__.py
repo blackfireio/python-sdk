@@ -281,7 +281,7 @@ def bootstrap():
 # This code should be the first to run before any import is made.
 # It monkey patches the modules given if installed.
 def patch_all():
-    PATCH_MODULES = ['django', 'flask']
+    PATCH_MODULES = ['nw', 'django', 'flask']
 
     patched_modules = []
     for mod_name in PATCH_MODULES:
@@ -292,7 +292,7 @@ def patch_all():
         if r:
             patched_modules.append(mod_name)
 
-    log.info("Patched modules=%s", patched_modules)
+    log.error("Patched modules=%s", patched_modules)
 
 
 def profile(func=None, client_id=None, client_token=None, title=None):

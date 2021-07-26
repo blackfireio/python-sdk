@@ -33,6 +33,8 @@ else:
 _DEFAULT_LOG_LEVEL = 2
 _DEFAULT_LOG_FILE = 'python-probe.log'
 
+from blackfire.hooks import nw
+
 
 class RuntimeMetrics(object):
 
@@ -108,7 +110,13 @@ def import_module(mod_name):
         pass
 
 
-def wrap(f, pre_func=None, post_func=None, orig=None):
+def wrap(
+    f,
+    pre_func=None,
+    post_func=None,
+    call_post_func_with_result=False,
+    orig=None
+):
     """
     orig: sometimes the original function might be different than f. Like what 
     we do to patch sys.stdout: we convert it to StringIO and then patch.
@@ -117,11 +125,19 @@ def wrap(f, pre_func=None, post_func=None, orig=None):
     def wrapper(*args, **kwargs):
         if pre_func:
             pre_func(*args, **kwargs)
+        result = None
         try:
-            return f(*args, **kwargs)
+            result = f(*args, **kwargs)
         finally:
+            # this flag is necessary because sometimes the given post_func does
+            # not accept a keyword argument (e.g: sys.stdout.write case). So
+            # we control that with an option
+            if call_post_func_with_result:
+                kwargs["_result"] = result
             if post_func:
                 post_func(*args, **kwargs)
+
+        return result
 
     if orig is not None:
         wrapper._orig = orig
