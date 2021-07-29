@@ -298,7 +298,13 @@ class BlackfireRequest(BlackfireMessage):
     def __init__(self, headers=None, data=None):
         if not headers:
             headers = {}
-        self.headers = headers
+        self.headers = {}
+        for k, v in headers.items():
+            # these headers are not expected to be lower-case
+            if k not in ['Blackfire-Query', 'Blackfire-Probe']:
+                self.headers[k.lower()] = v
+                continue
+            self.headers[k] = v
         self.data = data
 
     def to_bytes(self):
