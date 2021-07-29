@@ -133,32 +133,38 @@ class ApmTransaction(object):
         self.extended = extended
 
 
-# _curr_transaction holds the current executing APM transaction. It is currently
+# _state.transaction holds the current executing APM transaction. It is currently
 # implemented as a thread local variable. If 1:1 mapping of HTTP request:Thread
 # changes, this needs to change as well.
-_curr_transaction = threading.local()
-_curr_transaction = None
+_state = threading.local()
+
+
+def _set_current_transaction(transaction):
+    _state.transaction = transaction
+    return transaction
+
+
+def _get_current_transaction():
+    return getattr(_state, 'transaction', None)
 
 
 def set_transaction_name(name):
-    global _curr_transaction
-
-    if _curr_transaction:
-        _curr_transaction.name = name
+    curr_transaction = _get_current_transaction()
+    if curr_transaction:
+        curr_transaction.name = name
 
 
 def ignore_transaction():
-    global _curr_transaction
-
-    if _curr_transaction:
-        _curr_transaction.ignored = True
+    curr_transaction = _get_current_transaction()
+    if curr_transaction:
+        curr_transaction.ignored = True
 
 
 def start_transaction(extended=False):
-    global _curr_transaction
+    curr_transaction = _get_current_transaction()
 
     # do nothing if there is an ongoing APM transaction or a profiling session
-    if _curr_transaction:
+    if curr_transaction:
         log.debug(
             "APM transaction cannot be started as another transaction is in progress."
         )
@@ -185,16 +191,15 @@ def start_transaction(extended=False):
 
     log.debug("APM transaction started. (extended=%s)" % (extended))
 
-    _curr_transaction = ApmTransaction(extended)
-    return _curr_transaction
+    return _set_current_transaction(ApmTransaction(extended))
 
 
 def stop_transaction():
-    global _curr_transaction
+    curr_transaction = _get_current_transaction()
 
-    if _curr_transaction:
+    if curr_transaction:
         profiler.stop()
-    _curr_transaction = None
+    _set_current_transaction(None)
 
     log.debug("APM transaction stopped.")
 
@@ -204,13 +209,13 @@ def get_traced_memory():
 
 
 def reset():
-    global _apm_config, _apm_probe_config, _curr_transaction
+    global _apm_config, _apm_probe_config
 
     _apm_config = ApmConfig()
     # init config for the APM for communicating with the Agent
     _apm_probe_config = ApmProbeConfig()
     profiler.runtime_metrics.reset()
-    _curr_transaction = None
+    _set_current_transaction(None)
 
 
 def trigger_trace():
