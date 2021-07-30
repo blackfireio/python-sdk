@@ -11,7 +11,7 @@ from threading import Thread
 from blackfire.exceptions import *
 from blackfire.utils import get_logger, IS_PY3, json_prettify, ConfigParser, \
     is_testing, get_load_avg, get_cpu_count, get_os_memory_usage, Queue, \
-        get_probed_runtime, get_time, urlencode
+        get_probed_runtime, get_time, urlencode, get_caller_frame
 from blackfire import agent, DEFAULT_AGENT_SOCKET, DEFAULT_AGENT_TIMEOUT, \
     DEFAULT_CONFIG_FILE, profiler, VERSION
 from contextlib import contextmanager
@@ -20,6 +20,11 @@ log = get_logger(__name__)
 
 _DEFAULT_TIMESPAN_LIMIT_PER_RULE = 100
 _DEFAULT_TIMESPAN_LIMIT_GLOBAL = 200
+
+__all__ = [
+    'set_transaction_name', 'set_tag', 'ignore_transaction',
+    'start_transaction', 'stop_transaction'
+]
 
 
 class _ApmWorker(Thread):
@@ -125,6 +130,13 @@ if _apm_probe_config.apm_enabled:
 
 
 class ApmTransaction(object):
+    '''
+    ApmTransaction objects can also be used as a Contaxt Manager:
+
+    E.g:
+        with apm.start_transaction() as t:
+            foo()
+    '''
 
     def __init__(self, extended):
         self.ignored = False
@@ -132,6 +144,12 @@ class ApmTransaction(object):
         self.t0 = get_time()
         self.extended = extended
         self.tags = {}
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        stop_transaction()
 
 
 # _state.transaction holds the current executing APM transaction. It is currently
@@ -142,7 +160,6 @@ _state = threading.local()
 
 def _set_current_transaction(transaction):
     _state.transaction = transaction
-    return transaction
 
 
 def _get_current_transaction():
@@ -201,7 +218,9 @@ def start_transaction(extended=False):
 
     log.debug("APM transaction started. (extended=%s)" % (extended))
 
-    return _set_current_transaction(ApmTransaction(extended))
+    new_transaction = ApmTransaction(extended)
+    _set_current_transaction(new_transaction)
+    return new_transaction
 
 
 def _stop_transaction():
@@ -209,24 +228,25 @@ def _stop_transaction():
 
     if curr_transaction:
         profiler.stop()
-    _set_current_transaction(None)
+        _set_current_transaction(None)
 
-    log.debug("APM transaction stopped.")
+        log.debug("APM transaction stopped.")
 
-    return curr_transaction
+        return curr_transaction
 
 
 def stop_transaction():
     curr_transaction = _stop_transaction()
-    _queue_trace(
-        transaction,
-        controller_name=transaction.name
-        # response_code=0,
-        # stdout=0,
-    )
+
+    if curr_transaction:
+        _queue_trace(
+            curr_transaction,
+            controller_name=curr_transaction.name,
+            file=get_caller_frame().f_code.co_filename,
+        )
 
 
-def get_traced_memory():
+def _get_traced_memory():
     return profiler.runtime_metrics.memory()
 
 
@@ -303,7 +323,7 @@ def trigger_auto_profile(method, uri, controller_name):
 
 
 @contextmanager
-def get_agent_connection():
+def _get_agent_connection():
     global _apm_probe_config
 
     agent_conn = agent.Connection(
@@ -372,7 +392,7 @@ def get_autoprofile_query(method, uri, key_page):
     data += agent.Protocol.HEADER_MARKER
 
     try:
-        with get_agent_connection() as agent_conn:
+        with _get_agent_connection() as agent_conn:
             agent_conn.send(data)
 
             response_raw = agent_conn.recv()
@@ -389,7 +409,7 @@ def get_autoprofile_query(method, uri, key_page):
 
 def _send_trace(req):
     try:
-        with get_agent_connection() as agent_conn:
+        with _get_agent_connection() as agent_conn:
             agent_conn.send(req.to_bytes())
 
             response_raw = agent_conn.recv()
@@ -422,7 +442,7 @@ def _queue_trace(transaction, **kwargs):
         return
 
     now = get_time()
-    mu, pmu = get_traced_memory()
+    mu, pmu = _get_traced_memory()
 
     kwargs['file-format'] = 'BlackfireApm'
     kwargs['sample-rate'] = _apm_config.sample_rate
@@ -438,7 +458,8 @@ def _queue_trace(transaction, **kwargs):
     kwargs['mu'] = mu
     kwargs['pmu'] = pmu
     kwargs['timestamp'] = now / 1000000  # sec
-    kwargs['tags'] = urlencode(transaction.tags)
+    if len(transaction.tags):
+        kwargs['tags'] = urlencode(transaction.tags)
 
     if transaction.extended:
         kwargs['load'] = get_load_avg()

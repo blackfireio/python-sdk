@@ -4,6 +4,7 @@ import json
 import time
 import traceback
 import logging
+import inspect
 import platform
 import importlib
 import _blackfire_profiler as _bfext
@@ -297,3 +298,13 @@ def json_prettify(obj):
 
 def is_testing():
     return 'BLACKFIRE_TESTING' in os.environ
+
+
+def get_caller_frame():
+    '''
+    Return the caller's frame object.(caller of the function it is called)
+    '''
+    stk = inspect.stack()
+    if len(stk) >= 2:
+        frame_info = stk[2]
+        return frame_info[0]  # 0 holds PyFrameObject
