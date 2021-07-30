@@ -1,5 +1,5 @@
 from blackfire import probe, apm, generate_config
-from blackfire.utils import get_logger, read_blackfireyml_content, get_time
+from blackfire.utils import get_logger, read_blackfireyml_content
 from blackfire.hooks.utils import try_enable_probe, try_end_probe, \
     add_probe_response_header, try_validate_send_blackfireyml
 from blackfire.hooks.django.utils import get_current_view_name
@@ -111,17 +111,12 @@ class BlackfireDjangoMiddleware(object):
         finally:
             apm.stop_transaction()
             if not transaction.ignored:
-                mu, pmu = apm.get_traced_memory()
-                now = get_time()
                 apm.send_trace(
+                    transaction,
                     request,
                     extended,
                     controller_name=transaction.name
                     or get_current_view_name(request),
-                    wt=now - transaction.t0,  # usec
-                    mu=mu,
-                    pmu=pmu,
-                    timestamp=now / 1000000,
                     uri=request.path,
                     framework="django",
                     http_host=request.META.get('HTTP_HOST'),

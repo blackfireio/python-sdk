@@ -131,6 +131,7 @@ class ApmTransaction(object):
         self.name = None
         self.t0 = get_time()
         self.extended = extended
+        self.tags = {}
 
 
 # _state.transaction holds the current executing APM transaction. It is currently
@@ -152,6 +153,15 @@ def set_transaction_name(name):
     curr_transaction = _get_current_transaction()
     if curr_transaction:
         curr_transaction.name = name
+
+
+def set_tag(key, val):
+    '''
+    Updates/Inserts key:val pair to the transaction.tags dict.
+    '''
+    curr_transaction = _get_current_transaction()
+    if curr_transaction:
+        curr_transaction.tags[key] = val
 
 
 def ignore_transaction():
@@ -393,8 +403,10 @@ def _send_trace(req):
         log.error("APM message could not be sent. [reason:%s]" % (e))
 
 
-def send_trace(request, extended, **kwargs):
+def send_trace(transaction, request, extended, **kwargs):
     global _apm_config, _apm_worker
+    now = get_time()
+    mu, pmu = get_traced_memory()
 
     kwargs['file-format'] = 'BlackfireApm'
     kwargs['sample-rate'] = _apm_config.sample_rate
@@ -406,6 +418,10 @@ def send_trace(request, extended, **kwargs):
     kwargs['language'] = "python"
     kwargs['runtime'] = get_probed_runtime()
     kwargs['version'] = VERSION
+    kwargs['wt'] = now - transaction.t0  # usec
+    kwargs['mu'] = mu
+    kwargs['pmu'] = pmu
+    kwargs['timestamp'] = now / 1000000  # sec
 
     if extended:
         kwargs['load'] = get_load_avg()

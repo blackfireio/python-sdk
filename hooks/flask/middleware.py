@@ -162,17 +162,14 @@ class BlackfireFlaskMiddleware(object):
             if req_context.apm:
                 apm.stop_transaction()
                 if not req_context.transaction.ignored:
-                    mu, pmu = apm.get_traced_memory()
+
                     now = get_time()
                     apm.send_trace(
+                        req_context.transaction,
                         request,
                         req_context.apm_extended,
                         controller_name=req_context.transaction.name
                         or request.endpoint,
-                        wt=now - req_context.transaction.t0,  # usec
-                        mu=mu,
-                        pmu=pmu,
-                        timestamp=now / 1000000,
                         uri=request.path,
                         framework="flask",
                         http_host=request.environ.get('HTTP_HOST'),
