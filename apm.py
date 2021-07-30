@@ -11,7 +11,7 @@ from threading import Thread
 from blackfire.exceptions import *
 from blackfire.utils import get_logger, IS_PY3, json_prettify, ConfigParser, \
     is_testing, get_load_avg, get_cpu_count, get_os_memory_usage, Queue, \
-        get_probed_runtime, get_time
+        get_probed_runtime, get_time, urlencode
 from blackfire import agent, DEFAULT_AGENT_SOCKET, DEFAULT_AGENT_TIMEOUT, \
     DEFAULT_CONFIG_FILE, profiler, VERSION
 from contextlib import contextmanager
@@ -204,7 +204,7 @@ def start_transaction(extended=False):
     return _set_current_transaction(ApmTransaction(extended))
 
 
-def stop_transaction():
+def _stop_transaction():
     curr_transaction = _get_current_transaction()
 
     if curr_transaction:
@@ -212,6 +212,18 @@ def stop_transaction():
     _set_current_transaction(None)
 
     log.debug("APM transaction stopped.")
+
+    return curr_transaction
+
+
+def stop_transaction():
+    curr_transaction = _stop_transaction()
+    _queue_trace(
+        transaction,
+        controller_name=transaction.name
+        # response_code=0,
+        # stdout=0,
+    )
 
 
 def get_traced_memory():
@@ -403,8 +415,12 @@ def _send_trace(req):
         log.error("APM message could not be sent. [reason:%s]" % (e))
 
 
-def send_trace(transaction, request, extended, **kwargs):
+def _queue_trace(transaction, **kwargs):
     global _apm_config, _apm_worker
+
+    if transaction.ignored:
+        return
+
     now = get_time()
     mu, pmu = get_traced_memory()
 
@@ -422,8 +438,9 @@ def send_trace(transaction, request, extended, **kwargs):
     kwargs['mu'] = mu
     kwargs['pmu'] = pmu
     kwargs['timestamp'] = now / 1000000  # sec
+    kwargs['tags'] = urlencode(transaction.tags)
 
-    if extended:
+    if transaction.extended:
         kwargs['load'] = get_load_avg()
         kwargs['nproc'] = get_cpu_count()
         kwargs['cost-dimensions'] = 'wt cpu mu pmu'
@@ -439,7 +456,9 @@ def send_trace(transaction, request, extended, **kwargs):
             k = k.replace('_', '-')
             headers[k] = v
 
-    extended_traces = profiler.get_traces(extended=True) if extended else None
+    extended_traces = profiler.get_traces(
+        extended=True
+    ) if transaction.extended else None
     profiler.clear_traces()  # we can clear the traces
 
     apm_trace_req = agent.BlackfireAPMRequest(

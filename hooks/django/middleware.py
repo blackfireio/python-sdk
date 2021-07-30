@@ -109,21 +109,18 @@ class BlackfireDjangoMiddleware(object):
         try:
             response = self.get_response(request)
         finally:
-            apm.stop_transaction()
-            if not transaction.ignored:
-                apm.send_trace(
-                    transaction,
-                    request,
-                    extended,
-                    controller_name=transaction.name
-                    or get_current_view_name(request),
-                    uri=request.path,
-                    framework="django",
-                    http_host=request.META.get('HTTP_HOST'),
-                    method=request.method,
-                    response_code=response.status_code if response else 500,
-                    stdout=len(response.content) if response else 0,
-                )
+            apm._stop_transaction()
+            apm._queue_trace(
+                transaction,
+                controller_name=transaction.name
+                or get_current_view_name(request),
+                uri=request.path,
+                framework="django",
+                http_host=request.META.get('HTTP_HOST'),
+                method=request.method,
+                response_code=response.status_code if response else 500,
+                stdout=len(response.content) if response else 0,
+            )
         return response
 
     def _enable_sql_instrumentation(self):

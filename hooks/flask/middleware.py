@@ -160,23 +160,18 @@ class BlackfireFlaskMiddleware(object):
                 return response
 
             if req_context.apm:
-                apm.stop_transaction()
-                if not req_context.transaction.ignored:
-
-                    now = get_time()
-                    apm.send_trace(
-                        req_context.transaction,
-                        request,
-                        req_context.apm_extended,
-                        controller_name=req_context.transaction.name
-                        or request.endpoint,
-                        uri=request.path,
-                        framework="flask",
-                        http_host=request.environ.get('HTTP_HOST'),
-                        method=request.method,
-                        response_code=response.status_code,
-                        stdout=response.headers['Content-Length'],
-                    )
+                apm._stop_transaction()
+                apm._queue_trace(
+                    req_context.transaction,
+                    controller_name=req_context.transaction.name
+                    or request.endpoint,
+                    uri=request.path,
+                    framework="flask",
+                    http_host=request.environ.get('HTTP_HOST'),
+                    method=request.method,
+                    response_code=response.status_code,
+                    stdout=response.headers['Content-Length'],
+                )
         except Exception as e:
             # signals run in the context of app. Do not fail app code on any error
             log.exception(e)
