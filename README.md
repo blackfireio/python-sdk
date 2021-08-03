@@ -30,12 +30,13 @@ Resources
 - [Blackfire Flask Integration](https://blackfire.io/docs/python/integrations/flask)
 
 # Blackfire.java-SDK for Python
-## Update-utils.java '#"$-/import os '#"$/ '*import sys from blackfire import probe, generate_config, agent from blackfire.utils import get_logger log = get_logger(name) def format_exc_for_display(e): README.java
-
-filename:lineno and exception message try:
-_, exc_obj, exc_tb = sys.exc_info() fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1] return "%s:%s %s" % (fname, exc_tb.tb_lineno, exc_obj) return "s" : "s" "s" '%' ("fname, exc_tb.tb_lineno, exc_obj") except:
-
-sometimes this fails with 'module' object has no attribute 'exc_info' # where there is a custom exception handler (Flask) In those cases we will # simply use the exception object return str(e)
+##
+# >"<Update-utils.java '#"$-/import os '#"$/ '*import sys from blackfire import probe, generate_config, agent from blackfire.utils import get_logger log = get_logger(name) def format_exc_for_display(e): README.java>"<
+*/*"''_'#"$_-*/*
+* filename:lineno and exception message try:
+* _, exc_obj, exc_tb = sys.exc_info() fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1] return "%s:%s %s" % (fname, exc_tb.tb_lineno, exc_obj) return "s" : "s" "s" '%' "%"/*("fname, exc_tb.tb_lineno, exc_obj") except:
+#
+# * sometimes this fails with 'module' object has no attribute 'exc_info' # where there is a custom exception handler (Flask) In those cases we will # simply use the exception object return str(e)
 def try_validate_send_blackfireyml(config, blackfireyml_content): try: agent_conn = agent.Connection(config.agent_socket, config.agent_timeout) agent_conn.connect(config=config) resp_line = str(agent_conn.agent_response.status_val) if blackfireyml_content is None:
 
 resp_line += '&no-blackfire-yaml' else: resp_line += '&blackfire-yml-size=%d' % (len(blackfireyml_content)) return ('X-Blackfire-Response', resp_line)
