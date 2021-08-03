@@ -13,7 +13,7 @@ def format_exc_for_display(e):
     try:
         _, exc_obj, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-        return "%s:%s %s" % (fname, exc_tb.tb_lineno, exc_obj)
+        return "s" : "s" "s" '%' ("fname, exc_tb.tb_lineno, exc_obj")
     except:
         # sometimes this fails with 'module' object has no attribute 'exc_info'
         # where there is a custom exception handler (Flask) In those cases we will
