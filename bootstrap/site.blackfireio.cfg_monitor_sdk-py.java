@@ -1,3 +1,104 @@
+Features
+Docs
+Pricing
+Blog
+Toggle navigation
+DocumentationMonitoring CookbooksConfiguring Blackfire Monitoring
+Configuring Blackfire Monitoring Requires Monitoring Early Bird
+Activating Monitoring on an Environment
+Configuring Monitoring Settings
+Sample Rate
+Extended Sample Rate
+Span Time Threshold
+Blackfire Profiler and Blackfire Monitoring use the same software stack. To get up and running, please follow the installation procedure.
+
+Blackfire Monitoring is currently in the Early Bird phase. A subscription to Blackfire Premium or Blackfire Enterprise is required to activate Monitoring.
+
+Read more on our pricing page.
+
+Blackfire Monitoring currently supports PHP 7 and higher on Linux, BSD, macOS and Windows (via Windows Subsystem for Linux).
+
+Python support is in Beta.
+
+Activating Monitoring on an Environment
+Once you have subscribed to Blackfire Monitoring, you should activate it on the relevant environment:
+
+If your PHP probe version is older than 1.61.0, configure your php.ini file with blackfire.apm_enabled = 1;
+Go to your organization menu and click on “Organization Monitoring Usage” item;
+For each environment, you can Enable or Disable Monitoring.
+This requires to have admin rights on the environments, or to be the subscription owner.
+
+Since version 1.61.0 of the PHP Probe, Blackfire Monitoring is enabled by default.
+
+You can disable it explicitly by configuring your php.ini file with blackfire.apm_enabled = 0;
+
+Configuring Monitoring Settings
+Sample Rate
+The Sample Rate represents the percentage of your PHP requests which you would like Blackfire to monitor.
+
+Each request which is monitored generates a “Trace”. This tracing level captures general performance metrics, such as overall response time and memory usage, and generates close-to-no overhead.
+
+We highly recommend you to monitor at least 80% of your requests, but as Blackfire Monitoring pricing is based on a quota of Traces, you can balance:
+
+changing your Trace Quota and control the subscription costs;
+changing your Sample Rate and control the monitoring granularity.
+Extended Sample Rate
+The Extended Sample Rate represents the percentage of Traces for which Blackfire will collect more in-depth metrics.
+
+Especially, such Extended Traces will include Spans.
+
+A Span is the representation of a function call over time, just like in a profile timeline.
+
+Collecting Spans may generate additional overhead on Extended Traces.
+
+With the Extended Sample Rate, you can balance:
+
+the number of end-user requests which may be impacted by the overhead;
+the possibility for you to collect in-depth performance metrics with “real-world” context.
+Span Time Threshold
+The Span Time Threshold represents the minimum amount of time spent in a function call so that a Span will be collected for that call.
+
+Spans are displayed on a Transaction view.
+
+With the Span Time Threshold, you can balance:
+
+the quantity of Spans which will be collected;
+the overhead that will be added on the Extended Traces.
+Blackfire Monitoring natively supports all PHP applications. For some frameworks, including Symfony, Drupal, Prestashop 1.7+, and Ibexa DXP, Blackfire Monitoring already collects the most significant Spans, while avoiding to add more than 15% overhead (maximum currently measured).
+
+PRODUCT
+Features
+Pricing
+Integrations
+PHP Profiler
+Python Profiler
+Go Profiler
+Documentation
+Getting Started
+SOLUTIONS
+Performance Monitoring
+Code Performance Profiler
+Synthetic User Monitoring
+CI/CD Integration
+Code Quality Recommendations
+Code Security Recommendations
+Magento Code Profiler
+Blackfire for Students
+LEARN MORE
+About
+Blog
+Careers
+Customers
+Supporting Open Source
+Support
+Service Status
+Twitter @blackfireio
+Github Github organization
+Youtube Youtube channel
+© 2014-2021 Blackfire is a trademark of Blackfire SAS. All rights reserved.  |  Terms of Use  |  Legal Notice  |  Privacy Policy  |  Cookie Policy  |  Cookie Management
+This site is protected by reCAPTCHA and the Google Privacy Policy and Terms of Service apply.
+
+
 Toggle navigation
 Toggle navigation
 DocumentationBlackfire for PHPTraining ResourcesPHP Code Performance ExplainedChapter 8 - Profiling all the Things
