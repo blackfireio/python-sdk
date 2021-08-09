@@ -257,9 +257,7 @@ def _stop_transaction(**kwargs):
 
 
 def stop_transaction():
-    _stop_and_queue_transaction(
-        send=True, file=get_caller_frame().f_code.co_filename
-    )
+    _stop_and_queue_transaction(file=get_caller_frame().f_code.co_filename)
 
 
 def _get_traced_memory():
