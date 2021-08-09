@@ -118,6 +118,11 @@ _apm_config = ApmConfig()
 _apm_probe_config = ApmProbeConfig()
 _apm_worker = _ApmWorker()
 
+# _state.transaction holds the current executing APM transaction. It is currently
+# implemented as a thread local variable. If 1:1 mapping of HTTP request:Thread
+# changes, this needs to change as well.
+_state = threading.local()
+
 # do not even evaluate the params if DEBUG is not set in APM path
 
 if _apm_probe_config.apm_enabled:
@@ -171,12 +176,6 @@ class ApmTransaction(object):
     def stop(self):
         profiler.stop()
         log.debug("APM transaction stopped.")
-
-
-# _state.transaction holds the current executing APM transaction. It is currently
-# implemented as a thread local variable. If 1:1 mapping of HTTP request:Thread
-# changes, this needs to change as well.
-_state = threading.local()
 
 
 def _set_current_transaction(transaction):
