@@ -151,8 +151,6 @@ class ApmTransaction(object):
         self.extended = extended
         self.tags = {}
 
-        log.debug("APM transaction started. (extended=%s)" % (self.extended))
-
     def __enter__(self):
         return self
 
@@ -236,6 +234,9 @@ def start_transaction(extended=False):
 
     new_transaction = ApmTransaction(extended)
     _set_current_transaction(new_transaction)
+
+    log.debug("APM transaction started. (extended=%s)" % (extended))
+
     return new_transaction
 
 
