@@ -170,7 +170,6 @@ class ApmTransaction(object):
 
     def stop(self):
         profiler.stop()
-        log.debug("APM transaction stopped.")
 
 
 def _set_current_transaction(transaction):
@@ -251,6 +250,9 @@ def _stop_transaction(**kwargs):
     if curr_transaction:
         curr_transaction.stop()
         _set_current_transaction(None)
+
+        log.debug("APM transaction stopped.")
+
         return curr_transaction
 
 
