@@ -136,6 +136,7 @@ class ApmTransaction(object):
     E.g:
         with apm.start_transaction() as t:
             foo()
+            t.set_name('xxx')
     '''
 
     def __init__(self, extended):
@@ -145,11 +146,31 @@ class ApmTransaction(object):
         self.extended = extended
         self.tags = {}
 
+        log.debug("APM transaction started. (extended=%s)" % (self.extended))
+
     def __enter__(self):
         return self
 
     def __exit__(self, *exc):
-        stop_transaction()
+        _stop_transaction(
+            send=True,
+            extra_args={
+                'file': get_caller_frame().f_code.co_filename,
+            }
+        )
+
+    def set_tag(self, k, v):
+        self.tags[k] = v
+
+    def ignore(self):
+        self.ignored = True
+
+    def set_name(self, name):
+        self.name = name
+
+    def stop(self):
+        profiler.stop()
+        log.debug("APM transaction stopped.")
 
 
 # _state.transaction holds the current executing APM transaction. It is currently
@@ -178,13 +199,13 @@ def set_tag(key, val):
     '''
     curr_transaction = _get_current_transaction()
     if curr_transaction:
-        curr_transaction.tags[key] = val
+        curr_transaction.set_tag(key, val)
 
 
 def ignore_transaction():
     curr_transaction = _get_current_transaction()
     if curr_transaction:
-        curr_transaction.ignored = True
+        curr_transaction.ignore()
 
 
 def start_transaction(extended=False):
@@ -216,34 +237,33 @@ def start_transaction(extended=False):
             apm_timespan_limit_global=_apm_config.timespan_limit_global,
         )
 
-    log.debug("APM transaction started. (extended=%s)" % (extended))
-
     new_transaction = ApmTransaction(extended)
     _set_current_transaction(new_transaction)
     return new_transaction
 
 
-def _stop_transaction():
+def _stop_transaction(send=False, extra_args={}):
     curr_transaction = _get_current_transaction()
 
     if curr_transaction:
-        profiler.stop()
+        curr_transaction.stop()
         _set_current_transaction(None)
 
-        log.debug("APM transaction stopped.")
+        if send:
+            _queue_trace(
+                curr_transaction,
+                **extra_args,
+            )
 
         return curr_transaction
 
 
 def stop_transaction():
-    curr_transaction = _stop_transaction()
-
-    if curr_transaction:
-        _queue_trace(
-            curr_transaction,
-            controller_name=curr_transaction.name,
-            file=get_caller_frame().f_code.co_filename,
-        )
+    _stop_transaction(
+        send=True, extra_args={
+            'file': get_caller_frame().f_code.co_filename,
+        }
+    )
 
 
 def _get_traced_memory():
@@ -469,6 +489,10 @@ def _queue_trace(transaction, **kwargs):
         kwargs['timespan_dropped'] = profiler.get_apm_timespan_dropped()
         kwargs['timespan_limit_per_rule'] = _apm_config.timespan_limit_per_rule
         kwargs['timespan_limit_global'] = _apm_config.timespan_limit_global
+
+    # if no controller-name provided use transaction.name
+    if 'controller_name' not in kwargs:
+        kwargs['controller-name'] = transaction.name
 
     headers = {}
     for k, v in kwargs.items():
