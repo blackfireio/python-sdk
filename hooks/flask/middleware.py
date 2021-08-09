@@ -160,8 +160,7 @@ class BlackfireFlaskMiddleware(object):
                 return response
 
             if req_context.apm:
-                apm._stop_transaction(
-                    send=True,
+                apm._stop_and_queue_transaction(
                     controller_name=req_context.transaction.name
                     or request.endpoint,
                     uri=request.path,

@@ -155,8 +155,7 @@ class ApmTransaction(object):
         return self
 
     def __exit__(self, *exc):
-        _stop_transaction(
-            send=True,
+        _stop_and_queue_transaction(
             file=get_caller_frame().f_code.co_filename,
         )
 
@@ -240,21 +239,25 @@ def start_transaction(extended=False):
     return new_transaction
 
 
-def _stop_transaction(send=False, **kwargs):
+def _stop_and_queue_transaction(**kwargs):
+    curr_transaction = _stop_transaction()
+    if curr_transaction:
+        _queue_trace(curr_transaction, **kwargs)
+
+
+def _stop_transaction(**kwargs):
     curr_transaction = _get_current_transaction()
 
     if curr_transaction:
         curr_transaction.stop()
         _set_current_transaction(None)
-
-        if send:
-            _queue_trace(curr_transaction, **kwargs)
-
         return curr_transaction
 
 
 def stop_transaction():
-    _stop_transaction(send=True, file=get_caller_frame().f_code.co_filename)
+    _stop_and_queue_transaction(
+        send=True, file=get_caller_frame().f_code.co_filename
+    )
 
 
 def _get_traced_memory():

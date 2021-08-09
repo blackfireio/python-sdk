@@ -109,8 +109,7 @@ class BlackfireDjangoMiddleware(object):
         try:
             response = self.get_response(request)
         finally:
-            apm._stop_transaction(
-                send=True,
+            apm._stop_and_queue_transaction(
                 controller_name=transaction.name
                 or get_current_view_name(request),
                 uri=request.path,
