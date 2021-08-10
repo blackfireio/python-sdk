@@ -136,7 +136,7 @@ if _apm_probe_config.apm_enabled:
 
 class ApmTransaction(object):
     '''
-    ApmTransaction objects can also be used as a Contaxt Manager:
+    ApmTransaction objects can also be used as a Context Manager:
 
     E.g:
         with apm.start_transaction() as t:
