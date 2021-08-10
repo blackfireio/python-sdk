@@ -113,7 +113,7 @@ class BlackfireFlaskMiddleware(object):
         if apm.trigger_trace():
             req_context.apm = True
             req_context.apm_extended = apm.trigger_extended_trace()
-            req_context.transaction = apm.start_transaction(
+            req_context.transaction = apm._start_transaction(
                 extended=req_context.apm_extended
             )
 

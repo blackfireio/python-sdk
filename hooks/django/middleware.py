@@ -104,7 +104,7 @@ class BlackfireDjangoMiddleware(object):
         return response
 
     def _apm_trace(self, request, extended=False):
-        transaction = apm.start_transaction(extended)
+        transaction = apm._start_transaction(extended)
         response = None
         try:
             response = self.get_response(request)

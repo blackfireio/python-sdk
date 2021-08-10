@@ -208,7 +208,7 @@ def ignore_transaction():
         curr_transaction.ignore()
 
 
-def start_transaction(extended=False):
+def _start_transaction(extended=False):
     curr_transaction = _get_current_transaction()
 
     # do nothing if there is an ongoing APM transaction or a profiling session
@@ -242,13 +242,18 @@ def start_transaction(extended=False):
 
     log.debug("APM transaction started. (extended=%s)" % (extended))
 
+    return new_transaction
+
+
+def start_transaction():
+    result = _start_transaction()
+
     def _wait_pending_transactions():
         _apm_worker.close()
         _apm_worker.join()
 
     atexit.register(_wait_pending_transactions)
-
-    return new_transaction
+    return result
 
 
 def _stop_and_queue_transaction(**kwargs):
