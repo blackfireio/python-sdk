@@ -5,6 +5,7 @@ import platform
 import re
 import sys
 import threading
+import atexit
 
 import _blackfire_profiler as _bfext
 from threading import Thread
@@ -33,10 +34,15 @@ class _ApmWorker(Thread):
         Thread.__init__(self)
         # infinite Queue, put() should not block
         self._tasks = Queue(0)
+        self._closed = False
+
         self.daemon = True
         self.start()
 
     def add_task(self, fn, args=(), kwargs={}):
+        if self._closed:
+            return
+
         if is_testing():
             fn(*args, **kwargs)
         else:
@@ -56,6 +62,7 @@ class _ApmWorker(Thread):
 
     def close(self):
         self._tasks.put((None, None, None))
+        self._closed = True
 
 
 class ApmConfig(object):
@@ -234,6 +241,12 @@ def start_transaction(extended=False):
     _set_current_transaction(new_transaction)
 
     log.debug("APM transaction started. (extended=%s)" % (extended))
+
+    def _wait_pending_transactions():
+        _apm_worker.close()
+        _apm_worker.join()
+
+    atexit.register(_wait_pending_transactions)
 
     return new_transaction
 
