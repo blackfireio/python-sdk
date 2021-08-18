@@ -86,6 +86,9 @@ class BlackfireConfiguration(object):
 
         return value
 
+    def __repr__(self):
+        return json_prettify(self.__dict__)
+
 
 def _get_signing_response(
     signing_endpoint,

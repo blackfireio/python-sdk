@@ -12,3 +12,7 @@ class BlackfireAPMException(Exception):
 
 class BlackfireAPMStatusFalseException(BlackfireAPMException):
     pass
+
+
+class BlackfireInvalidSignatureError(Exception):
+    pass

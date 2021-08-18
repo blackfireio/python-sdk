@@ -378,3 +378,13 @@ def debug_print_context():
         "pid=%s, thread=%s, asyncio.Task=%s" %
         (os.getpid(), threading.current_thread(), id(asyncio.current_task()))
     )
+
+
+def replace_bad_chars(s):
+    '''
+    This function replaces some chars in Base64 encoded version of PublicKey/Signature
+    before sending it to signify.verify
+    '''
+    s = s.replace('-', '+')
+    s = s.replace('-', '+')
+    return s

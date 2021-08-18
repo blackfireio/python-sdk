@@ -4,7 +4,8 @@ import sys
 import json
 from blackfire.exceptions import *
 from collections import defaultdict
-from blackfire.utils import urlparse, get_logger, IS_PY3, parse_qsl, read_blackfireyml_content
+from blackfire.utils import urlparse, get_logger, IS_PY3, parse_qsl, read_blackfireyml_content, \
+    replace_bad_chars, get_time
 
 log = get_logger(__name__)
 
@@ -86,6 +87,7 @@ class Connection(object):
                 'Agent connection failed.[%s][%s]' % (e, self.agent_socket)
             )
 
+        # if no config provided, it is APM case
         if config:
             self._write_prolog(config)
 
@@ -136,6 +138,25 @@ class Connection(object):
             raise BlackfireApiException('Agent recv data failed.[%s]' % (e))
 
         return result
+
+    def _verify_signature(self, public_key, sig, msg):
+        return True
+
+    def _get_blackfire_keys(self, resp):
+        max_age, keys = resp.get_blackfire_keys()
+        print(max_age, keys, ">>")
+
+        # max_age = int(keys[0].split(';')[0])
+        # expiration_time = get_time() + max_age
+        # print(expiration_time, max_age, keys)
+        # import datetime
+        # expiration_time_string = datetime.datetime.fromtimestamp(
+        #     expiration_time
+        # ).strftime('%c')
+        # print(expiration_time_string, " >>> expiration_time_string")
+
+        # for key in keys:
+        #     pass
 
     def _write_prolog(self, config):
         blackfire_yml = bool(int(config.args.get('flag_yml', '1')))
@@ -191,6 +212,15 @@ class Connection(object):
 
         response_raw = self.recv()
         self.agent_response = BlackfireResponse().from_bytes(response_raw)
+        blackfire_keys = self.agent_response.args.get('Blackfire-Keys', None)
+
+        blackfire_keys = self._get_blackfire_keys(self.agent_response)
+
+        if not self._verify_signature(
+            public_key='', sig=config.signature, msg=config.challenge_raw
+        ):
+            raise BlackfireInvalidSignatureError()
+
         if self.agent_response.status_code != BlackfireResponse.StatusCode.OK:
             raise BlackfireApiException(
                 'Invalid response received from Agent. [%s]' %
@@ -246,6 +276,17 @@ class BlackfireResponseBase(BlackfireMessage):
     TIMESPAN_KEY = 'Blackfire-Timespan'
     FN_ARGS_KEY = 'Blackfire-Fn-Args'
     CONSTANTS_KEY = 'Blackfire-Const'
+    BLACKFIRE_KEYS_KEY = 'Blackfire-Keys'
+
+    def get_blackfire_keys(self):
+        keys = self.args.get(self.BLACKFIRE_KEYS_KEY, [])
+        # Blackfire-Keys example format:
+        # 2884902645;Key1, Key2, Key3
+        if len(keys):
+            max_age, keys = keys[0].split(';')
+            keys = keys.split(',')
+            keys = list(map(replace_bad_chars, keys))
+            return int(max_age), keys
 
     def get_timespan_selectors(self):
         result = {'^': set(), '=': set()}
