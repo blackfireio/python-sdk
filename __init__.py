@@ -29,6 +29,7 @@ with io.open(os.path.join(ext_dir, 'VERSION')) as f:
     VERSION = f.read().strip()
 
 
+# FIXME: darwin arm64 => unix:///opt/homebrew/var/run/blackfire-agent.sock
 def _get_default_agent_socket():
     plat = platform.system()
     if plat == 'Windows':
