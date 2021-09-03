@@ -90,13 +90,28 @@ def _format_funcname(module, name):
 def reset():
     initialize()
 
+def _set_threading_profile(on, _):
+    def _profile_thread_callback(frame, event, arg):
+        """
+        _profile_thread_callback will only be called once per-thread.
+        """
+        _bfext._profile_event(frame, event, arg)
+
+    if on:
+        threading.setprofile(_profile_thread_callback)
+    else:
+        threading.setprofile(None)
+
 
 def initialize(
     f=_format_funcname,
     s=_fn_matches_timespan_selector,
+    t=_set_threading_profile,
     m=runtime_metrics.memory,
 ):
     _bfext._initialize(locals(), log)
+
+
 
 
 # a custom dict class to reach keys as attributes
