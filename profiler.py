@@ -90,7 +90,9 @@ def _format_funcname(module, name):
 def reset():
     initialize()
 
+
 def _set_threading_profile(on, _):
+
     def _profile_thread_callback(frame, event, arg):
         """
         _profile_thread_callback will only be called once per-thread.
@@ -110,8 +112,6 @@ def initialize(
     m=runtime_metrics.memory,
 ):
     _bfext._initialize(locals(), log)
-
-
 
 
 # a custom dict class to reach keys as attributes
@@ -294,7 +294,12 @@ class _BlackfireTracesBase(dict):
             fname, fmodule, fname_formatted, flineno, fbuiltin, findex, fchildren, \
             fctxid, ffn_args, frec_level = trace
 
-            assert findex not in self, trace  # assert no duplicate index exists
+            assert findex not in self, (
+                {
+                    "new": trace,
+                    "existing": self[findex]
+                }
+            )  # assert no duplicate index exists
 
             dir_path = os.path.dirname(os.path.normpath(fmodule))
             last_dir = os.path.basename(dir_path)
