@@ -162,6 +162,7 @@ class Probe(object):
             timespan_selectors=timespan_selectors,
             timespan_threshold=timespan_threshold,
             probe=self,
+            ctx_var=self._config.ctx_var
         )
 
         # TODO: 'Blackfire-Error: 103 Samples quota is out'
@@ -309,6 +310,7 @@ def initialize(
     config_file=DEFAULT_CONFIG_FILE,
     method="manual",
     title=None,
+    ctx_var=None,
 ):
     global _config, log, _probe
 
@@ -333,6 +335,7 @@ def initialize(
         log_level,
         config_file,
         title,
+        ctx_var,
     )
 
     log.debug(

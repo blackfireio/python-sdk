@@ -337,6 +337,7 @@ def generate_config(
     log_level=None,
     config_file=DEFAULT_CONFIG_FILE,
     title=None,
+    ctx_var=None,
 ):
     agent_socket = agent_socket or os.environ.get(
         'BLACKFIRE_AGENT_SOCKET', DEFAULT_AGENT_SOCKET
@@ -414,4 +415,5 @@ def generate_config(
         endpoint=endpoint,
         log_file=log_file,
         log_level=log_level,
+        ctx_var=ctx_var,
     )

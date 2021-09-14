@@ -433,7 +433,7 @@ def start(
     apm_timespan_limit_per_rule=0,
     apm_timespan_limit_global=0,
     probe=None,
-    ctxvar=None
+    ctx_var=None
 ):
     global _max_prefix_cache
 
@@ -466,7 +466,7 @@ def start(
         apm_timespan_limit_global,
         probe,
         nw.get_counters(),
-        ctxvar,
+        ctx_var,
     )
 
 
