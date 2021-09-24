@@ -244,7 +244,7 @@ def bootstrap_python():
         'Executing command = %s (executable=%s, args=%s)', cmd, executable, args
     )
 
-    executable_path = spawn.find_executable(executable)
+    executable_path = get_executable_path(executable)
     if executable_path is None:
         if executable == BLACKFIRE_CLI_EXEC:
             print(
