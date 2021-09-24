@@ -308,3 +308,16 @@ def get_caller_frame():
     if len(stk) >= 2:
         frame_info = stk[2]
         return frame_info[0]  # 0 holds PyFrameObject
+
+
+def get_executable_path(name):
+    '''Return the executable path of a given binary
+
+    Return None if not found
+    '''
+    if sys.version_info >= (3, 3):
+        from shutil import which
+        return which(name)
+    else:
+        from distutils import spawn
+        return spawn.find_executable(name)

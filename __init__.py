@@ -12,8 +12,6 @@ import platform
 from blackfire.utils import *
 from blackfire import profiler
 from blackfire.exceptions import BlackfireApiException
-from distutils.sysconfig import get_python_lib
-from distutils import spawn
 
 __all__ = [
     'BlackfireConfiguration',
@@ -165,7 +163,7 @@ Commands:
 
 For more information on blackfire-python, please visit https://blackfire.io/docs.
     '''
-    if spawn.find_executable(BLACKFIRE_CLI_EXEC) is None:
+    if get_executable_path(BLACKFIRE_CLI_EXEC) is None:
         help_string += '\nWarning: The "blackfire" CLI is not installed. It is needed for the "run"' \
             'command to work properly.\nPlease visit https://blackfire.io/docs/up-and-running/installation ' \
             'to install it.\n'
@@ -191,7 +189,7 @@ To learn more, please run "blackfire help run".
 For more information on blackfire-python, please visit https://blackfire.io/docs.
 '''
 
-    if spawn.find_executable(BLACKFIRE_CLI_EXEC) is None:
+    if get_executable_path(BLACKFIRE_CLI_EXEC) is None:
         help_string += '\nWarning: The "blackfire" CLI is not installed. It is needed for the "run" ' \
             'command to work properly.\nPlease visit https://blackfire.io/docs/up-and-running/installation ' \
             'to install it.\n'
