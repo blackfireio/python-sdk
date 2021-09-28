@@ -86,6 +86,19 @@ def _format_funcname(module, name):
     return "%s.%s" % (module, name)
 
 
+def _set_threading_profile(on, _):
+
+    def _profile_thread_callback(frame, event, arg):
+        """_profile_thread_callback will only be called once per-thread.
+        """
+        _bfext._profile_event(frame, event, arg)
+
+    if on:
+        threading.setprofile(_profile_thread_callback)
+    else:
+        threading.setprofile(None)
+
+
 # used from testing to set Probe state to a consistent state
 def reset():
     initialize()
@@ -95,6 +108,7 @@ def initialize(
     f=_format_funcname,
     s=_fn_matches_timespan_selector,
     m=runtime_metrics.memory,
+    t=_set_threading_profile,
 ):
     _bfext._initialize(locals(), log)
 
