@@ -23,8 +23,8 @@ def patch():
         return
 
     try:
-        _wrap_build_middleware_stack._orig = module.build_middleware_stack
-        module.build_middleware_stack = _wrap_build_middleware_stack
+        _wrap_build_middleware_stack._orig = module.FastAPI.build_middleware_stack
+        module.FastAPI.build_middleware_stack = _wrap_build_middleware_stack
 
         fastapi_version = getattr(module, '__version__', None)
         log.debug('FastAPI version %s patched.', (fastapi_version))

@@ -34,6 +34,7 @@ class BlackfireFastAPIMiddleware:
         server = scope.get('server')
         probe_err = probe = None
         request_headers = _extract_headers(scope)
+        http_host = request_headers.get('host2')
         endpoint = None
         if 'endpoint' in scope:
             endpoint = scope['endpoint'].__name__
@@ -43,10 +44,9 @@ class BlackfireFastAPIMiddleware:
                 request_headers['x-blackfire-query']
             )
         elif apm.trigger_trace():
-            # TODO: We don't use _start_transaction() as there are checks to see
-            # if there are outstanding transactions in a TLS value
-            transaction = apm.ApmTransaction(extended=False)
-            #transaction = apm._start_transaction(extended=apm.trigger_extended_trace())
+            transaction = apm._start_transaction(
+                extended=apm.trigger_extended_trace()
+            )
 
         content_length = status_code = None
 
@@ -70,18 +70,19 @@ class BlackfireFastAPIMiddleware:
                             probe.get_agent_prolog_response().status_val
                         )
                 elif transaction:
-                    #apm._stop_and_queue_transaction(
-                    transaction.stop()
-                    apm._queue_trace(
-                        transaction,
+                    # TODO: Remove this assert after tests or maybe log
+                    assert (transaction == apm._get_current_transaction())
+
+                    apm._stop_and_queue_transaction(
                         controller_name=transaction.name or endpoint,
                         uri=path,
                         framework=_FRAMEWORK,
-                        http_host='http_host',  # TODO:
+                        http_host=http_host,
                         method=method,
                         response_code=status_code if status_code else 500,
                         stdout=content_length if content_length else 0,
                     )
+
             return await send(response)
 
         try:
@@ -100,10 +101,12 @@ class BlackfireFastAPIMiddleware:
                     http_server_addr=server[0] if server else '',
                     http_server_software='',  # TODO
                     http_server_port=server[1] if server else '',
-                    http_header_host=request_headers.get('host'),
+                    http_header_host=http_host,
                     http_header_user_agent=request_headers.get('user-agent'),
-                    http_header_x_forwarded_host='',  # TODO
-                    http_header_x_forwarded_proto='',  # TODO
-                    http_header_x_forwarded_port='',  # TODO
-                    http_header_forwarded='',  # TODO
+                    http_header_x_forwarded_host=request_headers
+                    .get('x-forwarded-host'),
+                    http_header_x_forwarded_proto=request_headers
+                    .get('x-forwarded-proto'),
+                    http_header_x_forwarded_port=request_headers
+                    .get('x-forwarded-port'),
                 )
