@@ -7,6 +7,7 @@ import logging
 import inspect
 import platform
 import importlib
+import threading
 import _blackfire_profiler as _bfext
 
 try:
@@ -31,10 +32,49 @@ else:
     from urllib2 import Request, urlopen, ProxyHandler, build_opener, install_opener
     from Queue import Queue
 
+if sys.version_info >= (3, 7):
+    import contextvars
+
+    CONTEXTVARS_AVAIL = True
+else:
+    CONTEXTVARS_AVAIL = False
+
 _DEFAULT_LOG_LEVEL = 2
 _DEFAULT_LOG_FILE = 'python-probe.log'
 
-from blackfire.hooks import nw
+
+class ContextState(object):
+    '''TODO : Comment
+    '''
+
+    def __init__(self, name, default=None):
+        if CONTEXTVARS_AVAIL:
+            cv = contextvars.ContextVar(name, default=None)
+            cv.set({})
+            self._state = cv
+        else:
+            self._state = threading.local()
+
+        self._default = default
+
+    def get(self, key):
+        if CONTEXTVARS_AVAIL:
+            state_cv = self._state.get()
+            # there is a possibility this being None as because get() might be called
+            # from a different Context/Thread than the once that called __init__.
+            if state_cv is None:
+                return self._default
+            return state_cv.get(key, self._default)
+        else:
+            return getattr(self._state, key, self._default)
+
+    def set(self, key, value):
+        if CONTEXTVARS_AVAIL:
+            state_cv = self._state.get()
+            if state_cv is not None:
+                state_cv[key] = value
+        else:
+            setattr(self._state, key, value)
 
 
 class RuntimeMetrics(object):

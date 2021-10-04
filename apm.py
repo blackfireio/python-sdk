@@ -3,18 +3,14 @@ import os
 import logging
 import platform
 import re
-import sys
-import threading
 import atexit
-
-import contextvars
 
 import _blackfire_profiler as _bfext
 from threading import Thread
 from blackfire.exceptions import *
 from blackfire.utils import get_logger, IS_PY3, json_prettify, ConfigParser, \
     is_testing, get_load_avg, get_cpu_count, get_os_memory_usage, Queue, \
-        get_probed_runtime, get_time, urlencode, get_caller_frame
+        get_probed_runtime, get_time, urlencode, get_caller_frame, ContextState
 from blackfire import agent, DEFAULT_AGENT_SOCKET, DEFAULT_AGENT_TIMEOUT, \
     DEFAULT_CONFIG_FILE, profiler, VERSION
 from contextlib import contextmanager
@@ -28,13 +24,6 @@ __all__ = [
     'set_transaction_name', 'set_tag', 'ignore_transaction',
     'start_transaction', 'stop_transaction'
 ]
-
-if sys.version_info >= (3, 7):
-    import contextvars
-
-    CONTEXTVARS_AVAIL = True
-else:
-    CONTEXTVARS_AVAIL = False
 
 
 class _ApmWorker(Thread):
@@ -130,35 +119,12 @@ class ApmProbeConfig(object):
         self.apm_enabled = bool(int(os.environ.get('BLACKFIRE_APM_ENABLED', 0)))
 
 
-class ContextState(object):
-    '''TODO : Comment
-    '''
-
-    def __init__(self):
-        if CONTEXTVARS_AVAIL:
-            self._state = None
-        else:
-            self._state = threading.local()
-
-    def get(self, key, default=None):
-        if CONTEXTVARS_AVAIL:
-            return contextvars.ContextVar(key).get(default)
-        else:
-            return getattr(self._state, key, default)
-
-    def set(self, key, value):
-        if CONTEXTVARS_AVAIL:
-            contextvars.ContextVar(key).set(value)
-        else:
-            setattr(self._state, key, value)
-
-
 _apm_config = ApmConfig()
 _apm_probe_config = ApmProbeConfig()
 _apm_worker = _ApmWorker()
 
 # _state is a per-context resource. An example use: it holds current executing APM transaction
-_state = ContextState()
+_state = ContextState('bf_apm_state')
 
 # do not even evaluate the params if DEBUG is not set in APM path
 
@@ -292,7 +258,7 @@ def _stop_and_queue_transaction(**kwargs):
         _queue_trace(curr_transaction, **kwargs)
 
 
-def _stop_transaction(**kwargs):
+def _stop_transaction():
     curr_transaction = _get_current_transaction()
 
     if curr_transaction:

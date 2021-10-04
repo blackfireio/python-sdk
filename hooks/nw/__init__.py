@@ -1,16 +1,23 @@
 import threading
+from blackfire.utils import ContextState
 
-_nw = threading.local()
+_nw = ContextState('bf_nw_counters')
+
+
+class NwCounters:
+
+    def __init__(self):
+        self.i = 0
+        self.o = 0
 
 
 def get_counters():
-    if getattr(_nw, 'enabled', None):
-        if not getattr(_nw, 'i', None):
-            _nw.i = 0
-        if not getattr(_nw, 'o', None):
-            _nw.o = 0
-
-        return _nw
+    if _nw.get('enabled'):
+        counters = _nw.get('counters')
+        if counters is None:
+            counters = NwCounters()
+            _nw.set('counters', counters)
+        return counters
 
 
 def enable():
@@ -19,8 +26,8 @@ def enable():
     socket APIs to communicate with the Agent. With this API, we make sure those
     happen after Agent communication and just before profiled application starts.
     """
-    _nw.enabled = True
+    _nw.set('enabled', True)
 
 
 def disable():
-    _nw.enabled = False
+    _nw.set('enabled', False)
