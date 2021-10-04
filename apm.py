@@ -7,6 +7,8 @@ import sys
 import threading
 import atexit
 
+import contextvars
+
 import _blackfire_profiler as _bfext
 from threading import Thread
 from blackfire.exceptions import *
@@ -26,6 +28,13 @@ __all__ = [
     'set_transaction_name', 'set_tag', 'ignore_transaction',
     'start_transaction', 'stop_transaction'
 ]
+
+if sys.version_info >= (3, 7):
+    import contextvars
+
+    CONTEXTVARS_AVAIL = True
+else:
+    CONTEXTVARS_AVAIL = False
 
 
 class _ApmWorker(Thread):
@@ -121,14 +130,35 @@ class ApmProbeConfig(object):
         self.apm_enabled = bool(int(os.environ.get('BLACKFIRE_APM_ENABLED', 0)))
 
 
+class ContextState(object):
+    '''TODO : Comment
+    '''
+
+    def __init__(self):
+        if CONTEXTVARS_AVAIL:
+            self._state = None
+        else:
+            self._state = threading.local()
+
+    def get(self, key, default=None):
+        if CONTEXTVARS_AVAIL:
+            return contextvars.ContextVar(key).get(default)
+        else:
+            return getattr(self._state, key, default)
+
+    def set(self, key, value):
+        if CONTEXTVARS_AVAIL:
+            contextvars.ContextVar(key).set(value)
+        else:
+            setattr(self._state, key, value)
+
+
 _apm_config = ApmConfig()
 _apm_probe_config = ApmProbeConfig()
 _apm_worker = _ApmWorker()
 
-# _state.transaction holds the current executing APM transaction. It is currently
-# implemented as a thread local variable. If 1:1 mapping of HTTP request:Thread
-# changes, this needs to change as well.
-_state = threading.local()
+# _state is a per-context resource. An example use: it holds current executing APM transaction
+_state = ContextState()
 
 # do not even evaluate the params if DEBUG is not set in APM path
 
@@ -180,11 +210,11 @@ class ApmTransaction(object):
 
 
 def _set_current_transaction(transaction):
-    _state.transaction = transaction
+    _state.set('transaction', transaction)
 
 
 def _get_current_transaction():
-    return getattr(_state, 'transaction', None)
+    return _state.get('transaction')
 
 
 def set_transaction_name(name):

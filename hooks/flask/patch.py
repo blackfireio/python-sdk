@@ -1,4 +1,3 @@
-import traceback
 from blackfire.utils import wrap, import_module, get_logger
 
 log = get_logger(__name__)
