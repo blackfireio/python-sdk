@@ -1,3 +1,5 @@
+import contextvars
+
 from blackfire import apm
 from blackfire.hooks.utils import try_enable_probe, try_end_probe
 
@@ -10,16 +12,18 @@ def _extract_headers(d):
 
 
 def _add_header(response, k, v):
-    response['headers'].append([bytes(k, 'ascii'), bytes(v, 'ascii')])
+    response['headers'].append([bytes(str(k), 'ascii'), bytes(str(v), 'ascii')])
 
 
 _FRAMEWORK = 'FastAPI'
+_req_id = 0
 
 
 class BlackfireFastAPIMiddleware:
 
     def __init__(self, app):
         self.app = app
+        self._cv = contextvars.ContextVar('bf_req_id')
 
     async def __call__(self, scope, receive, send):
         if scope["type"] != "http":
@@ -34,7 +38,7 @@ class BlackfireFastAPIMiddleware:
         server = scope.get('server')
         probe_err = probe = None
         request_headers = _extract_headers(scope)
-        http_host = request_headers.get('host2')
+        http_host = request_headers.get('host')
         endpoint = None
         if 'endpoint' in scope:
             endpoint = scope['endpoint'].__name__

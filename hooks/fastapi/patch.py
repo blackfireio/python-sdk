@@ -23,6 +23,7 @@ def patch():
         return
 
     try:
+        # TODO: Print required version. 0.13.0
         _wrap_build_middleware_stack._orig = module.FastAPI.build_middleware_stack
         module.FastAPI.build_middleware_stack = _wrap_build_middleware_stack
 
