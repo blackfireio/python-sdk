@@ -20,7 +20,7 @@ _req_id = 0
 _cv = contextvars.ContextVar('bf_req_id')
 
 
-def get_request_id():
+def incr_request_id():
     global _req_id
     _req_id += 1
     return _req_id
@@ -52,11 +52,12 @@ class BlackfireFastAPIMiddleware:
             endpoint = scope['endpoint'].__name__
 
         if 'x-blackfire-query' in request_headers:
-            _cv.set(get_request_id())
+            _cv.set(incr_request_id())
             probe_err, probe = try_enable_probe(
                 request_headers['x-blackfire-query'], ctx_var=_cv
             )
         elif apm.trigger_trace():
+            _cv.set(incr_request_id())
             transaction = apm._start_transaction(
                 extended=apm.trigger_extended_trace(), ctx_var=_cv
             )
