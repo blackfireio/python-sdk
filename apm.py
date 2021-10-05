@@ -204,7 +204,7 @@ def ignore_transaction():
         curr_transaction.ignore()
 
 
-def _start_transaction(extended=False):
+def _start_transaction(extended=False, ctx_var=None):
     curr_transaction = _get_current_transaction()
 
     # do nothing if there is an ongoing APM transaction or a profiling session
@@ -231,6 +231,7 @@ def _start_transaction(extended=False):
             timespan_threshold=_apm_config.timespan_time_threshold,
             apm_timespan_limit_per_rule=_apm_config.timespan_limit_per_rule,
             apm_timespan_limit_global=_apm_config.timespan_limit_global,
+            ctx_var=ctx_var,
         )
 
     new_transaction = ApmTransaction(extended)

@@ -17,15 +17,23 @@ def _add_header(response, k, v):
 
 _FRAMEWORK = 'FastAPI'
 _req_id = 0
+_cv = contextvars.ContextVar('bf_req_id')
+
+
+def get_request_id():
+    global _req_id
+    _req_id += 1
+    return _req_id
 
 
 class BlackfireFastAPIMiddleware:
 
     def __init__(self, app):
         self.app = app
-        self._cv = contextvars.ContextVar('bf_req_id')
 
     async def __call__(self, scope, receive, send):
+        global _cv, _req_id
+
         if scope["type"] != "http":
             return await self.app(scope, receive, send)
 
@@ -44,12 +52,13 @@ class BlackfireFastAPIMiddleware:
             endpoint = scope['endpoint'].__name__
 
         if 'x-blackfire-query' in request_headers:
+            _cv.set(get_request_id())
             probe_err, probe = try_enable_probe(
-                request_headers['x-blackfire-query']
+                request_headers['x-blackfire-query'], ctx_var=_cv
             )
         elif apm.trigger_trace():
             transaction = apm._start_transaction(
-                extended=apm.trigger_extended_trace()
+                extended=apm.trigger_extended_trace(), ctx_var=_cv
             )
 
         content_length = status_code = None
