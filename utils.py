@@ -361,3 +361,11 @@ def get_executable_path(name):
     else:
         from distutils import spawn
         return spawn.find_executable(name)
+
+
+def debug_print_context():
+    import os, threading, asyncio
+    print(
+        "pid=%s, thread=%s, asyncio.Task=%s" %
+        (os.getpid(), threading.current_thread(), id(asyncio.current_task()))
+    )
