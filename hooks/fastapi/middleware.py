@@ -41,8 +41,6 @@ class BlackfireFastAPIMiddleware:
         if scope["type"] != "http":
             return await self.app(scope, receive, send)
 
-        # TODO: Add logs
-
         method = scope.get("method")
         path = scope.get('path')
         transaction = None
@@ -56,6 +54,11 @@ class BlackfireFastAPIMiddleware:
             endpoint = scope['endpoint'].__name__
 
         if 'x-blackfire-query' in request_headers:
+            log.debug(
+                "FastAPIMiddleware profile request. [query=%s]",
+                request_headers['x-blackfire-query']
+            )
+
             _cv.set(incr_request_id())
             probe_err, probe = try_enable_probe(
                 request_headers['x-blackfire-query'], ctx_var=_cv
@@ -113,6 +116,8 @@ class BlackfireFastAPIMiddleware:
             return await self.app(scope, receive, wrapped_send)
         finally:
             if probe:
+                log.debug("FastAPIMiddleware profile request ended.")
+
                 r = try_end_probe(
                     probe,
                     response_status_code=status_code,

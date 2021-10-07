@@ -284,6 +284,8 @@ def bootstrap():
 def patch_all():
     PATCH_MODULES = ['nw', 'django', 'flask']
 
+    # we check for sys.version because patch will import FastAPI middleware code
+    # that might raise SyntaxError on older versions
     if sys.version_info >= (3, 7):
         PATCH_MODULES.append('fastapi')
 
