@@ -43,15 +43,22 @@ _DEFAULT_LOG_LEVEL = 2
 _DEFAULT_LOG_FILE = 'python-probe.log'
 
 
-class ContextState(object):
-    '''TODO : Comment
+class ContextDict(object):
+    '''ContextDict class gives you a *dictionary* that is thread local if run on 
+    multiple threads or context local if run on asyncio code. (using contextvars)
+
+    cv = ContextDict('my_namespace')
+    cv.set(k, v)
+
+    Then, in the same asyncio.Task or a child one that propagated the context, you
+    could call cv.get(). A contextvar behaves same as threading.local() when run
+    on multiple threads. When contextvar is not available, it fallbacks to 
+    threading.local()
     '''
 
     def __init__(self, name, default=None):
         if CONTEXTVARS_AVAIL:
-            cv = contextvars.ContextVar(name, default=None)
-            cv.set({})
-            self._state = cv
+            self._state = contextvars.ContextVar(name, default=None)
         else:
             self._state = threading.local()
 
@@ -59,20 +66,22 @@ class ContextState(object):
 
     def get(self, key):
         if CONTEXTVARS_AVAIL:
-            state_cv = self._state.get()
+            state_dict = self._state.get()
             # there is a possibility this being None as because get() might be called
             # from a different Context/Thread than the once that called __init__.
-            if state_cv is None:
+            if state_dict is None:
                 return self._default
-            return state_cv.get(key, self._default)
+            return state_dict.get(key, self._default)
         else:
             return getattr(self._state, key, self._default)
 
     def set(self, key, value):
         if CONTEXTVARS_AVAIL:
-            state_cv = self._state.get()
-            if state_cv is not None:
-                state_cv[key] = value
+            state_dict = self._state.get()
+            if state_dict is None:
+                state_dict = {}
+                self._state.set(state_dict)
+            state_dict[key] = value
         else:
             setattr(self._state, key, value)
 

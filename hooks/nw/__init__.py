@@ -1,7 +1,7 @@
 import threading
-from blackfire.utils import ContextState
+from blackfire.utils import ContextDict
 
-_nw = ContextState('bf_nw_counters')
+_nw = ContextDict('bf_nw_counters')
 
 
 class NwCounters:
