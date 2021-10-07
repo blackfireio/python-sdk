@@ -295,7 +295,7 @@ def get_logger(name, log_file=None, log_level=None, include_line_info=True):
     log_level = _get_log_level(logger, log_level)
     logger.setLevel(log_level)
 
-    formatter_info = "%(asctime)s - %(name)s - %(levelname)s - "
+    formatter_info = "%(asctime)s - [pid:%(process)d, tid:%(thread)d] - %(name)s - %(levelname)s - "
 
     # line info becomes irrelevant when logging is made from the C extension, thus
     # this is configurable.
