@@ -1,7 +1,8 @@
 from blackfire import probe, apm, generate_config
 from blackfire.utils import get_logger, read_blackfireyml_content
 from blackfire.hooks.utils import try_enable_probe, try_end_probe, \
-    add_probe_response_header, try_validate_send_blackfireyml
+    add_probe_response_header, try_validate_send_blackfireyml, try_apm_start_transaction, \
+    try_apm_stop_and_queue_transaction
 from blackfire.hooks.django.utils import get_current_view_name
 
 log = get_logger(__name__)
@@ -104,21 +105,22 @@ class BlackfireDjangoMiddleware(object):
         return response
 
     def _apm_trace(self, request, extended=False):
-        transaction = apm._start_transaction(extended)
+        transaction = try_apm_start_transaction(extended=extended)
         response = None
         try:
             response = self.get_response(request)
         finally:
-            apm._stop_and_queue_transaction(
-                controller_name=transaction.name
-                or get_current_view_name(request),
-                uri=request.path,
-                framework="django",
-                http_host=request.META.get('HTTP_HOST'),
-                method=request.method,
-                response_code=response.status_code if response else 500,
-                stdout=len(response.content) if response else 0,
-            )
+            if transaction:
+                try_apm_stop_and_queue_transaction(
+                    controller_name=transaction.name
+                    or get_current_view_name(request),
+                    uri=request.path,
+                    framework="django",
+                    http_host=request.META.get('HTTP_HOST'),
+                    method=request.method,
+                    response_code=response.status_code if response else 500,
+                    stdout=len(response.content) if response else 0,
+                )
 
         return response
 

@@ -1,6 +1,6 @@
 import os
 import sys
-from blackfire import probe, generate_config, agent
+from blackfire import probe, generate_config, agent, apm
 from blackfire.utils import get_logger
 
 log = get_logger(__name__)
@@ -77,6 +77,20 @@ def try_end_probe(
         return ('X-Blackfire-Response', agent_status_val)
     except Exception as e:
         return ('X-Blackfire-Error', '101 ' + format_exc_for_display(e))
+
+
+def try_apm_start_transaction(**kwargs):
+    try:
+        return apm._start_transaction(**kwargs)
+    except Exception as e:
+        log.exception(e)
+
+
+def try_apm_stop_and_queue_transaction(**kwargs):
+    try:
+        apm._stop_and_queue_transaction(**kwargs)
+    except Exception as e:
+        log.exception(e)
 
 
 def add_probe_response_header(http_response, probe_response):

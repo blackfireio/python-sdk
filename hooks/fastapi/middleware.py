@@ -2,7 +2,8 @@ import contextvars
 
 from blackfire import apm
 from blackfire.utils import get_logger
-from blackfire.hooks.utils import try_enable_probe, try_end_probe
+from blackfire.hooks.utils import try_enable_probe, try_end_probe, \
+    try_apm_start_transaction, try_apm_stop_and_queue_transaction
 
 log = get_logger(__name__)
 
@@ -61,7 +62,7 @@ class BlackfireFastAPIMiddleware:
             )
         elif apm.trigger_trace():
             _cv.set(incr_request_id())
-            transaction = apm._start_transaction(
+            transaction = try_apm_start_transaction(
                 extended=apm.trigger_extended_trace(), ctx_var=_cv
             )
 
@@ -94,7 +95,7 @@ class BlackfireFastAPIMiddleware:
                     elif transaction:
                         assert (transaction == apm._get_current_transaction())
 
-                        apm._stop_and_queue_transaction(
+                        try_apm_stop_and_queue_transaction(
                             controller_name=transaction.name or endpoint,
                             uri=path,
                             framework=_FRAMEWORK,

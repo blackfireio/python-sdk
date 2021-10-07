@@ -1,7 +1,7 @@
 from blackfire import apm, generate_config
 from blackfire.utils import get_logger, read_blackfireyml_content, get_time
 from blackfire.hooks.utils import try_enable_probe, try_end_probe, add_probe_response_header, \
-    try_validate_send_blackfireyml
+    try_validate_send_blackfireyml, try_apm_start_transaction, try_apm_stop_and_queue_transaction
 
 log = get_logger(__name__)
 
@@ -113,7 +113,7 @@ class BlackfireFlaskMiddleware(object):
         if apm.trigger_trace():
             req_context.apm = True
             req_context.apm_extended = apm.trigger_extended_trace()
-            req_context.transaction = apm._start_transaction(
+            req_context.transaction = try_apm_start_transaction(
                 extended=req_context.apm_extended
             )
 
@@ -160,16 +160,17 @@ class BlackfireFlaskMiddleware(object):
                 return response
 
             if req_context.apm:
-                apm._stop_and_queue_transaction(
-                    controller_name=req_context.transaction.name
-                    or request.endpoint,
-                    uri=request.path,
-                    framework="flask",
-                    http_host=request.environ.get('HTTP_HOST'),
-                    method=request.method,
-                    response_code=response.status_code,
-                    stdout=response.headers['Content-Length']
-                )
+                if req_context.transaction:
+                    try_apm_stop_and_queue_transaction(
+                        controller_name=req_context.transaction.name
+                        or request.endpoint,
+                        uri=request.path,
+                        framework="flask",
+                        http_host=request.environ.get('HTTP_HOST'),
+                        method=request.method,
+                        response_code=response.status_code,
+                        stdout=response.headers['Content-Length']
+                    )
         except Exception as e:
             # signals run in the context of app. Do not fail app code on any error
             log.exception(e)
