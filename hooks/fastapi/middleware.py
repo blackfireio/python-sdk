@@ -1,7 +1,10 @@
 import contextvars
 
 from blackfire import apm
+from blackfire.utils import get_logger
 from blackfire.hooks.utils import try_enable_probe, try_end_probe
+
+log = get_logger(__name__)
 
 
 def _extract_headers(d):
@@ -67,37 +70,43 @@ class BlackfireFastAPIMiddleware:
         async def wrapped_send(response):
             nonlocal content_length, status_code
 
-            if response.get("type") == "http.response.start":
-                response_headers = {}
-                if "status" in response:
-                    status_code = response["status"]
-                if "headers" in response:
-                    response_headers = _extract_headers(response)
-                content_length = response_headers.get('content-length', None)
-
-                if probe:
-                    if probe_err:
-                        _add_header(response, 'X-Blackfire-Error', probe_err[1])
-                    else:
-                        _add_header(
-                            response, 'X-Blackfire-Response',
-                            probe.get_agent_prolog_response().status_val
-                        )
-                elif transaction:
-                    # TODO: Remove this assert after tests or maybe log
-                    assert (transaction == apm._get_current_transaction())
-
-                    apm._stop_and_queue_transaction(
-                        controller_name=transaction.name or endpoint,
-                        uri=path,
-                        framework=_FRAMEWORK,
-                        http_host=http_host,
-                        method=method,
-                        response_code=status_code if status_code else 500,
-                        stdout=content_length if content_length else 0,
+            try:
+                if response.get("type") == "http.response.start":
+                    response_headers = {}
+                    if "status" in response:
+                        status_code = response["status"]
+                    if "headers" in response:
+                        response_headers = _extract_headers(response)
+                    content_length = response_headers.get(
+                        'content-length', None
                     )
 
-            return await send(response)
+                    if probe:
+                        if probe_err:
+                            _add_header(
+                                response, 'X-Blackfire-Error', probe_err[1]
+                            )
+                        else:
+                            _add_header(
+                                response, 'X-Blackfire-Response',
+                                probe.get_agent_prolog_response().status_val
+                            )
+                    elif transaction:
+                        assert (transaction == apm._get_current_transaction())
+
+                        apm._stop_and_queue_transaction(
+                            controller_name=transaction.name or endpoint,
+                            uri=path,
+                            framework=_FRAMEWORK,
+                            http_host=http_host,
+                            method=method,
+                            response_code=status_code if status_code else 500,
+                            stdout=content_length if content_length else 0,
+                        )
+            except Exception as e:
+                log.exception(e)
+            finally:
+                return await send(response)
 
         try:
             return await self.app(scope, receive, wrapped_send)
@@ -113,7 +122,6 @@ class BlackfireFastAPIMiddleware:
                     http_uri=path,
                     https='1' if scheme == 'https' else '',
                     http_server_addr=server[0] if server else '',
-                    http_server_software='',  # TODO
                     http_server_port=server[1] if server else '',
                     http_header_host=http_host,
                     http_header_user_agent=request_headers.get('user-agent'),
