@@ -26,10 +26,12 @@ def patch():
         fastapi_supported_min_version = '0.51.0'
         fastapi_version = getattr(module, '__version__', '0.0.0')
         if fastapi_version < fastapi_supported_min_version:
-            raise Exception(
-                'Blackfire FastAPI middleware requires FastAPI version %s and up.'
-                % (fastapi_supported_min_version)
+            log.warning(
+                'Blackfire FastAPI middleware requires FastAPI %s and up. '
+                'Current version is %s.' %
+                (fastapi_supported_min_version, fastapi_version)
             )
+            return False
 
         _wrap_build_middleware_stack._orig = module.FastAPI.build_middleware_stack
         module.FastAPI.build_middleware_stack = _wrap_build_middleware_stack
