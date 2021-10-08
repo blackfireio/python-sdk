@@ -16,7 +16,7 @@ def _extract_headers(d):
 
 
 def _add_header(response, k, v):
-    response['headers'].append([bytes(str(k)), bytes(str(v))])
+    response['headers'].append([bytes(str(k), 'utf-8'), bytes(str(v), 'utf-8')])
 
 
 _FRAMEWORK = 'FastAPI'
