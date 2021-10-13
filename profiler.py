@@ -451,6 +451,10 @@ def start(
     # start/stop pair.
     _max_prefix_cache = {}
 
+    # TODO: disable timespan profiling for context-aware profiling
+    if ctx_var is not None and not apm_extended_trace:
+        profile_timespan = False
+
     _bfext.start(
         builtins,
         profile_cpu,
