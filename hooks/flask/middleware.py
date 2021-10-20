@@ -124,6 +124,7 @@ class BlackfireFlaskMiddleware(object):
         log.debug("FlaskMiddleware._after_request called.")
 
         try:
+            content_length = response.headers.get('Content-Length', 0)
             if req_context.profile:
                 if req_context.probe_err:
                     add_probe_response_header(
@@ -134,7 +135,7 @@ class BlackfireFlaskMiddleware(object):
                 probe_resp = try_end_probe(
                     req_context.probe,
                     response_status_code=response.status_code,
-                    response_len=response.headers['Content-Length'],
+                    response_len=content_length,
                     controller_name=request.endpoint,
                     framework="flask",
                     http_method=request.method,
@@ -169,7 +170,7 @@ class BlackfireFlaskMiddleware(object):
                         http_host=request.environ.get('HTTP_HOST'),
                         method=request.method,
                         response_code=response.status_code,
-                        stdout=response.headers['Content-Length']
+                        stdout=content_length
                     )
         except Exception as e:
             # signals run in the context of app. Do not fail app code on any error
