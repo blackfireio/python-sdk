@@ -35,7 +35,7 @@ class _ApmWorker(Thread):
         self._closed = False
 
         self.daemon = True
-        self._start = False
+        self.started = False
 
     def add_task(self, fn, args=(), kwargs={}):
         if self._closed:
@@ -47,12 +47,13 @@ class _ApmWorker(Thread):
             # We lazily start the thread as a forked Process can see the Thread is
             # started but it might not be the case, so we make sure we start the thread
             # in the same context from where we send the trace.
-            if not self._start:
+            if not self.started:
                 self.start()
-                self._start = True
+                self.started = True
             self._tasks.put((fn, args, kwargs))
 
     def run(self):
+        self.started = True  # defensive
         while True:
             func, args, kwargs = self._tasks.get()
             try:
