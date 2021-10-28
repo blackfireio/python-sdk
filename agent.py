@@ -345,7 +345,10 @@ class BlackfireRequest(BlackfireMessage):
         if IS_PY3:
             result = bytes(result, Protocol.ENCODING)
         else:
-            result = result.encode('utf-8')
+            # Py2 treats the string as ASCII encoded unless you explicitly do it.
+            # As we have used _U() on most of the headers passed to this function,
+            # we are safe to encode to Protocol.ENCODING directly here
+            result = result.encode(Protocol.ENCODING)
         return result
 
     def from_bytes(self, data):
