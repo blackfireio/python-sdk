@@ -37,19 +37,24 @@ class _ApmWorker(Thread):
         self.daemon = True
         self.started = False
 
+    def _ensure_worker_started(self):
+        # We lazily start the thread because if we do it in import time as before,
+        # a forked Process that calls add_task() can see the Thread is started
+        # but it might not be started in that process at all, so we make sure
+        # we start the thread in the same context from where we send the trace.
+        if not self.started:
+            self.start()
+            self.started = True
+
     def add_task(self, fn, args=(), kwargs={}):
         if self._closed:
             return
 
+        self._ensure_worker_started()
+
         if is_testing():
             fn(*args, **kwargs)
         else:
-            # We lazily start the thread as a forked Process can see the Thread is
-            # started but it might not be the case, so we make sure we start the thread
-            # in the same context from where we send the trace.
-            if not self.started:
-                self.start()
-                self.started = True
             self._tasks.put((fn, args, kwargs))
 
     def run(self):
