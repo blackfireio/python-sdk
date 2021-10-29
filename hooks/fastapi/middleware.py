@@ -52,6 +52,9 @@ class BlackfireFastAPIMiddleware:
         endpoint = None
         if 'endpoint' in scope:
             endpoint = scope['endpoint'].__name__
+        trigger_auto_profile, key_page = apm.trigger_auto_profile(
+            method, path, endpoint
+        )
 
         if 'x-blackfire-query' in request_headers:
             log.debug(
@@ -63,6 +66,12 @@ class BlackfireFastAPIMiddleware:
             probe_err, probe = try_enable_probe(
                 request_headers['x-blackfire-query'], ctx_var=_cv
             )
+        elif trigger_auto_profile:
+            log.debug("FastAPI autoprofile triggered.")
+            query = apm.get_autoprofile_query(method, path, key_page)
+            if query:
+                _cv.set(incr_request_id())
+                probe_err, probe = try_enable_probe(query, ctx_var=_cv)
         elif apm.trigger_trace():
             _cv.set(incr_request_id())
             transaction = try_apm_start_transaction(
