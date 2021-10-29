@@ -1,9 +1,10 @@
 import contextvars
 
-from blackfire import apm
-from blackfire.utils import get_logger
+from blackfire import apm, generate_config
+from blackfire.utils import get_logger, read_blackfireyml_content
 from blackfire.hooks.utils import try_enable_probe, try_end_probe, \
-    try_apm_start_transaction, try_apm_stop_and_queue_transaction
+    try_apm_start_transaction, try_apm_stop_and_queue_transaction, \
+    try_validate_send_blackfireyml
 
 log = get_logger(__name__)
 
@@ -55,6 +56,30 @@ class BlackfireFastAPIMiddleware:
         trigger_auto_profile, key_page = apm.trigger_auto_profile(
             method, path, endpoint
         )
+
+        # bf yaml asked?
+        if method == 'POST' and 'x-blackfire-query' in request_headers:
+            config = generate_config(query=request_headers['x-blackfire-query'])
+            if config.is_blackfireyml_asked():
+                blackfireyml_content = read_blackfireyml_content()
+                agent_response = try_validate_send_blackfireyml(
+                    config, blackfireyml_content
+                )
+
+                # TODO: Impl. Good example on modifying response.body:
+                # https://github.com/encode/starlette/blob/467eb1c2121d1068323b37be068812a6e115ef0d/starlette/middleware/gzip.py
+                async def wrapped_send2(response):
+                    nonlocal blackfireyml_content, agent_response
+
+                    if response.get("type") == "http.response.start":
+                        if agent_response:  # send response if signature is validated
+                            response.content = blackfireyml_content or ''
+                            _add_header(
+                                response, agent_response[0], agent_response[1]
+                            )
+                    return await send(response)
+
+                return await self.app(scope, receive, wrapped_send2)
 
         if 'x-blackfire-query' in request_headers:
             log.debug(
