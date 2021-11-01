@@ -73,10 +73,9 @@ class BlackfireFastAPIMiddleware:
                     config, blackfireyml_content
                 )
                 body = blackfireyml_content or ''
-                initial_response = None
 
                 async def wrapped_send_bfyaml(response):
-                    nonlocal body, agent_response, initial_response
+                    nonlocal body, agent_response
 
                     if agent_response:  # send response if signature is validated
                         if response.get("type") == "http.response.start":
