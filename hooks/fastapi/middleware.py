@@ -61,7 +61,7 @@ class BlackfireFastAPIMiddleware:
             method, path, endpoint
         )
 
-        # bf yaml asked?
+        # autobuild triggered?
         if method == 'POST' and 'x-blackfire-query' in request_headers:
             config = generate_config(query=request_headers['x-blackfire-query'])
             if config.is_blackfireyml_asked():
