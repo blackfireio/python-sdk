@@ -1,6 +1,7 @@
 import contextvars
 
 from blackfire import apm, generate_config
+from blackfire.agent import Protocol
 from blackfire.utils import get_logger, read_blackfireyml_content
 from blackfire.hooks.utils import try_enable_probe, try_end_probe, \
     try_apm_start_transaction, try_apm_stop_and_queue_transaction, \
@@ -17,7 +18,10 @@ def _extract_headers(d):
 
 
 def _add_header(response, k, v):
-    response['headers'].append([bytes(str(k), 'utf-8'), bytes(str(v), 'utf-8')])
+    response['headers'].append(
+        [bytes(str(k), Protocol.ENCODING),
+         bytes(str(v), Protocol.ENCODING)]
+    )
 
 
 _FRAMEWORK = 'FastAPI'
@@ -61,25 +65,38 @@ class BlackfireFastAPIMiddleware:
         if method == 'POST' and 'x-blackfire-query' in request_headers:
             config = generate_config(query=request_headers['x-blackfire-query'])
             if config.is_blackfireyml_asked():
+                log.debug(
+                    'FastAPI autobuild triggered. Sending `.blackfire.yml` file.'
+                )
                 blackfireyml_content = read_blackfireyml_content()
                 agent_response = try_validate_send_blackfireyml(
                     config, blackfireyml_content
                 )
+                body = blackfireyml_content or ''
+                initial_response = None
 
-                # TODO: Impl. Good example on modifying response.body:
-                # https://github.com/encode/starlette/blob/467eb1c2121d1068323b37be068812a6e115ef0d/starlette/middleware/gzip.py
-                async def wrapped_send2(response):
-                    nonlocal blackfireyml_content, agent_response
+                async def wrapped_send_bfyaml(response):
+                    nonlocal body, agent_response, initial_response
 
-                    if response.get("type") == "http.response.start":
-                        if agent_response:  # send response if signature is validated
-                            response.content = blackfireyml_content or ''
+                    if agent_response:  # send response if signature is validated
+                        if response.get("type") == "http.response.start":
                             _add_header(
                                 response, agent_response[0], agent_response[1]
                             )
-                    return await send(response)
 
-                return await self.app(scope, receive, wrapped_send2)
+                            # override the Content-Length received from the original
+                            # Response. Note: MutableHeaders is present in the minimum
+                            # Starlette version used in minimum FastAPI version (0.51.0)
+                            from starlette.datastructures import MutableHeaders
+                            headers = MutableHeaders(raw=response["headers"])
+                            headers['Content-Length'] = str(len(body))
+
+                        elif response.get("type") == "http.response.body":
+                            response["body"] = body
+
+                    await send(response)
+
+                return await self.app(scope, receive, wrapped_send_bfyaml)
 
         if 'x-blackfire-query' in request_headers:
             log.debug(
