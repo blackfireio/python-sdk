@@ -353,8 +353,8 @@ class BlackfireRequest(BlackfireMessage):
 
         # There are multiple BlackfireRequest messages between Agent->Probe. If this
         # message contains file-format or Blackfire-Query header, we make sure it is the first line
-        # in the protocol. While this is not mandatory, this is to comply with PHP
-        # probe.
+        # in the protocol. While this is not mandatory, this is to comply with other
+        # probes.
         if 'file-format' in self.headers:
             result += 'file-format: %s\n' % (self.headers['file-format'])
         if 'Blackfire-Query' in self.headers:

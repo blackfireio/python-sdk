@@ -426,8 +426,7 @@ def set_transaction_name(name):
     '''
     Retrieves the current probe for the current session and sets transaction_name
     property. transaction_name is the generic name for the name of the handler 
-    function. E.g: In Django terms it is the view_name whereas in PHP it is called
-    controller_name.
+    function. E.g: In Django terms it is the view_name.
     '''
     curr_probe = profiler.get_current_probe()
     if curr_probe:
