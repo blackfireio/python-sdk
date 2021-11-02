@@ -212,14 +212,14 @@ class Connection(object):
 
         response_raw = self.recv()
         self.agent_response = BlackfireResponse().from_bytes(response_raw)
-        blackfire_keys = self.agent_response.args.get('Blackfire-Keys', None)
+        # blackfire_keys = self.agent_response.args.get('Blackfire-Keys', None)
 
-        blackfire_keys = self._get_blackfire_keys(self.agent_response)
+        # blackfire_keys = self._get_blackfire_keys(self.agent_response)
 
-        if not self._verify_signature(
-            public_key='', sig=config.signature, msg=config.challenge_raw
-        ):
-            raise BlackfireInvalidSignatureError()
+        # if not self._verify_signature(
+        #     public_key='', sig=config.signature, msg=config.challenge_raw
+        # ):
+        #     raise BlackfireInvalidSignatureError()
 
         if self.agent_response.status_code != BlackfireResponse.StatusCode.OK:
             raise BlackfireApiException(
