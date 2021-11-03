@@ -3,11 +3,13 @@ import os
 import sys
 import json
 from blackfire.exceptions import *
+import _blackfire_profiler as _bfext
 from collections import defaultdict
 from blackfire.utils import urlparse, get_logger, IS_PY3, parse_qsl, read_blackfireyml_content, \
-    replace_bad_chars, get_time
+    replace_bad_chars, get_time, unquote
 
 log = get_logger(__name__)
+_blackfire_keys = None
 
 
 class Protocol(object):
@@ -79,6 +81,23 @@ class Connection(object):
         return BFYAML_HDR in recv_wnd
 
     def connect(self, config=None):
+        # check if signature is valid even before connecting to the Agent
+        if config and _blackfire_keys and not _blackfire_keys.is_expired():
+            sig = replace_bad_chars(unquote(config.signature))
+            msg = config.challenge_raw
+            signature_verified = False
+            for key in _blackfire_keys:
+                signature_verified = _bfext._verify_signature(key, sig, msg)
+                log.debug("_verify_signature(key=%s, sig=%s, msg=%s) returned %s." % \
+                    (key, sig, msg, signature_verified))
+                if signature_verified:
+                    break
+            if not signature_verified:
+                raise BlackfireInvalidSignatureError(
+                    'Invalid signature received.'
+                )
+            log.debug('Signature verified.')
+
         log.debug("Connecting to agent at %s." % str(self._sock_addr))
         try:
             self._socket.connect(self._sock_addr)
@@ -142,23 +161,9 @@ class Connection(object):
     def _verify_signature(self, public_key, sig, msg):
         return True
 
-    def _get_blackfire_keys(self, resp):
-        max_age, keys = resp.get_blackfire_keys()
-        print(max_age, keys, ">>")
-
-        # max_age = int(keys[0].split(';')[0])
-        # expiration_time = get_time() + max_age
-        # print(expiration_time, max_age, keys)
-        # import datetime
-        # expiration_time_string = datetime.datetime.fromtimestamp(
-        #     expiration_time
-        # ).strftime('%c')
-        # print(expiration_time_string, " >>> expiration_time_string")
-
-        # for key in keys:
-        #     pass
-
     def _write_prolog(self, config):
+        global _blackfire_keys
+
         blackfire_yml = bool(int(config.args.get('flag_yml', '1')))
         blackfire_yml_content = None
         if blackfire_yml:
@@ -212,14 +217,13 @@ class Connection(object):
 
         response_raw = self.recv()
         self.agent_response = BlackfireResponse().from_bytes(response_raw)
-        # blackfire_keys = self.agent_response.args.get('Blackfire-Keys', None)
 
-        # blackfire_keys = self._get_blackfire_keys(self.agent_response)
+        print(self.agent_response.raw_data)
 
-        # if not self._verify_signature(
-        #     public_key='', sig=config.signature, msg=config.challenge_raw
-        # ):
-        #     raise BlackfireInvalidSignatureError()
+        # update blackfire_keys if received any
+        blackfire_keys = self.agent_response.get_blackfire_keys()
+        if blackfire_keys:
+            _blackfire_keys = blackfire_keys
 
         if self.agent_response.status_code != BlackfireResponse.StatusCode.OK:
             raise BlackfireApiException(
@@ -272,6 +276,26 @@ class BlackfireMessage(object):
             f.write(self.to_bytes())
 
 
+class BlackfireKeys(object):
+
+    def __init__(self, keys):
+        '''Blackfire-Keys example format:
+        2884902645;Key1, Key2, Key3
+        '''
+        self._keys_raw = keys
+        max_age, keys = keys[0].split(';')
+        keys = keys.split(',')
+        keys = list(map(replace_bad_chars, keys))
+        self._keys = keys
+        self.expiration_time = get_time() + int(max_age)
+
+    def is_expired(self):
+        return self.expiration_time <= get_time()
+
+    def __iter__(self):
+        return iter(self._keys)
+
+
 class BlackfireResponseBase(BlackfireMessage):
     TIMESPAN_KEY = 'Blackfire-Timespan'
     FN_ARGS_KEY = 'Blackfire-Fn-Args'
@@ -280,13 +304,8 @@ class BlackfireResponseBase(BlackfireMessage):
 
     def get_blackfire_keys(self):
         keys = self.args.get(self.BLACKFIRE_KEYS_KEY, [])
-        # Blackfire-Keys example format:
-        # 2884902645;Key1, Key2, Key3
         if len(keys):
-            max_age, keys = keys[0].split(';')
-            keys = keys.split(',')
-            keys = list(map(replace_bad_chars, keys))
-            return int(max_age), keys
+            return BlackfireKeys(keys)
 
     def get_timespan_selectors(self):
         result = {'^': set(), '=': set()}
