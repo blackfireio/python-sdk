@@ -258,6 +258,7 @@ def reset():
 
     _config = None
     _probe = None
+    agent._blackfire_keys = None
 
 
 def add_marker(label=''):

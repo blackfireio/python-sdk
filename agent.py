@@ -94,7 +94,7 @@ class Connection(object):
                     break
             if not signature_verified:
                 raise BlackfireInvalidSignatureError(
-                    'Invalid signature received.'
+                    'Invalid signature received. (%s)' % (sig)
                 )
             log.debug('Signature verified.')
 
@@ -272,19 +272,29 @@ class BlackfireKeys(object):
     def __init__(self, keys):
         '''Blackfire-Keys example format:
         2884902645;Key1, Key2, Key3
+
+        keys: a list that contains Blackfire-Keys entries. 
+            e.g: ['2884902645;Key1', 'Key2', 'Key3']
         '''
+
         self._keys_raw = keys
-        max_age, keys = keys[0].split(';')
-        keys = keys.split(',')
+
+        max_age, key1 = keys[0].split(';')
+        keys = [key1] + keys[1:]
         keys = list(map(replace_bad_chars, keys))
         self._keys = keys
-        self.expiration_time = get_time() + int(max_age)
+        self._expiration_time = get_time() + int(max_age)
 
     def is_expired(self):
-        return self.expiration_time <= get_time()
+        return self._expiration_time <= get_time()
 
     def __iter__(self):
         return iter(self._keys)
+
+    def __repr__(self):
+        return "keys=%s, expiration_time=%s" % (
+            self._keys, self._expiration_time
+        )
 
 
 class BlackfireResponseBase(BlackfireMessage):
