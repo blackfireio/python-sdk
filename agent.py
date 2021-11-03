@@ -158,9 +158,6 @@ class Connection(object):
 
         return result
 
-    def _verify_signature(self, public_key, sig, msg):
-        return True
-
     def _write_prolog(self, config):
         global _blackfire_keys
 
@@ -217,13 +214,7 @@ class Connection(object):
 
         response_raw = self.recv()
         self.agent_response = BlackfireResponse().from_bytes(response_raw)
-
-        print(self.agent_response.raw_data)
-
-        # update blackfire_keys if received any
-        blackfire_keys = self.agent_response.get_blackfire_keys()
-        if blackfire_keys:
-            _blackfire_keys = blackfire_keys
+        _blackfire_keys = self.agent_response.get_blackfire_keys()
 
         if self.agent_response.status_code != BlackfireResponse.StatusCode.OK:
             raise BlackfireApiException(
