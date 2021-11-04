@@ -270,14 +270,14 @@ class BlackfireMessage(object):
 class BlackfireKeys(object):
 
     def __init__(self, keys):
-        '''Blackfire-Keys example format:
-        2884902645;Key1, Key2, Key3
+        '''Parses the received Blackfire-Keys line and presents necessary fields
+        as attributes.
 
-        keys: a list that contains Blackfire-Keys entries. 
-            e.g: ['2884902645;Key1', 'Key2', 'Key3']
+        keys: a string that contains Blackfire-Keys entries.
+        e.g: max_age (secs);Key1, Key2, Key3
         '''
-
         self._keys_raw = keys
+        keys = keys.split(',')
 
         max_age, key1 = keys[0].split(';')
         keys = [key1] + keys[1:]
@@ -305,8 +305,10 @@ class BlackfireResponseBase(BlackfireMessage):
 
     def get_blackfire_keys(self):
         keys = self.args.get(self.BLACKFIRE_KEYS_KEY, [])
-        if len(keys):
-            return BlackfireKeys(keys)
+        if len(keys) == 1:  # defensive
+            # Blackfire-Keys is not repeated like other headers. Keys are sent
+            # in a single line as comma separated values
+            return BlackfireKeys(keys[0])
 
     def get_timespan_selectors(self):
         result = {'^': set(), '=': set()}
