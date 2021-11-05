@@ -64,6 +64,9 @@ class BlackfireDjangoMiddleware(object):
                     query=request.META['HTTP_X_BLACKFIRE_QUERY']
                 )
                 if config.is_blackfireyml_asked():
+                    log.debug(
+                        'Django autobuild triggered. Sending `.blackfire.yml` file.'
+                    )
                     blackfireyml_content = read_blackfireyml_content()
                     agent_response = try_validate_send_blackfireyml(
                         config, blackfireyml_content

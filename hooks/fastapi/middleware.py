@@ -1,9 +1,11 @@
 import contextvars
 
-from blackfire import apm
-from blackfire.utils import get_logger
+from blackfire import apm, generate_config
+from blackfire.agent import Protocol
+from blackfire.utils import get_logger, read_blackfireyml_content
 from blackfire.hooks.utils import try_enable_probe, try_end_probe, \
-    try_apm_start_transaction, try_apm_stop_and_queue_transaction
+    try_apm_start_transaction, try_apm_stop_and_queue_transaction, \
+    try_validate_send_blackfireyml
 
 log = get_logger(__name__)
 
@@ -16,7 +18,10 @@ def _extract_headers(d):
 
 
 def _add_header(response, k, v):
-    response['headers'].append([bytes(str(k), 'utf-8'), bytes(str(v), 'utf-8')])
+    response['headers'].append(
+        [bytes(str(k), Protocol.ENCODING),
+         bytes(str(v), Protocol.ENCODING)]
+    )
 
 
 _FRAMEWORK = 'FastAPI'
@@ -52,6 +57,45 @@ class BlackfireFastAPIMiddleware:
         endpoint = None
         if 'endpoint' in scope:
             endpoint = scope['endpoint'].__name__
+        trigger_auto_profile, key_page = apm.trigger_auto_profile(
+            method, path, endpoint
+        )
+
+        # autobuild triggered?
+        if method == 'POST' and 'x-blackfire-query' in request_headers:
+            config = generate_config(query=request_headers['x-blackfire-query'])
+            if config.is_blackfireyml_asked():
+                log.debug(
+                    'FastAPI autobuild triggered. Sending `.blackfire.yml` file.'
+                )
+                blackfireyml_content = read_blackfireyml_content()
+                agent_response = try_validate_send_blackfireyml(
+                    config, blackfireyml_content
+                )
+                body = blackfireyml_content or ''
+
+                async def wrapped_send_bfyaml(response):
+                    nonlocal body, agent_response
+
+                    if agent_response:  # send response if signature is validated
+                        if response.get("type") == "http.response.start":
+                            _add_header(
+                                response, agent_response[0], agent_response[1]
+                            )
+
+                            # override the Content-Length received from the original
+                            # Response. Note: MutableHeaders is present in the minimum
+                            # Starlette version used in minimum FastAPI version (0.51.0)
+                            from starlette.datastructures import MutableHeaders
+                            headers = MutableHeaders(raw=response["headers"])
+                            headers['Content-Length'] = str(len(body))
+
+                        elif response.get("type") == "http.response.body":
+                            response["body"] = body
+
+                    await send(response)
+
+                return await self.app(scope, receive, wrapped_send_bfyaml)
 
         if 'x-blackfire-query' in request_headers:
             log.debug(
@@ -63,6 +107,12 @@ class BlackfireFastAPIMiddleware:
             probe_err, probe = try_enable_probe(
                 request_headers['x-blackfire-query'], ctx_var=_cv
             )
+        elif trigger_auto_profile:
+            log.debug("FastAPI autoprofile triggered.")
+            query = apm.get_autoprofile_query(method, path, key_page)
+            if query:
+                _cv.set(incr_request_id())
+                probe_err, probe = try_enable_probe(query, ctx_var=_cv)
         elif apm.trigger_trace():
             _cv.set(incr_request_id())
             transaction = try_apm_start_transaction(
