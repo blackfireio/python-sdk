@@ -3,10 +3,13 @@ import os
 import sys
 import json
 from blackfire.exceptions import *
+import _blackfire_profiler as _bfext
 from collections import defaultdict
-from blackfire.utils import urlparse, get_logger, IS_PY3, parse_qsl, read_blackfireyml_content
+from blackfire.utils import urlparse, get_logger, IS_PY3, parse_qsl, read_blackfireyml_content, \
+    replace_bad_chars, get_time, unquote
 
 log = get_logger(__name__)
+_blackfire_keys = None
 
 
 class Protocol(object):
@@ -78,6 +81,23 @@ class Connection(object):
         return BFYAML_HDR in recv_wnd
 
     def connect(self, config=None):
+        # check if signature is valid even before connecting to the Agent
+        if config and _blackfire_keys and not _blackfire_keys.is_expired():
+            sig = replace_bad_chars(unquote(config.signature))
+            msg = config.challenge_raw
+            signature_verified = False
+            for key in _blackfire_keys:
+                signature_verified = _bfext._verify_signature(key, sig, msg)
+                log.debug("_verify_signature(key=%s, sig=%s, msg=%s) returned %s." % \
+                    (key, sig, msg, signature_verified))
+                if signature_verified:
+                    break
+            if not signature_verified:
+                raise BlackfireInvalidSignatureError(
+                    'Invalid signature received. (%s)' % (sig)
+                )
+            log.debug('Signature verified.')
+
         log.debug("Connecting to agent at %s." % str(self._sock_addr))
         try:
             self._socket.connect(self._sock_addr)
@@ -86,6 +106,7 @@ class Connection(object):
                 'Agent connection failed.[%s][%s]' % (e, self.agent_socket)
             )
 
+        # if no config provided, it is APM case
         if config:
             self._write_prolog(config)
 
@@ -138,6 +159,8 @@ class Connection(object):
         return result
 
     def _write_prolog(self, config):
+        global _blackfire_keys
+
         blackfire_yml = bool(int(config.args.get('flag_yml', '1')))
         blackfire_yml_content = None
         if blackfire_yml:
@@ -191,6 +214,8 @@ class Connection(object):
 
         response_raw = self.recv()
         self.agent_response = BlackfireResponse().from_bytes(response_raw)
+        _blackfire_keys = self.agent_response.get_blackfire_keys()
+
         if self.agent_response.status_code != BlackfireResponse.StatusCode.OK:
             raise BlackfireApiException(
                 'Invalid response received from Agent. [%s]' %
@@ -242,10 +267,48 @@ class BlackfireMessage(object):
             f.write(self.to_bytes())
 
 
+class BlackfireKeys(object):
+
+    def __init__(self, keys):
+        '''Parses the received Blackfire-Keys line and presents necessary fields
+        as attributes.
+
+        keys: a string that contains Blackfire-Keys entries.
+        e.g: max_age (secs);Key1, Key2, Key3
+        '''
+        self._keys_raw = keys
+        keys = keys.split(',')
+
+        max_age, key1 = keys[0].split(';')
+        keys = [key1] + keys[1:]
+        keys = list(map(replace_bad_chars, keys))
+        self._keys = keys
+        self._expiration_time = get_time() + int(max_age)
+
+    def is_expired(self):
+        return self._expiration_time <= get_time()
+
+    def __iter__(self):
+        return iter(self._keys)
+
+    def __repr__(self):
+        return "keys=%s, expiration_time=%s" % (
+            self._keys, self._expiration_time
+        )
+
+
 class BlackfireResponseBase(BlackfireMessage):
     TIMESPAN_KEY = 'Blackfire-Timespan'
     FN_ARGS_KEY = 'Blackfire-Fn-Args'
     CONSTANTS_KEY = 'Blackfire-Const'
+    BLACKFIRE_KEYS_KEY = 'Blackfire-Keys'
+
+    def get_blackfire_keys(self):
+        keys = self.args.get(self.BLACKFIRE_KEYS_KEY, [])
+        if len(keys) == 1:  # defensive
+            # Blackfire-Keys is not repeated like other headers. Keys are sent
+            # in a single line as comma separated values
+            return BlackfireKeys(keys[0])
 
     def get_timespan_selectors(self):
         result = {'^': set(), '=': set()}
@@ -312,8 +375,8 @@ class BlackfireRequest(BlackfireMessage):
 
         # There are multiple BlackfireRequest messages between Agent->Probe. If this
         # message contains file-format or Blackfire-Query header, we make sure it is the first line
-        # in the protocol. While this is not mandatory, this is to comply with PHP
-        # probe.
+        # in the protocol. While this is not mandatory, this is to comply with other
+        # probes.
         if 'file-format' in self.headers:
             result += 'file-format: %s\n' % (self.headers['file-format'])
         if 'Blackfire-Query' in self.headers:

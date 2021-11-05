@@ -2,6 +2,7 @@ import os
 import sys
 from blackfire import probe, generate_config, agent, apm
 from blackfire.utils import get_logger
+from blackfire.exceptions import *
 
 log = get_logger(__name__)
 
@@ -43,6 +44,10 @@ def try_enable_probe(query, ctx_var=None):
         new_probe = probe.Probe(config=config)
         new_probe.clear_traces()
         new_probe.enable()
+    except BlackfireInvalidSignatureError:
+        # do not send error if signature validation fails
+        probe_err = BlackfireInvalidSignatureError
+        log.error("Signature validation failed. [%s]", config)
     except Exception as e:
         # TODO: Is this really quote or urlencode?
         probe_err = ('X-Blackfire-Error', '101 ' + format_exc_for_display(e))
@@ -94,4 +99,7 @@ def try_apm_stop_and_queue_transaction(**kwargs):
 
 
 def add_probe_response_header(http_response, probe_response):
+    # do not add any response header if signature is invalid
+    if probe_response is BlackfireInvalidSignatureError:
+        return
     http_response[probe_response[0]] = probe_response[1]

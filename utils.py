@@ -19,14 +19,14 @@ except:
 IS_PY3 = sys.version_info > (3, 0)
 
 if IS_PY3:
-    from urllib.parse import parse_qsl, quote, urlparse, urlencode, urljoin
+    from urllib.parse import parse_qsl, quote, urlparse, urlencode, urljoin, unquote
     from configparser import ConfigParser
     console_input = input
     from urllib.request import Request, urlopen, ProxyHandler, build_opener, install_opener
     from queue import Queue
 else:
     from urlparse import parse_qsl, urlparse, urljoin
-    from urllib import quote, urlencode
+    from urllib import quote, unquote, urlencode
     from ConfigParser import ConfigParser
     console_input = raw_input
     from urllib2 import Request, urlopen, ProxyHandler, build_opener, install_opener
@@ -378,3 +378,13 @@ def debug_print_context():
         "pid=%s, thread=%s, asyncio.Task=%s" %
         (os.getpid(), threading.current_thread(), id(asyncio.current_task()))
     )
+
+
+def replace_bad_chars(s):
+    '''
+    This function replaces some chars in Base64 encoded version of PublicKey/Signature
+    before sending it to signify.verify
+    '''
+    s = s.replace('-', '+')
+    s = s.replace('_', '/')
+    return s
