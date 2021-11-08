@@ -10,7 +10,8 @@ from threading import Thread
 from blackfire.exceptions import *
 from blackfire.utils import get_logger, IS_PY3, json_prettify, ConfigParser, \
     is_testing, get_load_avg, get_cpu_count, get_os_memory_usage, Queue, \
-        get_probed_runtime, get_time, urlencode, get_caller_frame, ContextDict
+    get_probed_runtime, get_time, urlencode, get_caller_frame, ContextDict, \
+    QueueFull
 from blackfire import agent, DEFAULT_AGENT_SOCKET, DEFAULT_AGENT_TIMEOUT, \
     DEFAULT_CONFIG_FILE, profiler, VERSION
 from contextlib import contextmanager
@@ -19,6 +20,7 @@ log = get_logger(__name__)
 
 _DEFAULT_TIMESPAN_LIMIT_PER_RULE = 100
 _DEFAULT_TIMESPAN_LIMIT_GLOBAL = 200
+_DEFAULT_APM_QUEUE_SIZE = 100000
 
 __all__ = [
     'set_transaction_name', 'set_tag', 'ignore_transaction',
@@ -28,14 +30,14 @@ __all__ = [
 
 class _ApmWorker(Thread):
 
-    def __init__(self):
+    def __init__(self, queue_size=_DEFAULT_APM_QUEUE_SIZE):
         Thread.__init__(self)
-        # infinite Queue, put() should not block
-        self._tasks = Queue(0)
+        self._tasks = Queue(queue_size)
         self._closed = False
 
         self.daemon = True
         self.started = False
+        self.queue_size = queue_size
 
     def _ensure_worker_started(self):
         # We lazily start the thread because if we do it in import time as before,
@@ -46,6 +48,12 @@ class _ApmWorker(Thread):
             self.start()
             self.started = True
 
+    def _add_task_safe(self, task_tuple):
+        try:
+            self._tasks.put_nowait(task_tuple)
+        except QueueFull:
+            log.exception("add_task is ignored as Queue is full.")
+
     def add_task(self, fn, args=(), kwargs={}):
         if self._closed:
             return
@@ -55,7 +63,7 @@ class _ApmWorker(Thread):
         if is_testing():
             fn(*args, **kwargs)
         else:
-            self._tasks.put((fn, args, kwargs))
+            self._add_task_safe((fn, args, kwargs))
 
     def run(self):
         self.started = True  # defensive
@@ -71,7 +79,7 @@ class _ApmWorker(Thread):
                 self._tasks.task_done()
 
     def close(self):
-        self._tasks.put((None, None, None))
+        self._add_task_safe((None, None, None))
         self._closed = True
 
 

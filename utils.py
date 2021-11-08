@@ -23,14 +23,14 @@ if IS_PY3:
     from configparser import ConfigParser
     console_input = input
     from urllib.request import Request, urlopen, ProxyHandler, build_opener, install_opener
-    from queue import Queue
+    from queue import Queue, Full as QueueFull
 else:
     from urlparse import parse_qsl, urlparse, urljoin
     from urllib import quote, unquote, urlencode
     from ConfigParser import ConfigParser
     console_input = raw_input
     from urllib2 import Request, urlopen, ProxyHandler, build_opener, install_opener
-    from Queue import Queue
+    from Queue import Queue, Full as QueueFull
 
 if sys.version_info >= (3, 7):
     import contextvars
