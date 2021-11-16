@@ -81,6 +81,7 @@ def try_end_probe(
 
         return ('X-Blackfire-Response', agent_status_val)
     except Exception as e:
+        log.exception(e)
         return ('X-Blackfire-Error', '101 ' + format_exc_for_display(e))
 
 

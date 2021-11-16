@@ -25,6 +25,19 @@ class Protocol(object):
         MARKER = bytes(MARKER, ENCODING)
 
 
+def _U(s):
+    '''
+    In Python2, if we try to concat a string that contains non-ASCII characters 
+    and a unicode string , it fails with `UnicodeDecodeError: 'ascii' codec can't decode byte`
+    error because by default strings are treated as ASCII encoded. So, internally
+    a str.decode('ascii') is called for the string. This utility function tries to
+    convert a Py2 string to Protocol.ENCODING and ignores its errors during conversion.
+    '''
+    if not IS_PY3 and isinstance(s, str):
+        return unicode(s, Protocol.ENCODING, errors='ignore')
+    return s
+
+
 class Connection(object):
 
     def __init__(self, agent_socket, agent_timeout):
@@ -386,15 +399,19 @@ class BlackfireRequest(BlackfireMessage):
         for k, v in self.headers.items():
             if k in ['Blackfire-Query', 'file-format']:
                 continue
-            result += '%s: %s\n' % (k, v)
+            result += '%s: %s\n' % (_U(k), _U(v))
         if len(self.headers):
             result += '\n'
-
         if self.data:
             result += str(self.data)
 
         if IS_PY3:
             result = bytes(result, Protocol.ENCODING)
+        else:
+            # Py2 treats the string as ASCII encoded unless you explicitly do it.
+            # As we have used _U() on most of the headers passed to this function,
+            # we are safe to encode to Protocol.ENCODING directly here
+            result = result.encode(Protocol.ENCODING)
         return result
 
     def from_bytes(self, data):

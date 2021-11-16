@@ -80,6 +80,8 @@ class Probe(object):
 
         self.transaction_name = None
 
+        log.debug('Probe version %s initialized.' % (VERSION))
+
     def is_enabled(self):
         return self._enabled
 
