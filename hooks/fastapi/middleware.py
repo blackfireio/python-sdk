@@ -94,7 +94,7 @@ class BlackfireFastAPIMiddleware:
                                 headers['Content-Length'] = str(len(body))
                             elif response.get("type") == "http.response.body":
                                 response["body"] = bytes(
-                                    body, Protocol.ENCODING
+                                    str(body), Protocol.ENCODING
                                 )
 
                         await send(response)
