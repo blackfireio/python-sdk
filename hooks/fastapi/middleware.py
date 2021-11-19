@@ -60,7 +60,6 @@ class BlackfireFastAPIMiddleware:
         trigger_auto_profile, key_page = apm.trigger_auto_profile(
             method, path, endpoint
         )
-
         # autobuild triggered?
         if method == 'POST' and 'x-blackfire-query' in request_headers:
             config = generate_config(query=request_headers['x-blackfire-query'])
@@ -77,23 +76,30 @@ class BlackfireFastAPIMiddleware:
                 async def wrapped_send_bfyaml(response):
                     nonlocal body, agent_response
 
-                    if agent_response:  # send response if signature is validated
-                        if response.get("type") == "http.response.start":
-                            _add_header(
-                                response, agent_response[0], agent_response[1]
-                            )
+                    try:
+                        if agent_response:  # send response if signature is validated
+                            if response.get("type") == "http.response.start":
+                                _add_header(
+                                    response, agent_response[0],
+                                    agent_response[1]
+                                )
 
-                            # override the Content-Length received from the original
-                            # Response. Note: MutableHeaders is present in the minimum
-                            # Starlette version used in minimum FastAPI version (0.51.0)
-                            from starlette.datastructures import MutableHeaders
-                            headers = MutableHeaders(raw=response["headers"])
-                            headers['Content-Length'] = str(len(body))
+                                # override the Content-Length received from the original
+                                # Response. Note: MutableHeaders is present in the minimum
+                                # Starlette version used in minimum FastAPI version (0.51.0)
+                                from starlette.datastructures import MutableHeaders
+                                headers = MutableHeaders(
+                                    raw=response["headers"]
+                                )
+                                headers['Content-Length'] = str(len(body))
+                            elif response.get("type") == "http.response.body":
+                                response["body"] = bytes(
+                                    body, Protocol.ENCODING
+                                )
 
-                        elif response.get("type") == "http.response.body":
-                            response["body"] = body
-
-                    await send(response)
+                        await send(response)
+                    except Exception as e:
+                        log.exception(e)
 
                 return await self.app(scope, receive, wrapped_send_bfyaml)
 
