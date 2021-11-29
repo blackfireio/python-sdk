@@ -55,8 +55,6 @@ class BlackfireFastAPIMiddleware:
         request_headers = _extract_headers(scope)
         http_host = request_headers.get('host')
         endpoint = None
-        if 'endpoint' in scope:
-            endpoint = scope['endpoint'].__name__
         trigger_auto_profile, key_page = apm.trigger_auto_profile(
             method, path, endpoint
         )
@@ -128,7 +126,10 @@ class BlackfireFastAPIMiddleware:
         content_length = status_code = None
 
         async def wrapped_send(response):
-            nonlocal content_length, status_code
+            nonlocal content_length, status_code, endpoint
+
+            if 'endpoint' in scope:
+                endpoint = scope['endpoint'].__name__
 
             try:
                 if response.get("type") == "http.response.start":
