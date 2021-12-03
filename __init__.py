@@ -26,6 +26,7 @@ ext_dir = os.path.dirname(os.path.abspath(__file__))
 with io.open(os.path.join(ext_dir, 'VERSION')) as f:
     VERSION = f.read().strip()
 
+COST_DIMENSIONS = 'wt cpu mu pmu nw_in nw_out'
 
 def _get_default_agent_socket():
     plat = platform.system()
