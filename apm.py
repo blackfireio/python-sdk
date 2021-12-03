@@ -403,8 +403,20 @@ def _update_apm_config(response):
     except:
         pass
     try:
-        new_apm_config.timespan_time_threshold = float(
-            response.args['timespan_time_threshold'][0]
+        new_apm_config.timespan_time_threshold = int(
+            response.args['timespan-time-threshold'][0]
+        )
+    except:
+        pass
+    try:
+        new_apm_config.timespan_limit_per_rule = int(
+            response.args['timespan-limit-per-rule'][0]
+        )
+    except:
+        pass
+    try:
+        new_apm_config.timespan_limit_global= int(
+            response.args['timespan-limit-global'][0]
         )
     except:
         pass
