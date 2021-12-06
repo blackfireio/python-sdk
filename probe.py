@@ -9,7 +9,8 @@ import logging
 import base64
 import random
 from contextlib import contextmanager
-from blackfire import profiler, VERSION, agent, generate_config, DEFAULT_CONFIG_FILE
+from blackfire import profiler, VERSION, agent, generate_config, DEFAULT_CONFIG_FILE, \
+    COST_DIMENSIONS
 from blackfire.utils import IS_PY3, get_home_dir, ConfigParser, \
     urlparse, urljoin, urlencode, get_load_avg, get_logger, quote, \
     parse_qsl, Request, urlopen, json_prettify, get_probed_runtime
@@ -208,7 +209,7 @@ class Probe(object):
             'Request-Start': self._req_start,
             'Request-End': time.time(),
             'Profile-Title': profile_title,
-            'cost-dimensions': "wt cpu mu pmu nw_in nw_out",
+            'cost-dimensions': COST_DIMENSIONS,
         }
         load_avg = get_load_avg()
         if load_avg:

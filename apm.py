@@ -13,7 +13,7 @@ from blackfire.utils import get_logger, IS_PY3, json_prettify, ConfigParser, \
     get_probed_runtime, get_time, urlencode, get_caller_frame, ContextDict, \
     QueueFull
 from blackfire import agent, DEFAULT_AGENT_SOCKET, DEFAULT_AGENT_TIMEOUT, \
-    DEFAULT_CONFIG_FILE, profiler, VERSION
+    DEFAULT_CONFIG_FILE, profiler, VERSION, COST_DIMENSIONS
 from contextlib import contextmanager
 
 log = get_logger(__name__)
@@ -403,8 +403,20 @@ def _update_apm_config(response):
     except:
         pass
     try:
-        new_apm_config.timespan_time_threshold = float(
-            response.args['timespan_time_threshold'][0]
+        new_apm_config.timespan_time_threshold = int(
+            response.args['timespan-time-threshold'][0]
+        )
+    except:
+        pass
+    try:
+        new_apm_config.timespan_limit_per_rule = int(
+            response.args['timespan-limit-per-rule'][0]
+        )
+    except:
+        pass
+    try:
+        new_apm_config.timespan_limit_global= int(
+            response.args['timespan-limit-global'][0]
         )
     except:
         pass
@@ -513,7 +525,7 @@ def _queue_trace(transaction, **kwargs):
     if transaction.extended:
         kwargs['load'] = get_load_avg()
         kwargs['nproc'] = get_cpu_count()
-        kwargs['cost-dimensions'] = 'wt cpu mu pmu'
+        kwargs['cost-dimensions'] = COST_DIMENSIONS
         kwargs['extended-sample-rate'] = _apm_config.extended_sample_rate
         kwargs['timespan_dropped'] = profiler.get_apm_timespan_dropped()
         kwargs['timespan_limit_per_rule'] = _apm_config.timespan_limit_per_rule
