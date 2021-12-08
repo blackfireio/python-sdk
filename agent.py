@@ -178,6 +178,7 @@ class Connection(object):
         blackfire_yml_content = None
         if blackfire_yml:
             blackfire_yml_content = read_blackfireyml_content()
+            log.debug('Sending .blackfire.yml along with profile data.')
         bf_probe_header = 'python-%s, config' % (sys.hexversion)
 
         # recv timespan entries if timespan enabled
@@ -377,7 +378,9 @@ class BlackfireRequest(BlackfireMessage):
         self.headers = {}
         for k, v in headers.items():
             # these headers are not expected to be lower-case
-            if k not in ['Blackfire-Query', 'Blackfire-Probe']:
+            if k not in [
+                'Blackfire-Query', 'Blackfire-Probe', 'Blackfire-Yaml-Size'
+            ]:
                 self.headers[k.lower()] = v
                 continue
             self.headers[k] = v
