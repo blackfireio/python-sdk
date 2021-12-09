@@ -70,6 +70,7 @@ class BlackfireFastAPIMiddleware:
                     config, blackfireyml_content
                 )
                 body = blackfireyml_content or ''
+                body = bytes(str(body), Protocol.ENCODING)
 
                 async def wrapped_send_bfyaml(response):
                     nonlocal body, agent_response
@@ -91,9 +92,7 @@ class BlackfireFastAPIMiddleware:
                                 )
                                 headers['Content-Length'] = str(len(body))
                             elif response.get("type") == "http.response.body":
-                                response["body"] = bytes(
-                                    str(body), Protocol.ENCODING
-                                )
+                                response["body"] = body
 
                         await send(response)
                     except Exception as e:
