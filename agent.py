@@ -6,7 +6,7 @@ from blackfire.exceptions import *
 import _blackfire_profiler as _bfext
 from collections import defaultdict
 from blackfire.utils import urlparse, get_logger, IS_PY3, parse_qsl, read_blackfireyml_content, \
-    replace_bad_chars, get_time, unquote
+    replace_bad_chars, get_time, unquote, UC, unicode_or_bytes
 
 log = get_logger(__name__)
 _blackfire_keys = None
@@ -23,19 +23,6 @@ class Protocol(object):
     if IS_PY3:
         HEADER_MARKER = bytes(HEADER_MARKER, ENCODING)
         MARKER = bytes(MARKER, ENCODING)
-
-
-def _U(s):
-    '''
-    In Python2, if we try to concat a string that contains non-ASCII characters 
-    and a unicode string , it fails with `UnicodeDecodeError: 'ascii' codec can't decode byte`
-    error because by default strings are treated as ASCII encoded. So, internally
-    a str.decode('ascii') is called for the string. This utility function tries to
-    convert a Py2 string to Protocol.ENCODING and ignores its errors during conversion.
-    '''
-    if not IS_PY3 and isinstance(s, str):
-        return unicode(s, Protocol.ENCODING, errors='ignore')
-    return s
 
 
 class Connection(object):
@@ -402,20 +389,17 @@ class BlackfireRequest(BlackfireMessage):
         for k, v in self.headers.items():
             if k in ['Blackfire-Query', 'file-format']:
                 continue
-            result += '%s: %s\n' % (_U(k), _U(v))
+            result += '%s: %s\n' % (UC(k), UC(v))
         if len(self.headers):
             result += '\n'
         if self.data:
             result += str(self.data)
 
-        if IS_PY3:
-            result = bytes(result, Protocol.ENCODING)
-        else:
-            # Py2 treats the string as ASCII encoded unless you explicitly do it.
-            # As we have used _U() on most of the headers passed to this function,
-            # we are safe to encode to Protocol.ENCODING directly here
-            result = result.encode(Protocol.ENCODING)
-        return result
+        # Py2 note:
+        # Py2 treats the string as ASCII encoded unless you explicitly do it.
+        # As we have used UC() on most of the headers passed to this function,
+        # we are safe to encode to Protocol.ENCODING directly here
+        return unicode_or_bytes(result)
 
     def from_bytes(self, data):
         data = data.decode(Protocol.ENCODING)

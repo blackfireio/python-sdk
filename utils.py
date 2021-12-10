@@ -388,3 +388,28 @@ def replace_bad_chars(s):
     s = s.replace('-', '+')
     s = s.replace('_', '/')
     return s
+
+
+def UC(s):
+    '''
+    In Python2, if we try to concat a string that contains non-ASCII characters 
+    and a unicode string , it fails with `UnicodeDecodeError: 'ascii' codec can't decode byte`
+    error because by default strings are treated as ASCII encoded. So, internally
+    a str.decode('ascii') is called for the string. This utility function tries to
+    convert a Py2 string to Protocol.ENCODING and ignores its errors during conversion.
+    '''
+    from blackfire.agent import Protocol
+
+    if not IS_PY3 and isinstance(s, str):
+        return unicode(s, Protocol.ENCODING, errors='ignore')
+    return s
+
+
+def unicode_or_bytes(s):
+    from blackfire.agent import Protocol
+
+    if IS_PY3:
+        result = bytes(s, Protocol.ENCODING)
+    else:
+        result = s.encode(Protocol.ENCODING)
+    return result

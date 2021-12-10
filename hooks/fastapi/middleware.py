@@ -83,6 +83,9 @@ class BlackfireFastAPIMiddleware:
                                     agent_response[1]
                                 )
 
+                                # We can add headers as many as we want but it was
+                                # not possible to mutate an existing header without
+                                # using below approach.
                                 # override the Content-Length received from the original
                                 # Response. Note: MutableHeaders is present in the minimum
                                 # Starlette version used in minimum FastAPI version (0.51.0)

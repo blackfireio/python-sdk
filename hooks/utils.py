@@ -1,7 +1,7 @@
 import os
 import sys
 from blackfire import probe, generate_config, agent, apm
-from blackfire.utils import get_logger
+from blackfire.utils import get_logger, UC, unicode_or_bytes
 from blackfire.exceptions import *
 
 log = get_logger(__name__)
@@ -26,9 +26,15 @@ def try_validate_send_blackfireyml(config, blackfireyml_content):
         agent_conn.connect(config=config)
 
         resp_line = str(agent_conn.agent_response.status_val)
+
         if blackfireyml_content is None:
             resp_line += '&no-blackfire-yaml'
         else:
+            # convert .blackfire.yml contents to UTF-8 encoded string and get the
+            # length according to that. Otherwise blackfire-yml-size we set here
+            # might be inconsistent with Content-Length header
+            blackfireyml_content = UC(blackfireyml_content)
+            blackfireyml_content = unicode_or_bytes(blackfireyml_content)
             resp_line += '&blackfire-yml-size=%d' % (len(blackfireyml_content))
 
         return ('X-Blackfire-Response', resp_line)
