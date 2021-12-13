@@ -9,6 +9,7 @@ import json
 import base64
 import importlib
 import platform
+
 from blackfire.utils import *
 from blackfire import profiler
 from blackfire.exceptions import BlackfireApiException
@@ -27,6 +28,7 @@ with io.open(os.path.join(ext_dir, 'VERSION')) as f:
     VERSION = f.read().strip()
 
 COST_DIMENSIONS = 'wt cpu mu pmu nw_in nw_out'
+
 
 def _get_default_agent_socket():
     plat = platform.system()
@@ -305,12 +307,50 @@ def patch_all():
     log.debug("Patched modules=%s", patched_modules)
 
 
-def profile(func=None, client_id=None, client_token=None, title=None):
+def _wrap_flask_view(func, *args, **kwargs):
+    from blackfire.hooks.utils import try_enable_probe, try_end_probe
+    from blackfire.hooks.flask.middleware import get_request_context, get_current_request
+    from flask import after_this_request
+
+    # TODO: Make sure there is no global hook in Flask middleware, if so this will
+    # conflict
+
+    req_context = get_request_context()
+    request = get_current_request()
+
+    if 'HTTP_X_BLACKFIRE_QUERY' in request.environ:
+        req_context.probe_err, req_context.probe = try_enable_probe(
+            request.environ['HTTP_X_BLACKFIRE_QUERY']
+        )
+        try:
+            result = func(*args, **kwargs)
+        finally:
+            pass
+
+    @after_this_request
+    def end_profile(response):
+        end()
+        return response
+
+    return result
+
+
+def profile(
+    func=None,
+    client_id=None,
+    client_token=None,
+    title=None,
+    flask_view=False,
+):
     from blackfire.probe import enable, end, initialize
 
     def inner_func(func):
 
         def wrapper(*args, **kwargs):
+
+            if flask_view:
+                return _wrap_flask_view(func, *args, **kwargs)
+
             initialize(
                 client_id=client_id,
                 client_token=client_token,
@@ -319,9 +359,11 @@ def profile(func=None, client_id=None, client_token=None, title=None):
             )
             enable()
             try:
-                func(*args, **kwargs)
+                result = func(*args, **kwargs)
             finally:
                 end()
+
+            return result
 
         return wrapper
 
