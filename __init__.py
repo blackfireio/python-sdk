@@ -308,12 +308,14 @@ def patch_all():
 
 
 def _wrap_flask_view(func, *args, **kwargs):
-    from blackfire.hooks.utils import try_enable_probe, try_end_probe
-    from blackfire.hooks.flask.middleware import get_request_context, get_current_request
-    from flask import after_this_request
+    import flask
+    from blackfire.hooks.utils import try_enable_probe
+    from blackfire.hooks.flask.middleware import get_request_context, get_current_request, end_profile
 
-    # TODO: Make sure there is no global hook in Flask middleware, if so this will
-    # conflict
+    # already patched?
+    if getattr(flask, '_blackfire_patch', False):
+        log.error('Flask is already patched. `profile` decorator is disabled.')
+        return func(*args, **kwargs)
 
     req_context = get_request_context()
     request = get_current_request()
@@ -327,10 +329,9 @@ def _wrap_flask_view(func, *args, **kwargs):
         finally:
             pass
 
-    @after_this_request
-    def end_profile(response):
-        end()
-        return response
+    @flask.after_this_request
+    def end_profile_after_this_request(response):
+        return end_profile(response)
 
     return result
 

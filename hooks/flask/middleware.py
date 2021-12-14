@@ -27,6 +27,41 @@ def get_request_context():
     return g
 
 
+def end_profile(response):
+    req_context = get_request_context()
+    request = get_current_request()
+    if req_context.probe_err:
+        add_probe_response_header(response.headers, req_context.probe_err)
+        return response
+
+    probe_resp = try_end_probe(
+        req_context.probe,
+        response_status_code=response.status_code,
+        response_len=response.headers.get('Content-Length', 0),
+        controller_name=request.endpoint,
+        framework="flask",
+        http_method=request.method,
+        http_uri=request.path,
+        https='1' if request.is_secure else '',
+        http_server_addr=request.environ.get('SERVER_NAME'),
+        http_server_software=request.environ.get('SERVER_SOFTWARE'),
+        http_server_port=request.environ.get('SERVER_PORT'),
+        http_header_host=request.environ.get('HTTP_HOST'),
+        http_header_user_agent=request.environ.get('HTTP_USER_AGENT'),
+        http_header_x_forwarded_host=request.environ
+        .get('HTTP_X_FORWARDED_HOST'),
+        http_header_x_forwarded_proto=request.environ
+        .get('HTTP_X_FORWARDED_PROTO'),
+        http_header_x_forwarded_port=request.environ
+        .get('HTTP_X_FORWARDED_PORT'),
+        http_header_forwarded=request.environ.get('HTTP_FORWARDED'),
+    )
+
+    add_probe_response_header(response.headers, probe_resp)
+
+    return response
+
+
 class BlackfireFlaskMiddleware(object):
 
     def __init__(self, app):
@@ -127,41 +162,8 @@ class BlackfireFlaskMiddleware(object):
         log.debug("FlaskMiddleware._after_request called.")
 
         try:
-            content_length = response.headers.get('Content-Length', 0)
             if req_context.profile:
-                if req_context.probe_err:
-                    add_probe_response_header(
-                        response.headers, req_context.probe_err
-                    )
-                    return response
-
-                probe_resp = try_end_probe(
-                    req_context.probe,
-                    response_status_code=response.status_code,
-                    response_len=content_length,
-                    controller_name=request.endpoint,
-                    framework="flask",
-                    http_method=request.method,
-                    http_uri=request.path,
-                    https='1' if request.is_secure else '',
-                    http_server_addr=request.environ.get('SERVER_NAME'),
-                    http_server_software=request.environ.get('SERVER_SOFTWARE'),
-                    http_server_port=request.environ.get('SERVER_PORT'),
-                    http_header_host=request.environ.get('HTTP_HOST'),
-                    http_header_user_agent=request.environ
-                    .get('HTTP_USER_AGENT'),
-                    http_header_x_forwarded_host=request.environ
-                    .get('HTTP_X_FORWARDED_HOST'),
-                    http_header_x_forwarded_proto=request.environ
-                    .get('HTTP_X_FORWARDED_PROTO'),
-                    http_header_x_forwarded_port=request.environ
-                    .get('HTTP_X_FORWARDED_PORT'),
-                    http_header_forwarded=request.environ.get('HTTP_FORWARDED'),
-                )
-
-                add_probe_response_header(response.headers, probe_resp)
-
-                return response
+                return end_profile(response)
 
             if req_context.apm:
                 if req_context.transaction:
@@ -173,7 +175,7 @@ class BlackfireFlaskMiddleware(object):
                         http_host=request.environ.get('HTTP_HOST'),
                         method=request.method,
                         response_code=response.status_code,
-                        stdout=content_length
+                        stdout=response.headers.get('Content-Length', 0)
                     )
         except Exception as e:
             # signals run in the context of app. Do not fail app code on any error
