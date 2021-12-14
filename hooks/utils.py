@@ -43,10 +43,18 @@ def try_validate_send_blackfireyml(config, blackfireyml_content):
         log.exception(e)
 
 
-def try_enable_probe(query, ctx_var=None):
+def try_enable_probe(
+    query, client_id=None, client_token=None, title=None, ctx_var=None
+):
     probe_err = new_probe = None
     try:
-        config = generate_config(query=query, ctx_var=ctx_var)
+        config = generate_config(
+            query=query,
+            client_id=client_id,
+            client_token=client_token,
+            title=title,
+            ctx_var=ctx_var
+        )
         new_probe = probe.Probe(config=config)
         new_probe.clear_traces()
         new_probe.enable()

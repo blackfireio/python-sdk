@@ -307,51 +307,17 @@ def patch_all():
     log.debug("Patched modules=%s", patched_modules)
 
 
-def _wrap_flask_view(func, *args, **kwargs):
-    import flask
-    from blackfire.hooks.utils import try_enable_probe
-    from blackfire.hooks.flask.middleware import get_request_context, get_current_request, end_profile
-
-    # already patched?
-    if getattr(flask, '_blackfire_patch', False):
-        log.error('Flask is already patched. `profile` decorator is disabled.')
-        return func(*args, **kwargs)
-
-    req_context = get_request_context()
-    request = get_current_request()
-
-    if 'HTTP_X_BLACKFIRE_QUERY' in request.environ:
-        req_context.probe_err, req_context.probe = try_enable_probe(
-            request.environ['HTTP_X_BLACKFIRE_QUERY']
-        )
-        try:
-            result = func(*args, **kwargs)
-        finally:
-            pass
-
-    @flask.after_this_request
-    def end_profile_after_this_request(response):
-        return end_profile(response)
-
-    return result
-
-
 def profile(
     func=None,
     client_id=None,
     client_token=None,
     title=None,
-    flask_view=False,
 ):
     from blackfire.probe import enable, end, initialize
 
     def inner_func(func):
 
         def wrapper(*args, **kwargs):
-
-            if flask_view:
-                return _wrap_flask_view(func, *args, **kwargs)
-
             initialize(
                 client_id=client_id,
                 client_token=client_token,
@@ -400,7 +366,10 @@ def generate_config(
     )
     agent_timeout = float(agent_timeout)
 
-    log.debug("generate_config() called.")
+    log.debug(
+        "generate_config(query=%s, endpoint=%s, title=%s, ctx_var=%s) called." %
+        (query, endpoint, title, ctx_var)
+    )
 
     # manual profiling?
     if query is None:
