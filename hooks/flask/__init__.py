@@ -23,15 +23,13 @@ def profile_flask_view(
             import flask
             # already patched?
             if getattr(flask, '_blackfire_patch', False):
-                log.error(
-                    'Flask is already patched. `profile` decorator is disabled.'
-                )
+                log.error('Flask is already patched. Profiling is disabled.')
                 return func(*args, **kwargs)
 
             req_context = get_request_context()
             if not req_context:
                 log.error(
-                    'Function is decorated via `profile_flask_view` but no application context found.'
+                    'Function is decorated via `profile_flask_view` but no application context found. Profiling is disabled.'
                 )
                 return func(*args, **kwargs)
 
