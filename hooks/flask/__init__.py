@@ -30,9 +30,10 @@ def profile_flask_view(
 
             req_context = get_request_context()
             if not req_context:
-                raise BlackfireProfilerException(
+                log.error(
                     'Function is decorated via `profile_flask_view` but no application context found.'
                 )
+                return func(*args, **kwargs)
 
             req_context.probe_err, req_context.probe = try_enable_probe(
                 query=None,
