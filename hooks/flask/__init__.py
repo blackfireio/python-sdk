@@ -1,6 +1,7 @@
 from blackfire.hooks.utils import try_enable_probe
 from blackfire.hooks.flask.middleware import get_request_context, end_profile
 from blackfire.utils import get_logger
+from blackfire.exceptions import BlackfireProfilerException
 
 log = get_logger(__name__)
 
@@ -20,11 +21,6 @@ def profile_flask_view(
 
         def wrapper(*args, **kwargs):
             import flask
-
-            @flask.after_this_request
-            def end_profile_after_this_request(response):
-                return end_profile(response)
-
             # already patched?
             if getattr(flask, '_blackfire_patch', False):
                 log.error(
@@ -33,6 +29,11 @@ def profile_flask_view(
                 return func(*args, **kwargs)
 
             req_context = get_request_context()
+            if not req_context:
+                raise BlackfireProfilerException(
+                    'Function is decorated via `profile_flask_view` but no application context found.'
+                )
+
             req_context.probe_err, req_context.probe = try_enable_probe(
                 query=None,
                 client_id=client_id,
