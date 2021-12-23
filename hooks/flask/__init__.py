@@ -33,6 +33,10 @@ def profile_flask_view(
                 )
                 return func(*args, **kwargs)
 
+            @flask.after_this_request
+            def end_profile_after_this_request(response):
+                return end_profile(response)
+
             req_context.probe_err, req_context.probe = try_enable_probe(
                 query=None,
                 client_id=client_id,
