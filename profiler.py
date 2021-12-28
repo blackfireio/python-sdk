@@ -458,6 +458,7 @@ def start(
             profile_timespan = False
         profile_nw = False
 
+    profile_nw = True
     _bfext.start(
         builtins,
         profile_cpu,
