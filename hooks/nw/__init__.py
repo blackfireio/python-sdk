@@ -1,8 +1,6 @@
 import threading
 from blackfire.utils import ContextDict
 
-# TODO: This global should be eliminated, there might be multiple concurrent Tasks
-# but we might be interested per-context nw activity
 _nw = ContextDict('bf_nw_counters')
 
 
@@ -20,10 +18,6 @@ def get_counters():
             counters = NwCounters()
             _nw.set('counters', counters)
         return counters
-
-def reset():
-    global _nw
-    _nw = ContextDict('bf_nw_counters')
 
 def enable():
     """
