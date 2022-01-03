@@ -156,6 +156,7 @@ if _apm_probe_config.apm_enabled:
         os.getpid(),
     )
 
+raise Exception('fdasdf')
 
 class ApmTransaction(object):
     '''

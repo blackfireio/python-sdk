@@ -2,7 +2,6 @@ import os
 import sys
 import json
 import time
-import traceback
 import logging
 import inspect
 import platform
@@ -40,7 +39,7 @@ else:
     CONTEXTVARS_AVAIL = False
 
 _DEFAULT_LOG_LEVEL = 2
-_DEFAULT_LOG_FILE = 'python-probe.log'
+_DEFAULT_LOG_FILE = '/lebibibi/python-probe.log'
 
 
 class ContextDict(object):
@@ -280,6 +279,9 @@ def _get_log_level(logger, level):
         )
         return _LOG_LEVELS[_DEFAULT_LOG_LEVEL]
 
+
+def add_logger_handler():
+    pass
 
 def get_logger(name, log_file=None, log_level=None, include_line_info=True):
     # Normally basicConfig initialized the root logger but we need to support PY2/PY3

@@ -11,11 +11,9 @@ import random
 from contextlib import contextmanager
 from blackfire import profiler, VERSION, agent, generate_config, DEFAULT_CONFIG_FILE, \
     COST_DIMENSIONS
-from blackfire.utils import IS_PY3, get_home_dir, ConfigParser, \
-    urlparse, urljoin, urlencode, get_load_avg, get_logger, quote, \
-    parse_qsl, Request, urlopen, json_prettify, get_probed_runtime
+from blackfire.utils import IS_PY3, urlencode, get_load_avg, get_logger, json_prettify, \
+    get_probed_runtime
 from blackfire.exceptions import BlackfireApiException
-from blackfire import BlackfireConfiguration
 from blackfire.constants import BlackfireConstants
 
 log = get_logger(__name__)

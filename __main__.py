@@ -1,5 +1,5 @@
 import sys
-from blackfire.utils import console_input, get_logger
+from blackfire.utils import get_logger
 
 log = get_logger(__name__)
 
