@@ -451,12 +451,10 @@ def start(
     # start/stop pair.
     _max_prefix_cache = {}
 
-    # TODO: disable timespan profiling for context-aware profiling and nw dimension
-    # for both context-aware profiling+extended trace
+    # TODO: disable timespan profiling for context-aware profiling
     if ctx_var is not None:
         if not apm_extended_trace:
             profile_timespan = False
-        profile_nw = False
 
     _bfext.start(
         builtins,

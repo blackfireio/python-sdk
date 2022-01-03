@@ -19,7 +19,6 @@ def get_counters():
             _nw.set('counters', counters)
         return counters
 
-
 def enable():
     """
     We need an API to explicitly enable() the `nw` hooks because BF itself uses
