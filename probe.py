@@ -307,22 +307,12 @@ def initialize(
     agent_socket=None,
     agent_timeout=None,
     endpoint=None,
-    log_file=None,
-    log_level=None,
     config_file=DEFAULT_CONFIG_FILE,
     method="manual",
     title=None,
     ctx_var=None,
 ):
     global _config, log, _probe
-
-    if log_file or log_level:
-        log = get_logger(__name__, log_file=log_file, log_level=log_level)
-        log.warning(
-            "DeprecationWarning: 'LOG_FILE' and 'LOG_LEVEL' params are no longer used from 'probe.initialize' API. "
-            "Please use 'BLACKFIRE_LOG_FILE'/'BLACKFIRE_LOG_LEVEL' environment variables."
-            "These settings will be removed in the next version."
-        )
 
     log.debug("probe.initialize called. [method:'%s']", method)
 
@@ -333,8 +323,6 @@ def initialize(
         agent_socket,
         agent_timeout,
         endpoint,
-        log_file,
-        log_level,
         config_file,
         title,
         ctx_var,

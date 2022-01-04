@@ -39,7 +39,6 @@ else:
     CONTEXTVARS_AVAIL = False
 
 _DEFAULT_LOG_LEVEL = 2
-_DEFAULT_LOG_FILE = '/lebibibi/python-probe.log'
 
 
 class ContextDict(object):
@@ -280,19 +279,12 @@ def _get_log_level(logger, level):
         return _LOG_LEVELS[_DEFAULT_LOG_LEVEL]
 
 
-def add_logger_handler():
-    pass
-
-def get_logger(name, log_file=None, log_level=None, include_line_info=True):
+def get_logger(name, include_line_info=True):
     # Normally basicConfig initialized the root logger but we need to support PY2/PY3
     # in same code base, so we use a flag to determine if logger is initialized or not
 
-    log_file = log_file or os.environ.get(
-        'BLACKFIRE_LOG_FILE', _DEFAULT_LOG_FILE
-    )
-    log_level = log_level or os.environ.get(
-        'BLACKFIRE_LOG_LEVEL', _DEFAULT_LOG_LEVEL
-    )
+    log_file = os.environ.get('BLACKFIRE_LOG_FILE')
+    log_level = os.environ.get('BLACKFIRE_LOG_LEVEL', _DEFAULT_LOG_LEVEL)
     logger = logging.getLogger(name)
     log_level = _get_log_level(logger, log_level)
     logger.setLevel(log_level)
@@ -309,13 +301,15 @@ def get_logger(name, log_file=None, log_level=None, include_line_info=True):
 
     console_handler = logging.StreamHandler()
     console_handler.setFormatter(formatter)
-    file_handler = logging.FileHandler(log_file, 'a')
-    file_handler.setFormatter(formatter)
 
     logger.handlers = [
         console_handler,
-        file_handler,
     ]
+
+    if log_file:
+        file_handler = logging.FileHandler(log_file, 'a')
+        file_handler.setFormatter(formatter)
+        logger.addHandler(file_handler)
 
     return logger
 

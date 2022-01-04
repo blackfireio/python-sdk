@@ -156,7 +156,6 @@ if _apm_probe_config.apm_enabled:
         os.getpid(),
     )
 
-raise Exception('fdasdf')
 
 class ApmTransaction(object):
     '''
@@ -416,7 +415,7 @@ def _update_apm_config(response):
     except:
         pass
     try:
-        new_apm_config.timespan_limit_global= int(
+        new_apm_config.timespan_limit_global = int(
             response.args['timespan-limit-global'][0]
         )
     except:
