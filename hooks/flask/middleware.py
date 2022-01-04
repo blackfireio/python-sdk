@@ -77,11 +77,6 @@ class BlackfireFlaskMiddleware(object):
         self.app.after_request(self._after_request)
         self.app.teardown_request(self._teardown_request)
 
-    def __call__(self, environ, start_response):
-        # this stays here for Backward compat.
-        # TODO: Remove after deprecation period for patch_all
-        return self.wsgi_app(environ, start_response)
-
     def _before_request(self):
         req_context = get_request_context()
 
