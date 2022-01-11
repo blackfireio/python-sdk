@@ -61,9 +61,9 @@ class BlackfireConstants(object):
     @classmethod
     @_on_except()
     def python_pgo_flag(cls):
-        return '-fprofile-use' in _get_sys_config_params(
+        return '-fprofile-use' in " ".join(_get_sys_config_params(
             'PY_CFLAGS', 'PY_CFLAGS_NODIST'
-        )
+        ))
 
     @classmethod
     @_on_except()
