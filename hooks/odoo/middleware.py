@@ -25,22 +25,37 @@ class OdooMiddleware(object):
             "OdooMiddleware._blackfired_request called. [query=%s]", query
         )
 
+        new_probe = None
         try:
-            probe_err, new_probe = try_enable_probe(query)
+            bf_status = None
+            bf_headers = None
 
             def _start_response(status, headers):
-                nonlocal probe_err, new_probe, environ
-                if probe_err:
-                    logger.info(probe_err)
-                    headers.append((probe_err[0], probe_err[1]))
-                    return start_response(status, headers)
-
+                nonlocal bf_status, bf_headers
+                bf_status = status
+                bf_headers = headers
                 resp = start_response(status, headers)
+
+                return resp
+
+            probe_err, new_probe = try_enable_probe(query)
+            # let exceptions propagate through
+            response = self.application(environ, _start_response)
+
+            if probe_err:
+                logger.info(probe_err)
+                bf_headers.append((probe_err[0], probe_err[1]))
+            else:
+                response_len = -1
+                for h in bf_headers:
+                    if h[0] == 'Content-Length':
+                        response_len = h[1]
+                        break
 
                 probe_resp = try_end_probe(
                     new_probe,
-                    response_status_code=status[0:3], # status contains code+string status, e.g. "200 OK"
-                    response_len=-1, # FIXME: Not sure how to get the actual response length
+                    response_status_code=bf_status[0:3],  # status contains code+string status, e.g. "200 OK"
+                    response_len=response_len,
                     controller_name=environ['REQUEST_URI'],
                     framework="odoo",
                     http_method=environ['REQUEST_METHOD'],
@@ -56,12 +71,7 @@ class OdooMiddleware(object):
                     http_header_x_forwarded_port=environ['HTTP_X_FORWARDED_PORT'] if 'HTTP_X_FORWARDED_PORT' in environ else '',
                     http_header_forwarded=environ['HTTP_FORWARDED'] if 'HTTP_FORWARDED' in environ else '',
                 )
-                headers.append((probe_resp[0], probe_resp[1]))
-
-                return resp
-
-            # let exceptions propagate through
-            response = self.application(environ, _start_response)
+                bf_headers.append((probe_resp[0], probe_resp[1]))
 
             return response
 
