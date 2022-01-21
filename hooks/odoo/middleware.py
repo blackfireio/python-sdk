@@ -3,30 +3,13 @@ from blackfire.utils import get_logger, read_blackfireyml_content
 
 logger = get_logger(__name__)
 
-# class OdooMiddleware(object):
-#     def __init__(self, application):
-#         self.application = application
-#         print("odo mid loaded...")
-
-#     def __call__(self, environ, start_response):
-#         # from blackfire import profiler
-
-#         # profiler.start()
-
-#         response = self.application(environ, start_response)
-        
-#         print(">>>>")
-#         print(type(response), dir(response))
-#         print(">>>>")
-
-#         # profiler.stop()
-#         # print(profiler.get_traces())
 
 def _extract_headers(headers):
     return dict((k, v) for (k, v) in headers)
 
 
 class OdooMiddleware(object):
+
     def __init__(self, application):
         self.application = application
 
@@ -39,7 +22,6 @@ class OdooMiddleware(object):
 
         self.application(environ, start_response)
 
-
     def _blackfired_request(self, environ, start_response):
         query = environ['HTTP_X_BLACKFIRE_QUERY']
         logger.debug(
@@ -49,11 +31,12 @@ class OdooMiddleware(object):
         content_length = status_code = None
         probe_err, probe = try_enable_probe(query)
         try:
+
             def _start_response(status, headers):
                 nonlocal status_code, content_length, probe_err, probe
 
                 try:
-                    status_code = int(status[:3]) # e.g. 200 OK
+                    status_code = int(status[:3])  # e.g. 200 OK
                 except Exception as e:
                     logger.exception(e)
                 headers_dict = _extract_headers(headers)
@@ -63,8 +46,11 @@ class OdooMiddleware(object):
                     if probe_err:
                         headers.append((probe_err[0], probe_err[1]))
                     else:
-                        headers.append(('X-Blackfire-Response',
-                            probe.get_agent_prolog_response().status_val)
+                        headers.append(
+                            (
+                                'X-Blackfire-Response',
+                                probe.get_agent_prolog_response().status_val
+                            )
                         )
 
                 return start_response(status, headers)
@@ -89,8 +75,12 @@ class OdooMiddleware(object):
                 http_server_port=environ['SERVER_PORT'],
                 http_header_host=environ['HTTP_HOST'],
                 http_header_user_agent=environ['HTTP_USER_AGENT'],
-                http_header_x_forwarded_host=environ['HTTP_X_FORWARDED_HOST'] if 'HTTP_X_FORWARDED_HOST' in environ else '',
-                http_header_x_forwarded_proto=environ['HTTP_X_FORWARDED_PROTO'] if 'HTTP_X_FORWARDED_PROTO' in environ else '',
-                http_header_x_forwarded_port=environ['HTTP_X_FORWARDED_PORT'] if 'HTTP_X_FORWARDED_PORT' in environ else '',
-                http_header_forwarded=environ['HTTP_FORWARDED'] if 'HTTP_FORWARDED' in environ else '',
+                http_header_x_forwarded_host=environ['HTTP_X_FORWARDED_HOST']
+                if 'HTTP_X_FORWARDED_HOST' in environ else '',
+                http_header_x_forwarded_proto=environ['HTTP_X_FORWARDED_PROTO']
+                if 'HTTP_X_FORWARDED_PROTO' in environ else '',
+                http_header_x_forwarded_port=environ['HTTP_X_FORWARDED_PORT']
+                if 'HTTP_X_FORWARDED_PORT' in environ else '',
+                http_header_forwarded=environ['HTTP_FORWARDED']
+                if 'HTTP_FORWARDED' in environ else '',
             )
