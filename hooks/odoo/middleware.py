@@ -20,7 +20,7 @@ class OdooMiddleware(object):
         if 'HTTP_X_BLACKFIRE_QUERY' in environ:
             return self._blackfired_request(environ, start_response)
 
-        self.application(environ, start_response)
+        return self.application(environ, start_response)
 
     def _blackfired_request(self, environ, start_response):
         query = environ['HTTP_X_BLACKFIRE_QUERY']
