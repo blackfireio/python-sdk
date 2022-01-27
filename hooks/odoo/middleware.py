@@ -62,26 +62,28 @@ class OdooMiddleware(object):
         finally:
             logger.debug("OdooMiddleware._profiled_request ended.")
 
-            probe_resp = try_end_probe(
-                probe,
-                response_status_code=status_code,
-                response_len=content_length,
-                controller_name=environ['REQUEST_URI'],
-                framework="odoo",
-                http_method=environ['REQUEST_METHOD'],
-                http_uri=environ['REQUEST_URI'],
-                https='1' if environ['wsgi.url_scheme'] == 'https' else '',
-                http_server_addr=environ['SERVER_NAME'],
-                http_server_software=environ['SERVER_SOFTWARE'],
-                http_server_port=environ['SERVER_PORT'],
-                http_header_host=environ['HTTP_HOST'],
-                http_header_user_agent=environ['HTTP_USER_AGENT'],
-                http_header_x_forwarded_host=environ['HTTP_X_FORWARDED_HOST']
-                if 'HTTP_X_FORWARDED_HOST' in environ else '',
-                http_header_x_forwarded_proto=environ['HTTP_X_FORWARDED_PROTO']
-                if 'HTTP_X_FORWARDED_PROTO' in environ else '',
-                http_header_x_forwarded_port=environ['HTTP_X_FORWARDED_PORT']
-                if 'HTTP_X_FORWARDED_PORT' in environ else '',
-                http_header_forwarded=environ['HTTP_FORWARDED']
-                if 'HTTP_FORWARDED' in environ else '',
-            )
+            if probe:
+                probe_resp = try_end_probe(
+                    probe,
+                    response_status_code=status_code,
+                    response_len=content_length,
+                    controller_name=environ['REQUEST_URI'],
+                    framework="odoo",
+                    http_method=environ['REQUEST_METHOD'],
+                    http_uri=environ['REQUEST_URI'],
+                    https='1' if environ['wsgi.url_scheme'] == 'https' else '',
+                    http_server_addr=environ['SERVER_NAME'],
+                    http_server_software=environ['SERVER_SOFTWARE'],
+                    http_server_port=environ['SERVER_PORT'],
+                    http_header_host=environ['HTTP_HOST'],
+                    http_header_user_agent=environ['HTTP_USER_AGENT'],
+                    http_header_x_forwarded_host=environ['HTTP_X_FORWARDED_HOST']
+                    if 'HTTP_X_FORWARDED_HOST' in environ else '',
+                    http_header_x_forwarded_proto=environ[
+                        'HTTP_X_FORWARDED_PROTO']
+                    if 'HTTP_X_FORWARDED_PROTO' in environ else '',
+                    http_header_x_forwarded_port=environ['HTTP_X_FORWARDED_PORT']
+                    if 'HTTP_X_FORWARDED_PORT' in environ else '',
+                    http_header_forwarded=environ['HTTP_FORWARDED']
+                    if 'HTTP_FORWARDED' in environ else '',
+                )
