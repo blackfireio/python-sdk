@@ -8,7 +8,7 @@
     'description': """
 Profile with Blackfire.io
 =========================
-Allows users and developers to profile Odoo with Blackfire.io.
+Allows users and developers profiling/monitoring of Odoo applications with Blackfire.io.
     """,
 
     'author': "Blackfire.io",
