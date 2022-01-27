@@ -1,5 +1,6 @@
 import contextvars
 
+from blackfire.exceptions import *
 from blackfire import apm, generate_config
 from blackfire.agent import Protocol
 from blackfire.utils import get_logger, read_blackfireyml_content
@@ -145,7 +146,7 @@ class BlackfireFastAPIMiddleware:
                     )
 
                     if probe:
-                        if probe_err:
+                        if probe_err and probe_err is not BlackfireInvalidSignatureError:
                             _add_header(
                                 response, 'X-Blackfire-Error', probe_err[1]
                             )

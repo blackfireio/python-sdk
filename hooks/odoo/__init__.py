@@ -6,6 +6,8 @@ logger = logging.getLogger(__name__)
 
 
 def _blackfire_post_load():
-    logger.info('Hello Blackfire!')
+    logger.debug('Hello Blackfire!')
     import odoo
-    odoo.service.wsgi_server.application = OdooMiddleware(odoo.service.wsgi_server.application)
+    odoo.service.wsgi_server.application = OdooMiddleware(
+        odoo.service.wsgi_server.application
+    )
