@@ -44,8 +44,9 @@ class OdooMiddleware(object):
                 content_length = headers_dict.get('Content-Length')
 
                 if probe:
-                    if probe_err and probe_err is not BlackfireInvalidSignatureError:
-                        headers.append((probe_err[0], probe_err[1]))
+                    if probe_err:
+                        if probe_err is not BlackfireInvalidSignatureError:
+                            headers.append((probe_err[0], probe_err[1]))
                     else:
                         headers.append(
                             (

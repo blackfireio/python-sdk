@@ -146,10 +146,11 @@ class BlackfireFastAPIMiddleware:
                     )
 
                     if probe:
-                        if probe_err and probe_err is not BlackfireInvalidSignatureError:
-                            _add_header(
-                                response, 'X-Blackfire-Error', probe_err[1]
-                            )
+                        if probe_err:
+                            if probe_err is not BlackfireInvalidSignatureError:
+                                _add_header(
+                                    response, 'X-Blackfire-Error', probe_err[1]
+                                )
                         else:
                             _add_header(
                                 response, 'X-Blackfire-Response',
