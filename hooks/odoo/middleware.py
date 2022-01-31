@@ -29,19 +29,19 @@ class OdooMiddleware(object):
             "OdooMiddleware._blackfired_request called. [query=%s]", query
         )
 
-        content_length = status_code = None
+        local_dict = {'content_length': None, 'status_code': None}
         probe_err, probe = try_enable_probe(query)
         try:
 
             def _start_response(status, headers):
-                nonlocal status_code, content_length, probe_err, probe
-
                 try:
-                    status_code = int(status[:3])  # e.g. 200 OK
+                    local_dict['status_code'] = int(status[:3])  # e.g. 200 OK
                 except Exception as e:
                     logger.exception(e)
                 headers_dict = _extract_headers(headers)
-                content_length = headers_dict.get('Content-Length')
+                local_dict['content_length'] = headers_dict.get(
+                    'Content-Length'
+                )
 
                 if probe:
                     if probe_err:
@@ -66,8 +66,8 @@ class OdooMiddleware(object):
             if probe:
                 probe_resp = try_end_probe(
                     probe,
-                    response_status_code=status_code,
-                    response_len=content_length,
+                    response_status_code=local_dict['status_code'],
+                    response_len=local_dict['content_length'],
                     controller_name=environ['REQUEST_URI'],
                     framework="odoo",
                     http_method=environ['REQUEST_METHOD'],
