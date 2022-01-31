@@ -1,6 +1,8 @@
+from blackfire import generate_config
 from blackfire.exceptions import *
-from blackfire.hooks.utils import try_enable_probe, try_end_probe
-from blackfire.utils import get_logger
+from blackfire.utils import get_logger, read_blackfireyml_content
+from blackfire.hooks.utils import try_enable_probe, try_end_probe, \
+    try_validate_send_blackfireyml
 
 logger = get_logger(__name__)
 
@@ -15,7 +17,7 @@ class OdooMiddleware(object):
         self.application = application
 
     def __call__(self, environ, start_response):
-        # TODO: bfyaml, APM
+        # TODO: APM
 
         # profile?
         if 'HTTP_X_BLACKFIRE_QUERY' in environ:
@@ -28,6 +30,27 @@ class OdooMiddleware(object):
         logger.debug(
             "OdooMiddleware._blackfired_request called. [query=%s]", query
         )
+
+        # bf yaml asked?
+        if environ['REQUEST_METHOD'] == 'POST':
+            config = generate_config(query=query)
+            if config.is_blackfireyml_asked():
+                logger.debug(
+                    'Odoo autobuild triggered. Sending `.blackfire.yml` file.'
+                )
+                blackfireyml_content = read_blackfireyml_content()
+                agent_response = try_validate_send_blackfireyml(
+                    config, blackfireyml_content
+                )
+
+                from werkzeug.wrappers import Response
+
+                # send response if signature is validated
+                return Response(
+                    response=blackfireyml_content or '',
+                    headers=[agent_response]
+                )(environ, start_response) \
+                    if agent_response else Response()(environ, start_response)
 
         local_dict = {'content_length': None, 'status_code': None}
         probe_err, probe = try_enable_probe(query)
