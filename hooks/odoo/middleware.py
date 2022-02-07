@@ -1,8 +1,8 @@
-from blackfire import generate_config
+from blackfire import apm, generate_config
 from blackfire.exceptions import *
 from blackfire.utils import get_logger, read_blackfireyml_content
 from blackfire.hooks.utils import try_enable_probe, try_end_probe, \
-    try_validate_send_blackfireyml
+    try_validate_send_blackfireyml, try_apm_start_transaction, try_apm_stop_and_queue_transaction
 
 logger = get_logger(__name__)
 
@@ -17,16 +17,33 @@ class OdooMiddleware(object):
         self.application = application
 
     def __call__(self, environ, start_response):
-        # TODO: APM
-
         # profile?
         if 'HTTP_X_BLACKFIRE_QUERY' in environ:
-            return self._blackfired_request(environ, start_response)
+            return self._blackfired_request(
+                environ, start_response, environ['HTTP_X_BLACKFIRE_QUERY']
+            )
+
+        # auto-profile triggered?
+        trigger_auto_profile, key_page = apm.trigger_auto_profile(
+            environ['REQUEST_METHOD'], environ['REQUEST_URI'],
+            environ['REQUEST_URI']
+        )
+        if trigger_auto_profile:
+            logger.debug("Odoo autoprofile triggered.")
+            query = apm.get_autoprofile_query(
+                environ['REQUEST_METHOD'], environ['REQUEST_URI'], key_page
+            )
+            if query:
+                return self._blackfired_request(environ, start_response, query)
+
+        if apm.trigger_trace():
+            return self._apm_trace(
+                environ, start_response, extended=apm.trigger_extended_trace()
+            )
 
         return self.application(environ, start_response)
 
-    def _blackfired_request(self, environ, start_response):
-        query = environ['HTTP_X_BLACKFIRE_QUERY']
+    def _blackfired_request(self, environ, start_response, query):
         logger.debug(
             "OdooMiddleware._blackfired_request called. [query=%s]", query
         )
@@ -111,3 +128,34 @@ class OdooMiddleware(object):
                     http_header_forwarded=environ['HTTP_FORWARDED']
                     if 'HTTP_FORWARDED' in environ else '',
                 )
+
+    def _apm_trace(self, environ, start_response, extended=False):
+        transaction = try_apm_start_transaction(extended=extended)
+        local_dict = {'content_length': 0, 'status_code': 500}
+        try:
+
+            def _start_response(status, headers):
+                try:
+                    local_dict['status_code'] = int(status[:3])  # e.g. 200 OK
+                except Exception as e:
+                    logger.exception(e)
+                headers_dict = _extract_headers(headers)
+                local_dict['content_length'] = headers_dict.get(
+                    'Content-Length'
+                )
+                return start_response(status, headers)
+
+            response = self.application(environ, _start_response)
+        finally:
+            if transaction:
+                try_apm_stop_and_queue_transaction(
+                    controller_name=transaction.name or environ['REQUEST_URI'],
+                    uri=environ['REQUEST_URI'],
+                    framework="odoo",
+                    http_host=environ['HTTP_HOST'],
+                    method=environ['REQUEST_METHOD'],
+                    response_code=local_dict['status_code'],
+                    stdout=local_dict['content_length'],
+                )
+
+        return response
