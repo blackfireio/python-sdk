@@ -288,7 +288,7 @@ def bootstrap():
 # This code should be the first to run before any import is made.
 # It monkey patches the modules given if installed.
 def patch_all():
-    PATCH_MODULES = ['nw', 'django', 'flask']
+    PATCH_MODULES = ['nw', 'django', 'flask', 'odoo']
 
     # we check for sys.version because patch will import FastAPI middleware code
     # that might raise SyntaxError on older versions
