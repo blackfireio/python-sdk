@@ -1,9 +1,21 @@
-from blackfire.utils import wrap, import_module, get_logger
+from blackfire.utils import wrap, import_module, get_logger, get_executable_path
 
 log = get_logger(__name__)
 
 
 def patch():
+
+    # Since Odoo is not importable by default, try to add
+    # its directory in python path.
+    # Assumes that odoo-bin is in the same directory than odoo module.
+    import sys
+    executable_path = get_executable_path(sys.argv[0])
+    if executable_path is not None and executable_path.endswith('/odoo-bin'):
+        import os
+        odoo_path = os.path.dirname(executable_path)
+        log.debug("Detected Odoo path: %s", odoo_path)
+        sys.path.append(odoo_path)
+
     module = import_module('odoo')
     if not module:
         return False
