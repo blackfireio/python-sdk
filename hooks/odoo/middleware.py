@@ -11,6 +11,20 @@ def _extract_headers(headers):
     return dict((k, v) for (k, v) in headers)
 
 
+def extract_response_headers(start_response, extracted_data):
+
+    def _wrapper(status, headers):
+        try:
+            extracted_data['status_code'] = int(status[:3])  # e.g. 200 OK
+        except Exception as e:
+            logger.exception(e)
+        headers_dict = _extract_headers(headers)
+        extracted_data['content_length'] = headers_dict.get('Content-Length')
+        return start_response(status, headers)
+
+    return _wrapper
+
+
 class OdooMiddleware(object):
 
     def __init__(self, application):
@@ -74,15 +88,6 @@ class OdooMiddleware(object):
         try:
 
             def _start_response(status, headers):
-                try:
-                    local_dict['status_code'] = int(status[:3])  # e.g. 200 OK
-                except Exception as e:
-                    logger.exception(e)
-                headers_dict = _extract_headers(headers)
-                local_dict['content_length'] = headers_dict.get(
-                    'Content-Length'
-                )
-
                 if probe:
                     if probe_err:
                         if probe_err is not BlackfireInvalidSignatureError:
@@ -97,7 +102,9 @@ class OdooMiddleware(object):
 
                 return start_response(status, headers)
 
-            response = self.application(environ, _start_response)
+            response = self.application(
+                environ, extract_response_headers(_start_response, local_dict)
+            )
             return response
 
         finally:
@@ -133,19 +140,9 @@ class OdooMiddleware(object):
         transaction = try_apm_start_transaction(extended=extended)
         local_dict = {'content_length': 0, 'status_code': 500}
         try:
-
-            def _start_response(status, headers):
-                try:
-                    local_dict['status_code'] = int(status[:3])  # e.g. 200 OK
-                except Exception as e:
-                    logger.exception(e)
-                headers_dict = _extract_headers(headers)
-                local_dict['content_length'] = headers_dict.get(
-                    'Content-Length'
-                )
-                return start_response(status, headers)
-
-            response = self.application(environ, _start_response)
+            response = self.application(
+                environ, extract_response_headers(start_response, local_dict)
+            )
         finally:
             if transaction:
                 try_apm_stop_and_queue_transaction(
