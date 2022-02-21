@@ -1,6 +1,7 @@
 import os
 import sys
 import json
+import tracemalloc
 import warnings
 import threading
 import logging
@@ -8,7 +9,7 @@ import _blackfire_profiler as _bfext
 from contextlib import contextmanager
 from collections import Counter
 from blackfire.utils import urlencode, IS_PY3, get_logger, RuntimeMetrics, \
-    get_time, json_prettify
+    get_time, json_prettify, import_module
 from blackfire.exceptions import *
 from blackfire.hooks import nw
 
@@ -455,6 +456,21 @@ def start(
     if ctx_var is not None:
         if not apm_extended_trace:
             profile_timespan = False
+
+    # Use tracemalloc for some libraries like numpy. They have their own allocators
+    # and use tracemalloc APIs to track the allocations. See: PyTraceMalloc_Track API
+    # There might be a possibility that a general memory tracer API might be
+    # investigated in the future: 
+    # https://mail.python.org/archives/list/python-dev@python.org/thread/BHOIDGRUWPM5WEOB3EIDPOJLDMU4WQ4F/
+    use_tracemalloc = False
+    _TRACEMALLOC_REQUIRED_MODS = ['numpy']
+    if profile_memory:
+        for tm in _TRACEMALLOC_REQUIRED_MODS:
+            # is module importable?
+            if import_module(tm):
+                use_tracemalloc = True
+                #tracemalloc.start(1)
+                break
 
     _bfext.start(
         builtins,
