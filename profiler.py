@@ -1,3 +1,4 @@
+from inspect import trace
 import os
 import sys
 import json
@@ -12,6 +13,13 @@ from blackfire.utils import urlencode, IS_PY3, get_logger, RuntimeMetrics, \
     get_time, json_prettify, import_module
 from blackfire.exceptions import *
 from blackfire.hooks import nw
+
+TRACEMALLOC_AVAIL = False
+try:
+    import tracemalloc
+    TRACEMALLOC_AVAIL = True
+except:
+    pass
 
 __all__ = ['start', 'stop', 'get_traces', 'clear_traces', 'run']
 
@@ -100,6 +108,12 @@ def _set_threading_profile(on, _):
         threading.setprofile(None)
 
 
+def _get_tracemalloc_traced_memory(*args):
+    # If something fails: e.g: tracemalloc is not available, the exception will
+    # be printed but application will continue its normal flow.
+    return tracemalloc.get_traced_memory()
+
+
 # used from testing to set Probe state to a consistent state
 def reset():
     initialize()
@@ -110,6 +124,7 @@ def initialize(
     s=_fn_matches_timespan_selector,
     m=runtime_metrics.memory,
     t=_set_threading_profile,
+    tm=_get_tracemalloc_traced_memory,
 ):
     _bfext._initialize(locals(), log)
 
@@ -460,16 +475,16 @@ def start(
     # Use tracemalloc for some libraries like numpy. They have their own allocators
     # and use tracemalloc APIs to track the allocations. See: PyTraceMalloc_Track API
     # There might be a possibility that a general memory tracer API might be
-    # investigated in the future: 
+    # investigated in the future:
     # https://mail.python.org/archives/list/python-dev@python.org/thread/BHOIDGRUWPM5WEOB3EIDPOJLDMU4WQ4F/
     use_tracemalloc = False
     _TRACEMALLOC_REQUIRED_MODS = ['numpy']
-    if profile_memory:
+    if profile_memory and TRACEMALLOC_AVAIL:
         for tm in _TRACEMALLOC_REQUIRED_MODS:
             # is module importable?
             if import_module(tm):
                 use_tracemalloc = True
-                #tracemalloc.start(1)
+                tracemalloc.start()
                 break
 
     _bfext.start(
@@ -478,6 +493,7 @@ def start(
         profile_memory,
         profile_nw,
         profile_timespan,
+        use_tracemalloc,
         instrumented_funcs,
         timespan_selectors,
         timespan_threshold,
@@ -492,6 +508,8 @@ def start(
 
 def stop():
     _bfext.stop()
+    if TRACEMALLOC_AVAIL:
+        tracemalloc.stop()
 
 
 def get_traces(omit_sys_path_dirs=True, extended=False):
