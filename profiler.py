@@ -2,7 +2,6 @@ from inspect import trace
 import os
 import sys
 import json
-import tracemalloc
 import warnings
 import threading
 import logging
