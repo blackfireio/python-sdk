@@ -2,7 +2,6 @@ from inspect import trace
 import os
 import sys
 import json
-import warnings
 import threading
 import logging
 import _blackfire_profiler as _bfext
@@ -13,6 +12,7 @@ from blackfire.utils import urlencode, IS_PY3, get_logger, RuntimeMetrics, \
 from blackfire.exceptions import *
 from blackfire.hooks import nw
 
+TRACEMALLOC_REQUIRED_MODULES = ['numpy']
 TRACEMALLOC_AVAIL = False
 try:
     import tracemalloc
@@ -477,14 +477,11 @@ def start(
     # investigated in the future:
     # https://mail.python.org/archives/list/python-dev@python.org/thread/BHOIDGRUWPM5WEOB3EIDPOJLDMU4WQ4F/
     use_tracemalloc = False
-    _TRACEMALLOC_REQUIRED_MODS = ['numpy']
     if profile_memory and TRACEMALLOC_AVAIL:
-        for tm in _TRACEMALLOC_REQUIRED_MODS:
-            # is module importable?
-            if import_module(tm):
-                use_tracemalloc = True
-                tracemalloc.start()
-                break
+        if any([import_module(tm) for tm in TRACEMALLOC_REQUIRED_MODULES]) or \
+            os.environ.get('BLACKFIRE_USE_TRACEMALLOC'):
+            use_tracemalloc = True
+            tracemalloc.start()
 
     _bfext.start(
         builtins,
