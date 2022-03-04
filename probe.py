@@ -344,7 +344,9 @@ def enable(end_at_exit=False):
     global _config, _probe
 
     if not _config:
-        initialize()
+        raise BlackfireApiException(
+            'No configuration set. initialize should be called first.'
+        )
 
     if profiler.is_session_active():
         raise BlackfireApiException('Another probe is already profiling')
