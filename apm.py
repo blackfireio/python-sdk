@@ -87,10 +87,12 @@ class _ApmWorker(Thread):
         self._closed = True
 
     def join(self):
+        # The reason of this defensive check here:
         # We start ApmWorker thread lazily in _ensure_worker_started.
         # There is a possibilty where there is Connection issue with the Agent
-        # and probe pauses APM and then a join() is called. This is an example
-        # of one of the situations for making this defensive check here.
+        # and probe pauses APM and then a join() is called. This is only an
+        # example, there might be many more scenarios leading up here without a
+        # started Thread.
         if not self.started:
             return
         super(_ApmWorker, self).join()
@@ -155,7 +157,6 @@ class ApmProbeConfig(object):
 _apm_config = ApmConfig()
 _apm_probe_config = ApmProbeConfig()
 _apm_worker = _ApmWorker()
-_apm_worker._ensure_worker_started
 
 # _state is a per-context resource. An example use: it holds current executing APM transaction
 _state = ContextDict('bf_apm_state')
