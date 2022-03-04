@@ -7,6 +7,7 @@ import _blackfire_profiler as _bfext
 from collections import defaultdict
 from blackfire.utils import urlparse, get_logger, IS_PY3, parse_qsl, read_blackfireyml_content, \
     replace_bad_chars, get_time, unquote, UC, unicode_or_bytes
+from blackfire import apm
 
 log = get_logger(__name__)
 _blackfire_keys = None
@@ -102,6 +103,7 @@ class Connection(object):
         try:
             self._socket.connect(self._sock_addr)
         except Exception as e:
+            apm.pause(reason=e)
             raise BlackfireApiException(
                 'Agent connection failed.[%s][%s]' % (e, self.agent_socket)
             )
@@ -126,6 +128,7 @@ class Connection(object):
                 self._socket.sendall(data[:Protocol.MAX_SEND_SIZE])
                 data = data[Protocol.MAX_SEND_SIZE:]
         except Exception as e:
+            apm.pause(reason=e)
             raise BlackfireApiException(
                 'Agent send data failed.[%s][%s]' % (e, data)
             )
@@ -154,6 +157,7 @@ class Connection(object):
                     break
 
         except Exception as e:
+            apm.pause(reason=e)
             raise BlackfireApiException('Agent recv data failed.[%s]' % (e))
 
         return result

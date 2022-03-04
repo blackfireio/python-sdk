@@ -1,5 +1,6 @@
 import random
 import os
+import time
 import logging
 import platform
 import re
@@ -21,6 +22,9 @@ log = get_logger(__name__)
 _DEFAULT_TIMESPAN_LIMIT_PER_RULE = 100
 _DEFAULT_TIMESPAN_LIMIT_GLOBAL = 200
 _DEFAULT_APM_QUEUE_SIZE = 100000
+_PAUSE_DURATION = 300  # secs
+_paused = False
+_paused_until = 0
 
 __all__ = [
     'set_transaction_name', 'set_tag', 'ignore_transaction',
@@ -82,6 +86,15 @@ class _ApmWorker(Thread):
         self._add_task_safe((None, None, None))
         self._closed = True
 
+    def join(self):
+        # We start ApmWorker thread lazily in _ensure_worker_started.
+        # There is a possibilty where there is Connection issue with the Agent
+        # and probe pauses APM and then a join() is called. This is an example
+        # of one of the situations for making this defensive check here.
+        if not self.started:
+            return
+        super(_ApmWorker, self).join()
+
 
 class ApmConfig(object):
 
@@ -142,6 +155,7 @@ class ApmProbeConfig(object):
 _apm_config = ApmConfig()
 _apm_probe_config = ApmProbeConfig()
 _apm_worker = _ApmWorker()
+_apm_worker._ensure_worker_started
 
 # _state is a per-context resource. An example use: it holds current executing APM transaction
 _state = ContextDict('bf_apm_state')
@@ -203,6 +217,36 @@ def _get_current_transaction():
     return _state.get('transaction')
 
 
+def pause(reason):
+    global _paused, _paused_until
+
+    _paused = True
+    _paused_until = time.time() + _PAUSE_DURATION
+
+    log.warning(
+        "APM is paused for %s seconds. [reason:%s]", _PAUSE_DURATION, reason
+    )
+
+
+def unpause():
+    global _paused, _paused_until
+
+    _paused = False
+    _paused_until = 0
+    log.debug("APM unpaused.")
+
+
+def is_paused():
+    global _paused, _paused_until
+
+    if _paused:
+        if time.time() <= _paused_until:
+            return True
+        unpause()
+
+    return False
+
+
 def set_transaction_name(name):
     curr_transaction = _get_current_transaction()
     if curr_transaction:
@@ -233,6 +277,7 @@ def _start_transaction(extended=False, ctx_var=None):
             "APM transaction cannot be started as another transaction is in progress."
         )
         return
+
     if profiler.is_session_active():
         log.debug(
             "APM transaction cannot be started as a profile is in progress."
@@ -498,6 +543,10 @@ def _send_trace(req):
 
 def _queue_trace(transaction, **kwargs):
     global _apm_config, _apm_worker
+
+    if is_paused():
+        log.debug("Transaction ignored since APM is paused.")
+        return
 
     if transaction.ignored:
         return
