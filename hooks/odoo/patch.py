@@ -5,6 +5,13 @@ log = get_logger(__name__)
 
 
 def patch():
+    module = import_module('odoo')
+    if not module:
+        return False
+
+    # already patched?
+    if getattr(module, '_blackfire_patch', False):
+        return
 
     # this defensive check is necessary since sometimes argv is not present
     # during bootstrap
@@ -20,14 +27,6 @@ def patch():
             odoo_path = os.path.dirname(executable_path)
             log.debug("Detected Odoo path: %s", odoo_path)
             sys.path.append(odoo_path)
-
-    module = import_module('odoo')
-    if not module:
-        return False
-
-    # already patched?
-    if getattr(module, '_blackfire_patch', False):
-        return
 
     try:
         from blackfire.hooks.odoo.middleware import OdooMiddleware
