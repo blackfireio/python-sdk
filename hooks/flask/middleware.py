@@ -194,7 +194,7 @@ class BlackfireWSGIMiddleware(object):
         # profile
         query = environ.get('HTTP_X_BLACKFIRE_QUERY')
         if query:
-            self._blackfired_request(environ, start_response, query)
+            return self._blackfired_request(environ, start_response, query)
 
         # auto-profile
         trigger_auto_profile, key_page = apm.trigger_auto_profile(
