@@ -105,8 +105,7 @@ class BlackfireWSGIMiddleware(object):
         Custom WSGI middlewares need to override this function and return a 
         proper Response class
         '''
-        from werkzeug.wrappers import Response
-        return Response
+        raise NotImplemented('')
 
     def _blackfired_request(self, environ, start_response, query):
         log.debug("_blackfired_request called. [query=%s]", query)
@@ -217,9 +216,15 @@ class BlackfireWSGIMiddleware(object):
 
 class BlackfireFlaskMiddleware(BlackfireWSGIMiddleware):
 
+    FRAMEWORK = 'Flask'
+
     def __init__(self, flask_app):
         self.app = flask_app.wsgi_app
         self.flask_app = flask_app
+
+    def get_response_class(self):
+        from werkzeug.wrappers import Response
+        return Response
 
     def get_view_name(self, method, url):
         """This is a best effort to get the viewname in wsgi.__call__ method. 
