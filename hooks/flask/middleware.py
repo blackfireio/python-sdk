@@ -66,6 +66,26 @@ def end_profile(response):
 # TODO: Maybe add __class__.__name__ to logs?
 
 
+def _extract_response_headers(headers):
+    return dict((k, v) for (k, v) in headers)
+
+
+def _catch_response_headers(environ, start_response):
+
+    def _wrapper(status, headers):
+        try:
+            environ['blackfire.status_code'] = int(status[:3])
+            headers_dict = _extract_response_headers(headers)
+            environ['blackfire.content_length'] = headers_dict.get(
+                'Content-Length', 0
+            )
+        except Exception as e:
+            log.exception(e)
+        return start_response(status, headers)
+
+    return _wrapper
+
+
 class BlackfireWSGIMiddleware(object):
 
     # Custom WSGI middlewares should override this value
@@ -111,9 +131,6 @@ class BlackfireWSGIMiddleware(object):
 
                 return response_klass()(environ, start_response)
 
-        def _extract_headers(headers):
-            return dict((k, v) for (k, v) in headers)
-
         probe_err, probe = try_enable_probe(query)
 
         def _start_response(status, headers):
@@ -129,20 +146,15 @@ class BlackfireWSGIMiddleware(object):
                                 probe.get_agent_prolog_response().status_val
                             )
                         )
-                        environ['blackfire.endpoint'] = get_current_request(
-                        ).endpoint
-                        environ['blackfire.status_code'] = int(status[:3])
-                        headers_dict = _extract_headers(headers)
-                        environ['blackfire.content_length'] = headers_dict.get(
-                            'Content-Length', 0
-                        )
             except Exception as e:
-                log.exception(e)  # defensive
+                log.exception(e)
 
             return start_response(status, headers)
 
         try:
-            return self.app(environ, _start_response)
+            return self.app(
+                environ, _catch_response_headers(environ, _start_response)
+            )
         finally:
             log.debug("_blackfired_request ended.")
 
@@ -172,31 +184,35 @@ class BlackfireWSGIMiddleware(object):
                 )
 
     def __call__(self, environ, start_response):
+        # method/path_info are mandatory in WSGI spec.
+        method = environ['REQUEST_METHOD']
+        path_info = environ['PATH_INFO']
+        view_name = environ['blackfire.endpoint'] = self.get_view_name(
+            method, path_info
+        )
+
         # profile
         query = environ.get('HTTP_X_BLACKFIRE_QUERY')
         if query:
             self._blackfired_request(environ, start_response, query)
 
         # auto-profile
-        view_name = self.get_view_name(
-            environ.get('REQUEST_URI'), environ.get('REQUEST_METHOD')
-        )
         trigger_auto_profile, key_page = apm.trigger_auto_profile(
-            environ.get('REQUEST_METHOD', ''), environ.get('REQUEST_URI', ''),
-            view_name
+            method, path_info, view_name
         )
         if trigger_auto_profile:
-            logger.debug("Odoo autoprofile triggered.")
-            query = apm.get_autoprofile_query(
-                environ['REQUEST_METHOD'], environ['REQUEST_URI'], key_page
-            )
+            log.debug("autoprofile triggered.")
+            query = apm.get_autoprofile_query(method, path_info, key_page)
             if query:
                 return self._blackfired_request(environ, start_response, query)
 
-        try:
-            return self.app(environ, start_response)
-        finally:
-            pass
+        # todo: implement _apm_trace
+        if apm.trigger_trace():
+            return self._apm_trace(
+                environ, start_response, extended=apm.trigger_extended_trace()
+            )
+
+        return self.app(environ, start_response)
 
 
 class BlackfireFlaskMiddleware(BlackfireWSGIMiddleware):
@@ -205,10 +221,12 @@ class BlackfireFlaskMiddleware(BlackfireWSGIMiddleware):
         self.app = flask_app.wsgi_app
         self.flask_app = flask_app
 
-    def get_view_name(self, url, method):
-        """This is a best effort to get the viewname in wsgi.__call__ method. While 
-        running in Flask context, it is easy to get this value from the Request object
-        via `request.endpoint` but wsgi.__call__ is not running in request context.
+    def get_view_name(self, method, url):
+        """This is a best effort to get the viewname in wsgi.__call__ method. 
+        
+        In fact, while running in Flask context, it is easy to get this value 
+        from the Request object via `request.endpoint` but wsgi.__call__ is not 
+        running in request context.
         
         The only place we run in request context in a standard WSGI middleware is
         the `start_response` callback. But if we check endpoint there and start 
