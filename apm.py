@@ -9,12 +9,11 @@ import atexit
 import _blackfire_profiler as _bfext
 from threading import Thread
 from blackfire.exceptions import *
-from blackfire.utils import get_logger, IS_PY3, json_prettify, ConfigParser, \
-    is_testing, get_load_avg, get_cpu_count, get_os_memory_usage, Queue, \
-    get_probed_runtime, get_time, urlencode, get_caller_frame, ContextDict, \
-    QueueFull
+from blackfire.utils import get_logger, IS_PY3, json_prettify, is_testing, \
+    get_load_avg, get_cpu_count, Queue, get_probed_runtime, get_time, \
+    urlencode, get_caller_frame, ContextDict, QueueFull
 from blackfire import agent, DEFAULT_AGENT_SOCKET, DEFAULT_AGENT_TIMEOUT, \
-    DEFAULT_CONFIG_FILE, profiler, VERSION, COST_DIMENSIONS
+ profiler, VERSION, COST_DIMENSIONS
 from contextlib import contextmanager
 
 log = get_logger(__name__)
