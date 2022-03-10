@@ -7,7 +7,7 @@ def _wrap_app(instance, *args, **kwargs):
     try:
         from blackfire.hooks.flask.middleware import BlackfireFlaskMiddleware
 
-        _ = BlackfireFlaskMiddleware(instance)
+        instance.wsgi_app = BlackfireFlaskMiddleware(instance)
 
         log.debug("Flask middleware enabled.")
     except Exception as e:

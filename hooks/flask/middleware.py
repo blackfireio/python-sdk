@@ -6,7 +6,7 @@ log = get_logger(__name__)
 
 class BlackfireFlaskMiddleware(BlackfireWSGIMiddleware):
 
-    FRAMEWORK = 'Flask'
+    FRAMEWORK = 'flask'
 
     def __init__(self, flask_app):
         self.app = flask_app.wsgi_app
