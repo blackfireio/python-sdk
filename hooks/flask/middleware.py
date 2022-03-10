@@ -17,7 +17,7 @@ class BlackfireFlaskMiddleware(BlackfireWSGIMiddleware):
         return Response
 
     def get_view_name(self, method, url):
-        """This is a best effort to get the viewname in wsgi.__call__ method. 
+        """This is a best effort to get the viewname at the start of Wsgi.__call__
         
         In fact, while running in Flask context, it is easy to get this value 
         from the Request object via `request.endpoint` but wsgi.__call__ is not 
