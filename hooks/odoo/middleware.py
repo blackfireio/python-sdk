@@ -4,28 +4,27 @@ from blackfire.utils import get_logger, read_blackfireyml_content
 from blackfire.hooks.utils import try_enable_probe, try_end_probe, \
     try_validate_send_blackfireyml, try_apm_start_transaction, try_apm_stop_and_queue_transaction
 
-logger = get_logger(__name__)
+log = get_logger(__name__)
+
+from blackfire.hooks.wsgi import BlackfireWSGIMiddleware
+
+log = get_logger(__name__)
 
 
-def _extract_headers(headers):
-    return dict((k, v) for (k, v) in headers)
+class OdooMiddleware(BlackfireWSGIMiddleware):
+
+    FRAMEWORK = 'odoo'
+
+    def get_response_class(self):
+        from werkzeug.wrappers import Response
+        return Response
+
+    def get_view_name(self, method, url):
+        # TODO: Maybe a way to retrieve this information?
+        return None
 
 
-def extract_response_headers(start_response, extracted_data):
-
-    def _wrapper(status, headers):
-        try:
-            extracted_data['status_code'] = int(status[:3])  # e.g. 200 OK
-        except Exception as e:
-            logger.exception(e)
-        headers_dict = _extract_headers(headers)
-        extracted_data['content_length'] = headers_dict.get('Content-Length')
-        return start_response(status, headers)
-
-    return _wrapper
-
-
-class OdooMiddleware(object):
+class OdooMiddleware2(object):
 
     def __init__(self, application):
         self.application = application

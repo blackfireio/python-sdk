@@ -147,7 +147,7 @@ class BlackfireWSGIMiddleware(object):
     def __call__(self, environ, start_response):
         # method/path_info are mandatory in WSGI spec.
         method = environ['REQUEST_METHOD']
-        path_info = environ['PATH_INFO']
+        path_info = environ.get('PATH_INFO', '')  # defensive
         view_name = environ['blackfire.endpoint'] = self.get_view_name(
             method, path_info
         )
@@ -158,6 +158,12 @@ class BlackfireWSGIMiddleware(object):
             return self._profile(environ, start_response, query)
 
         # auto-profile
+        # path_info is used for matching the key-page controller-name. The key is
+        # always present as per WSGI spec and gives more consistent values while
+        # switching between staging/prod servers.
+        # See https://docs.djangoproject.com/en/4.0/ref/request-response/#django.http.HttpRequest.path_info
+        # for more information
+        # Also see: https://wsgi.readthedocs.io/en/latest/definitions.html#envvar-PATH_INFO
         trigger_auto_profile, key_page = apm.trigger_auto_profile(
             method, path_info, view_name
         )
