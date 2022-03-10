@@ -50,6 +50,14 @@ class BlackfireWSGIMiddleware(object):
         '''
         raise NotImplemented('')
 
+    def get_view_name(self, method, url):
+        '''This function is called at the start of wsgi.__call__ to retrieve the
+        actual view function name. Usually, the view function is not retrieved by 
+        here but we need this information to match controller-name field in APM
+        key-pages.
+        '''
+        raise NotImplemented('')
+
     def _profile(self, environ, start_response, query):
         log.debug("_blackfired_request called. [query=%s]", query)
 
