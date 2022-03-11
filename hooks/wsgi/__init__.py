@@ -51,7 +51,7 @@ class BlackfireWSGIMiddleware(object):
         '''
         raise NotImplemented('')
 
-    def get_response(self, *args, **kwargs):
+    def get_app_response(self, *args, **kwargs):
         return self.app(*args)
 
     def _profile(self, environ, start_response, query):
@@ -95,7 +95,7 @@ class BlackfireWSGIMiddleware(object):
         #self.before_request()
 
         try:
-            return self.get_response(
+            return self.get_app_response(
                 environ, _catch_response_headers(environ, _start_response)
             )
         finally:
@@ -129,7 +129,7 @@ class BlackfireWSGIMiddleware(object):
     def _trace(self, environ, start_response, extended=False):
         transaction = try_apm_start_transaction(extended=extended)
         try:
-            return self.get_response(
+            return self.get_app_response(
                 environ, _catch_response_headers(environ, start_response)
             )
         finally:
@@ -180,4 +180,4 @@ class BlackfireWSGIMiddleware(object):
                 environ, start_response, extended=apm.trigger_extended_trace()
             )
 
-        return self.get_response(environ, start_response)
+        return self.get_app_response(environ, start_response)
