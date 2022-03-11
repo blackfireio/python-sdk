@@ -8,7 +8,7 @@ class OdooMiddleware(BlackfireWSGIMiddleware):
 
     FRAMEWORK = 'odoo'
 
-    def get_blackfire_yml_response(
+    def build_blackfire_yml_response(
         self, blackfireyml_content, agent_response, environ, start_response
     ):
         from werkzeug.wrappers import Response
@@ -20,6 +20,6 @@ class OdooMiddleware(BlackfireWSGIMiddleware):
 
         return Response()(environ, start_response)
 
-    def get_view_name(self, method, url):
+    def get_view_name(self, environ):
         # TODO: Maybe a way to retrieve this information?
         return None

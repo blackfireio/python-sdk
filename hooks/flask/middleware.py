@@ -1,5 +1,6 @@
 from blackfire.utils import get_logger
 from blackfire.hooks.wsgi import BlackfireWSGIMiddleware
+from blackfire.hooks.utils import add_probe_response_header
 
 log = get_logger(__name__)
 
@@ -12,19 +13,20 @@ class BlackfireFlaskMiddleware(BlackfireWSGIMiddleware):
         self.app = flask_app.wsgi_app
         self.flask_app = flask_app
 
-    def get_blackfire_yml_response(
-        self, blackfireyml_content, agent_response, environ, start_response
+    def build_blackfire_yml_response(
+        self, blackfireyml_content, agent_response, environ, start_response,
+        *args
     ):
-        from werkzeug.wrappers import Response
-        # send response if signature is validated
-        if agent_response:
-            return Response(
-                response=blackfireyml_content or '', headers=[agent_response]
-            )(environ, start_response)
+        from flask import Response
 
-        return Response()(environ, start_response)
+        response = Response()
+        if agent_response:  # send response if signature is validated
+            response.data = blackfireyml_content or ''
+            add_probe_response_header(response.headers, agent_response)
 
-    def get_view_name(self, method, url):
+        return response(environ, start_response)
+
+    def get_view_name(self, environ):
         """This is a best effort to get the viewname at the start of Wsgi.__call__
         
         In fact, while running in Flask context, it is easy to get this value 
@@ -37,20 +39,26 @@ class BlackfireFlaskMiddleware(BlackfireWSGIMiddleware):
         the middlewares that ran before ours. As a general rule of thumb: we would 
         like to start the profiler as early as possible and end as late as possible.
         """
-        from werkzeug.routing import RequestRedirect, MethodNotAllowed, NotFound
 
-        adapter = self.flask_app.url_map.bind('dummy')
-        try:
-            match = adapter.match(url, method=method)
-        except RequestRedirect as e:
-            # recursively match redirects
-            return self.get_view_name(e.new_url, method)
-        except (MethodNotAllowed, NotFound):
-            return None
+        def _get_view_name(method, url):
+            from werkzeug.routing import RequestRedirect, MethodNotAllowed, NotFound
 
-        try:
-            r = self.flask_app.view_functions[match[0]]
-            return r.__name__
-        except KeyError:
-            # no view is associated with the endpoint
-            return None
+            adapter = self.flask_app.url_map.bind('dummy')
+            try:
+                match = adapter.match(url, method=method)
+            except RequestRedirect as e:
+                # recursively match redirects
+                return _get_view_name(e.new_url, method)
+            except (MethodNotAllowed, NotFound):
+                return None
+
+            try:
+                r = self.flask_app.view_functions[match[0]]
+                return r.__name__
+            except KeyError:
+                # no view is associated with the endpoint
+                return None
+
+        return _get_view_name(
+            environ['REQUEST_METHOD'], environ.get('PATH_INFO', '')
+        )
