@@ -8,9 +8,17 @@ class OdooMiddleware(BlackfireWSGIMiddleware):
 
     FRAMEWORK = 'odoo'
 
-    def get_response_class(self):
+    def get_blackfire_yml_response(
+        self, blackfireyml_content, agent_response, environ, start_response
+    ):
         from werkzeug.wrappers import Response
-        return Response
+        # send response if signature is validated
+        if agent_response:
+            return Response(
+                response=blackfireyml_content or '', headers=[agent_response]
+            )(environ, start_response)
+
+        return Response()(environ, start_response)
 
     def get_view_name(self, method, url):
         # TODO: Maybe a way to retrieve this information?

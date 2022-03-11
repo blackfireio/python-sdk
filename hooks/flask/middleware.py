@@ -12,9 +12,17 @@ class BlackfireFlaskMiddleware(BlackfireWSGIMiddleware):
         self.app = flask_app.wsgi_app
         self.flask_app = flask_app
 
-    def get_response_class(self):
+    def get_blackfire_yml_response(
+        self, blackfireyml_content, agent_response, environ, start_response
+    ):
         from werkzeug.wrappers import Response
-        return Response
+        # send response if signature is validated
+        if agent_response:
+            return Response(
+                response=blackfireyml_content or '', headers=[agent_response]
+            )(environ, start_response)
+
+        return Response()(environ, start_response)
 
     def get_view_name(self, method, url):
         """This is a best effort to get the viewname at the start of Wsgi.__call__

@@ -1,4 +1,4 @@
-from blackfire.utils import wrap, import_module, get_logger
+from blackfire.utils import import_module, get_logger
 from blackfire.hooks.fastapi.middleware import BlackfireFastAPIMiddleware
 
 log = get_logger(__name__)

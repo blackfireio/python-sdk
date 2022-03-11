@@ -37,17 +37,10 @@ class BlackfireWSGIMiddleware(object):
     def __init__(self, app):
         self.app = app
 
-    def get_response_class(self):
-        '''This function retrieves the Response class per framework. There are
-        situations where the Middleware needs to return a custom Response object.
-        (e.g: sending .blackfire.yml in builds)
-
-        We make this a function rather than a class attribute since we need this 
-        to be lazily imported in runtime
-
-        Custom WSGI middlewares need to override this function and return a 
-        proper Response class
-        '''
+    def get_blackfire_yml_response(
+        self, blackfireyml_content, agent_response, environ, start_response
+    ):
+        # TODO: Write comment
         raise NotImplemented('')
 
     def get_view_name(self, method, url):
@@ -57,6 +50,9 @@ class BlackfireWSGIMiddleware(object):
         key-pages.
         '''
         raise NotImplemented('')
+
+    def get_response(self, *args, **kwargs):
+        return self.app(*args)
 
     def _profile(self, environ, start_response, query):
         log.debug("_blackfired_request called. [query=%s]", query)
@@ -71,15 +67,10 @@ class BlackfireWSGIMiddleware(object):
                     config, blackfireyml_content
                 )
 
-                response_klass = self.get_response_class()
-                # send response if signature is validated
-                if agent_response:
-                    return response_klass(
-                        response=blackfireyml_content or '',
-                        headers=[agent_response]
-                    )(environ, start_response)
-
-                return response_klass()(environ, start_response)
+                return self.get_blackfire_yml_response(
+                    blackfireyml_content, agent_response, environ,
+                    start_response
+                )
 
         probe_err, probe = try_enable_probe(query)
 
@@ -101,8 +92,10 @@ class BlackfireWSGIMiddleware(object):
 
             return start_response(status, headers)
 
+        #self.before_request()
+
         try:
-            return self.app(
+            return self.get_response(
                 environ, _catch_response_headers(environ, _start_response)
             )
         finally:
@@ -136,7 +129,7 @@ class BlackfireWSGIMiddleware(object):
     def _trace(self, environ, start_response, extended=False):
         transaction = try_apm_start_transaction(extended=extended)
         try:
-            return self.app(
+            return self.get_response(
                 environ, _catch_response_headers(environ, start_response)
             )
         finally:
@@ -187,4 +180,4 @@ class BlackfireWSGIMiddleware(object):
                 environ, start_response, extended=apm.trigger_extended_trace()
             )
 
-        return self.app(environ, start_response)
+        return self.get_response(environ, start_response)
