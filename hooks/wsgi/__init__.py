@@ -6,8 +6,6 @@ from blackfire.hooks.utils import try_enable_probe, try_end_probe, add_probe_res
 
 log = get_logger(__name__)
 
-# TODO: Maybe add __class__.__name__ to logs?
-
 
 def _extract_response_headers(headers):
     return dict((k, v) for (k, v) in headers)
@@ -55,7 +53,7 @@ class BlackfireWSGIMiddleware(object):
     def enable_probe(self, query):
         return try_enable_probe(query)
 
-    def end_probe(self, probe, probe_err, environ):
+    def end_probe(self, response, probe, probe_err, environ):
         if probe:
             return try_end_probe(
                 probe,
@@ -81,13 +79,18 @@ class BlackfireWSGIMiddleware(object):
             )
 
     def _profile(self, query, environ, start_response):
-        log.debug("_blackfired_request called. [query=%s]", query)
+        log.debug(
+            "%s profile called. [query=%s]", self.__class__.__name__, query
+        )
 
         # bf yaml asked?
         if environ['REQUEST_METHOD'] == 'POST':
             config = generate_config(query=query)
             if config.is_blackfireyml_asked():
-                log.debug('autobuild triggered. Sending `.blackfire.yml` file.')
+                log.debug(
+                    '%s autobuild triggered. Sending `.blackfire.yml` file.',
+                    self.__class__.__name__,
+                )
                 blackfireyml_content = read_blackfireyml_content()
                 agent_response = try_validate_send_blackfireyml(
                     config, blackfireyml_content
@@ -119,20 +122,25 @@ class BlackfireWSGIMiddleware(object):
             return start_response(status, headers)
 
         try:
-            return self.get_app_response(
+            response = self.get_app_response(
                 environ, _catch_response_headers(environ, _start_response)
             )
+            return response
         finally:
-            log.debug("_blackfired_request ended.")
+            log.debug(
+                "%s profile ended.",
+                self.__class__.__name__,
+            )
 
-            self.end_probe(probe, probe_err, environ)
+            self.end_probe(response, probe, probe_err, environ)
 
     def _trace(self, environ, start_response, extended=False):
         transaction = try_apm_start_transaction(extended=extended)
         try:
-            return self.get_app_response(
+            response = self.get_app_response(
                 environ, _catch_response_headers(environ, start_response)
             )
+            return response
         finally:
             if transaction:
                 try_apm_stop_and_queue_transaction(
@@ -168,7 +176,7 @@ class BlackfireWSGIMiddleware(object):
             method, path_info, view_name
         )
         if trigger_auto_profile:
-            log.debug("autoprofile triggered.")
+            log.debug("%s autoprofile triggered.", self.__class__.__name__)
             query = apm.get_autoprofile_query(method, path_info, key_page)
             if query:
                 return self._profile(query, environ, start_response)

@@ -1,4 +1,4 @@
-def get_current_view_name(request):
+def get_current_view_name(path):
     try:
         from django.urls import resolve
     except:
@@ -11,6 +11,6 @@ def get_current_view_name(request):
         pass
 
     try:
-        return resolve(request.path).view_name
+        return resolve(path).view_name
     except:
         pass

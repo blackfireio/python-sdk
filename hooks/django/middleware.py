@@ -1,4 +1,4 @@
-from blackfire import probe, apm, generate_config
+from blackfire import apm, generate_config
 from blackfire.utils import get_logger, read_blackfireyml_content
 from blackfire.hooks.utils import try_enable_probe, try_end_probe, \
     add_probe_response_header, try_validate_send_blackfireyml, try_apm_start_transaction, \
@@ -50,174 +50,112 @@ class _DjangoCursorWrapper:
         self.close()
 
 
-class BlackfireDjangoMiddleware(object):
+from blackfire.hooks.wsgi import BlackfireWSGIMiddleware
+
+
+def _enable_sql_instrumentation():
+
+    def wrap_cursor(connection):
+        if not hasattr(connection, "_blackfire_cursor"):
+            connection._blackfire_cursor = connection.cursor
+            connection._blackfire_chunked_cursor = connection.chunked_cursor
+
+            def cursor(*args, **kwargs):
+                return _DjangoCursorWrapper(
+                    connection._blackfire_cursor(*args, **kwargs)
+                )
+
+            def chunked_cursor(*args, **kwargs):
+                return _DjangoCursorWrapper(
+                    connection._blackfire_chunked_cursor(*args, **kwargs)
+                )
+
+            connection.cursor = cursor
+            connection.chunked_cursor = chunked_cursor
+            return cursor
+
+    from django.db import connections
+    try:
+        for connection in connections.all():
+            wrap_cursor(connection)
+    except Exception as e:
+        log.exception(e)
+
+
+def _disable_sql_instrumentation():
+
+    def unwrap_cursor(connection):
+        if hasattr(connection, "_blackfire_cursor"):
+            del connection._blackfire_cursor
+            del connection.cursor
+            del connection.chunked_cursor
+
+    from django.db import connections
+    try:
+        for connection in connections.all():
+            unwrap_cursor(connection)
+    except Exception as e:
+        log.exception(e)
+
+
+class BlackfireDjangoMiddleware(BlackfireWSGIMiddleware):
+    FRAMEWORK = 'django'
 
     def __init__(self, get_response):
         self.get_response = get_response
 
-    def __call__(self, request):
-        # bf yaml asked?
-        if request.method == 'POST':
-            if 'HTTP_X_BLACKFIRE_QUERY' in request.META:
-                config = generate_config(
-                    query=request.META['HTTP_X_BLACKFIRE_QUERY']
-                )
-                if config.is_blackfireyml_asked():
-                    log.debug(
-                        'Django autobuild triggered. Sending `.blackfire.yml` file.'
-                    )
-                    blackfireyml_content = read_blackfireyml_content()
-                    agent_response = try_validate_send_blackfireyml(
-                        config, blackfireyml_content
-                    )
-                    from django.http import HttpResponse
+    def build_blackfire_yml_response(
+        self, blackfireyml_content, agent_response, *args
+    ):
+        from django.http import HttpResponse
 
-                    response = HttpResponse()
-                    if agent_response:  # send response if signature is validated
-                        response.content = blackfireyml_content or ''
-                        add_probe_response_header(response, agent_response)
-
-                    return response
-
-        # regular profile
-        if 'HTTP_X_BLACKFIRE_QUERY' in request.META:
-            return self._profiled_request(
-                request, request.META['HTTP_X_BLACKFIRE_QUERY']
-            )
-
-        # auto-profile triggered?
-        trigger_auto_profile, key_page = apm.trigger_auto_profile(
-            request.method, request.path, get_current_view_name(request)
-        )
-        if trigger_auto_profile:
-            log.debug("DjangoMiddleware autoprofile triggered.")
-            query = apm.get_autoprofile_query(
-                request.method, request.path, key_page
-            )
-            if query:
-                return self._profiled_request(request, query)
-
-        if apm.trigger_trace():
-            return self._apm_trace(
-                request, extended=apm.trigger_extended_trace()
-            )
-
-        # no instrumentation
-        response = self.get_response(request)
+        response = HttpResponse()
+        if agent_response:  # send response if signature is validated
+            response.content = blackfireyml_content or ''
+            add_probe_response_header(response, agent_response)
         return response
 
-    def _apm_trace(self, request, extended=False):
-        transaction = try_apm_start_transaction(extended=extended)
-        response = None
-        try:
-            response = self.get_response(request)
-        finally:
-            if transaction:
-                try_apm_stop_and_queue_transaction(
-                    controller_name=transaction.name
-                    or get_current_view_name(request),
-                    uri=request.path,
-                    framework="django",
-                    http_host=request.META.get('HTTP_HOST'),
-                    method=request.method,
-                    response_code=response.status_code if response else 500,
-                    stdout=len(response.content) if response else 0,
-                )
+    def get_view_name(self, environ):
+        return get_current_view_name(environ['PATH'])
+
+    def get_app_response(self, environ, *args, **kwargs):
+        response = self.get_response(environ["blackfire.orig_request"])
+
+        environ['blackfire.status_code'] = response.status_code
+        environ['blackfire.content_length'] = len(response.content)
 
         return response
 
-    def _enable_sql_instrumentation(self):
+    def enable_probe(self, query):
+        probe_err, probe = try_enable_probe(query)
+        if not probe_err:
+            _enable_sql_instrumentation()
+        return probe_err, probe
 
-        def wrap_cursor(connection):
-            if not hasattr(connection, "_blackfire_cursor"):
-                connection._blackfire_cursor = connection.cursor
-                connection._blackfire_chunked_cursor = connection.chunked_cursor
+    def end_probe(self, response, probe, probe_err, environ):
+        if probe is None:
+            return
 
-                def cursor(*args, **kwargs):
-                    return _DjangoCursorWrapper(
-                        connection._blackfire_cursor(*args, **kwargs)
-                    )
-
-                def chunked_cursor(*args, **kwargs):
-                    return _DjangoCursorWrapper(
-                        connection._blackfire_chunked_cursor(*args, **kwargs)
-                    )
-
-                connection.cursor = cursor
-                connection.chunked_cursor = chunked_cursor
-                return cursor
-
-        from django.db import connections
-        try:
-            for connection in connections.all():
-                wrap_cursor(connection)
-        except Exception as e:
-            log.exception(e)
-
-    def _disable_sql_instrumentation(self):
-
-        def unwrap_cursor(connection):
-            if hasattr(connection, "_blackfire_cursor"):
-                del connection._blackfire_cursor
-                del connection.cursor
-                del connection.chunked_cursor
-
-        from django.db import connections
-        try:
-            for connection in connections.all():
-                unwrap_cursor(connection)
-        except Exception as e:
-            log.exception(e)
-
-    def _profiled_request(self, request, query):
-        log.debug(
-            "DjangoMiddleware._profiled_request called. [query=%s]", query
-        )
-
-        try:
-            probe_err, new_probe = try_enable_probe(query)
-            if not probe_err:
-                self._enable_sql_instrumentation()
-
-            # let user/django exceptions propagate through
-            response = self.get_response(request)
-
-            if probe_err:
-                add_probe_response_header(response, probe_err)
-                return response
-
-            probe_resp = try_end_probe(
-                new_probe,
-                response_status_code=response.status_code,
-                response_len=len(response.content),
-                controller_name=get_current_view_name(request),
-                framework="django",
-                http_method=request.method,
-                http_uri=request.path,
-                https='1' if request.is_secure() else '',
-                http_server_addr=request.META.get('SERVER_NAME'),
-                http_server_software=request.META.get('SERVER_SOFTWARE'),
-                http_server_port=request.META.get('SERVER_PORT'),
-                http_header_host=request.META.get('HTTP_HOST'),
-                http_header_user_agent=request.META.get('HTTP_USER_AGENT'),
-                http_header_x_forwarded_host=request.META
-                .get('HTTP_X_FORWARDED_HOST'),
-                http_header_x_forwarded_proto=request.META
-                .get('HTTP_X_FORWARDED_PROTO'),
-                http_header_x_forwarded_port=request.META
-                .get('HTTP_X_FORWARDED_PORT'),
-                http_header_forwarded=request.META.get('HTTP_FORWARDED'),
-            )
-
-            add_probe_response_header(response, probe_resp)
+        if probe_err:
+            add_probe_response_header(response, probe_err)
             return response
 
+        try:
+            probe_response = super(BlackfireDjangoMiddleware, self).end_probe(
+                response, probe, probe_err, environ
+            )
+
+            add_probe_response_header(response, probe_response)
+            return response
         finally:
-            log.debug("DjangoMiddleware._profiled_request ended.")
+            _disable_sql_instrumentation()
 
-            # code that will be run no matter what happened above
-            self._disable_sql_instrumentation()
-
-            if new_probe:
-                new_probe.disable()
-                new_probe.clear_traces()
+    def __call__(self, request):
+        # setup a proper environ dict and pass the request to a normal
+        # WSGI middleware
+        request.META['REQUEST_METHOD'] = request.method
+        request.META['PATH_INFO'] = request.path_info
+        request.META['REQUEST_URI'] = request.META['PATH'] = request.path
+        request.META['blackfire.orig_request'] = request
+        return super(BlackfireDjangoMiddleware,
+                     self).__call__(environ=request.META, start_response=None)
