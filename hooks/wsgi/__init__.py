@@ -1,13 +1,13 @@
 from blackfire.exceptions import *
 from blackfire import apm, generate_config
 from blackfire.utils import get_logger, read_blackfireyml_content
-from blackfire.hooks.utils import try_enable_probe, try_end_probe, add_probe_response_header, \
+from blackfire.hooks.utils import try_enable_probe, try_end_probe, \
     try_validate_send_blackfireyml, try_apm_start_transaction, try_apm_stop_and_queue_transaction
 
 log = get_logger(__name__)
 
 
-def _extract_response_headers(headers):
+def _headers_to_dict(headers):
     return dict((k, v) for (k, v) in headers)
 
 
@@ -16,7 +16,7 @@ def _catch_response_headers(environ, start_response):
     def _wrapper(status, headers):
         try:
             environ['blackfire.status_code'] = int(status[:3])
-            headers_dict = _extract_response_headers(headers)
+            headers_dict = _headers_to_dict(headers)
             environ['blackfire.content_length'] = headers_dict.get(
                 'Content-Length', 0
             )
@@ -30,7 +30,7 @@ def _catch_response_headers(environ, start_response):
 class BlackfireWSGIMiddleware(object):
 
     # Custom WSGI middlewares should override this value
-    FRAMEWORK = ''
+    FRAMEWORK = 'Generic-WSGI'
 
     def __init__(self, app):
         self.app = app
@@ -105,17 +105,16 @@ class BlackfireWSGIMiddleware(object):
 
         def _start_response(status, headers):
             try:
-                if probe:
-                    if probe_err:
-                        if probe_err is not BlackfireInvalidSignatureError:
-                            headers.append((probe_err[0], probe_err[1]))
-                    else:
-                        headers.append(
-                            (
-                                'X-Blackfire-Response',
-                                probe.get_agent_prolog_response().status_val
-                            )
+                if probe_err:
+                    if probe_err is not BlackfireInvalidSignatureError:
+                        headers.append((probe_err[0], probe_err[1]))
+                else:
+                    headers.append(
+                        (
+                            'X-Blackfire-Response',
+                            probe.get_agent_prolog_response().status_val
                         )
+                    )
             except Exception as e:
                 log.exception(e)
 
@@ -123,7 +122,10 @@ class BlackfireWSGIMiddleware(object):
 
         try:
             response = self.get_app_response(
-                environ, _catch_response_headers(environ, _start_response)
+                environ,
+                _catch_response_headers(
+                    environ, _start_response if probe else start_response
+                )
             )
             return response
         finally:

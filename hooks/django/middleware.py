@@ -1,9 +1,7 @@
-from blackfire import apm, generate_config
-from blackfire.utils import get_logger, read_blackfireyml_content
-from blackfire.hooks.utils import try_enable_probe, try_end_probe, \
-    add_probe_response_header, try_validate_send_blackfireyml, try_apm_start_transaction, \
-    try_apm_stop_and_queue_transaction
+from blackfire.utils import get_logger
+from blackfire.hooks.utils import try_enable_probe, add_probe_response_header
 from blackfire.hooks.django.utils import get_current_view_name
+from blackfire.hooks.wsgi import BlackfireWSGIMiddleware
 
 log = get_logger(__name__)
 
@@ -48,9 +46,6 @@ class _DjangoCursorWrapper:
 
     def __exit__(self, type, value, traceback):
         self.close()
-
-
-from blackfire.hooks.wsgi import BlackfireWSGIMiddleware
 
 
 def _enable_sql_instrumentation():
