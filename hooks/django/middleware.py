@@ -122,7 +122,8 @@ class BlackfireDjangoMiddleware(BlackfireWSGIMiddleware):
         return response
 
     def enable_probe(self, query):
-        probe_err, probe = try_enable_probe(query)
+        probe_err, probe = super(BlackfireDjangoMiddleware,
+                                 self).enable_probe(query)
         if not probe_err:
             _enable_sql_instrumentation()
         return probe_err, probe
