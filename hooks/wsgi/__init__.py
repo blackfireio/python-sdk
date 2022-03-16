@@ -36,7 +36,10 @@ class BlackfireWSGIMiddleware(object):
         self.app = app
 
     def build_blackfire_yml_response(self, *args):
-        # TODO: Write comment
+        '''This function is called to handle Blackfire builds. When a special build
+        POST request received, this function gets called to build framework specific
+        response that contains the blackfire.yaml file contents.
+        '''
         raise NotImplemented('')
 
     def get_view_name(self, environ):

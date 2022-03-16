@@ -21,5 +21,4 @@ class OdooMiddleware(BlackfireWSGIMiddleware):
         return Response()(environ, start_response)
 
     def get_view_name(self, environ):
-        # TODO: Maybe a way to retrieve this information?
         return None
