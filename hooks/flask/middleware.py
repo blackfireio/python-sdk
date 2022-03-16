@@ -59,6 +59,9 @@ class BlackfireFlaskMiddleware(BlackfireWSGIMiddleware):
                 # no view is associated with the endpoint
                 return None
 
-        return _get_view_name(
-            environ['REQUEST_METHOD'], environ.get('PATH_INFO', '')
-        )
+        try:
+            return _get_view_name(
+                environ['REQUEST_METHOD'], environ.get('PATH_INFO', '')
+            )
+        except Exception as e:
+            log.exception(e)
