@@ -21,6 +21,10 @@ def get_request_context():
 def end_profile(response):
     req_context = get_request_context()
     request = get_current_request()
+
+    if req_context.probe is None:
+        return
+
     if req_context.probe_err:
         add_probe_response_header(response.headers, req_context.probe_err)
         return response
