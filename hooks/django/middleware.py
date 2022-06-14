@@ -117,7 +117,11 @@ class BlackfireDjangoMiddleware(BlackfireWSGIMiddleware):
         response = self.get_response(environ["blackfire.orig_request"])
 
         environ['blackfire.status_code'] = response.status_code
-        environ['blackfire.content_length'] = len(response.content)
+        # When the response is a FileResponse/HttpStreamingResponse
+        # response.content throws an AttributeError. We defensively accept only
+        # HttpResponse object by checking content attribute
+        content = response.content if hasattr(response, "content") else ''
+        environ['blackfire.content_length'] = len(content)
 
         return response
 
