@@ -120,6 +120,7 @@ class BlackfireDjangoMiddleware(BlackfireWSGIMiddleware):
         # When the response is a FileResponse/HttpStreamingResponse
         # response.content throws an AttributeError. We defensively accept only
         # HttpResponse object by checking content attribute
+        print(response, ">>")
         content = response.content if hasattr(response, "content") else ''
         environ['blackfire.content_length'] = len(content)
 
