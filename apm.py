@@ -268,7 +268,7 @@ def ignore_transaction():
         curr_transaction.ignore()
 
 
-def _start_transaction(extended=False, ctx_var=None):
+def _start_transaction(extended=False, ctx_var=None, name=None):
     curr_transaction = _get_current_transaction()
 
     # do nothing if there is an ongoing APM transaction or a profiling session
@@ -301,14 +301,15 @@ def _start_transaction(extended=False, ctx_var=None):
 
     new_transaction = ApmTransaction(extended)
     _set_current_transaction(new_transaction)
+    new_transaction.name = name
 
     log.debug("APM transaction started. (extended=%s)" % (extended))
 
     return new_transaction
 
 
-def start_transaction():
-    result = _start_transaction()
+def start_transaction(name=None):
+    result = _start_transaction(name=name)
 
     def _wait_pending_transactions():
         _apm_worker.close()
