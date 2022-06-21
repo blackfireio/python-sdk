@@ -57,7 +57,7 @@ class BlackfireWSGIMiddleware(object):
         return try_enable_probe(query)
 
     def end_probe(self, response, probe, probe_err, environ):
-        if probe:
+        if probe and probe_err is None:
             return try_end_probe(
                 probe,
                 response_status_code=environ.get('blackfire.status_code'),

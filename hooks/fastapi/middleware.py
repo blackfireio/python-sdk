@@ -176,9 +176,9 @@ class BlackfireFastAPIMiddleware:
         try:
             return await self.app(scope, receive, wrapped_send)
         finally:
-            if probe:
-                log.debug("FastAPIMiddleware profile request ended.")
+            log.debug("FastAPIMiddleware profile request ended.")
 
+            if probe and probe_err is None:
                 r = try_end_probe(
                     probe,
                     response_status_code=status_code,
