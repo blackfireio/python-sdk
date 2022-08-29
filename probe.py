@@ -10,15 +10,14 @@ from contextlib import contextmanager
 from blackfire import profiler, VERSION, agent, generate_config, DEFAULT_CONFIG_FILE, \
     COST_DIMENSIONS
 from blackfire.utils import IS_PY3, urlencode, get_load_avg, get_logger, json_prettify, \
-    get_probed_runtime
+    get_probed_runtime, ContextDict
 from blackfire.exceptions import BlackfireApiException
 from blackfire.constants import BlackfireConstants
 
 log = get_logger(__name__)
 
 # globals
-_config = None
-_probe = None
+_ctx = ContextDict('bf_probe_ctx')
 
 _DEFAULT_OMIT_SYS_PATH = True
 _DEFAULT_PROFILE_TITLE = 'unnamed profile'
@@ -253,10 +252,8 @@ def clear_traces():
 
 # used from testing to set Probe state to a consistent state
 def reset():
-    global _config, _probe
-
-    _config = None
-    _probe = None
+    _ctx.set('config', None)
+    _ctx.set('probe', None)
     agent._blackfire_keys = None
 
 
@@ -265,14 +262,14 @@ def add_marker(label=''):
 
 
 def generate_subprofile_query():
-    global _config
+    config = _ctx.get('config')
 
-    if not _config:
+    if not config:
         raise BlackfireApiException(
             'Unable to create a subprofile query as profiling is not enabled.'
         )
 
-    args_copy = _config.args.copy()
+    args_copy = config.args.copy()
 
     parent_sid = ''
     if 'sub_profile' in args_copy:
@@ -291,8 +288,8 @@ def generate_subprofile_query():
     args_copy['sub_profile'] = '%s:%s' % (parent_sid, sid)
 
     result = "%s&signature=%s&%s" % (
-        _config.challenge_raw,
-        _config.signature,
+        config.challenge_raw,
+        config.signature,
         urlencode(args_copy),
     )
     return result
@@ -310,11 +307,9 @@ def initialize(
     title=None,
     ctx_var=None,
 ):
-    global _config, log, _probe
-
     log.debug("probe.initialize called. [method:'%s']", method)
 
-    _config = generate_config(
+    config = generate_config(
         query,
         client_id,
         client_token,
@@ -327,11 +322,15 @@ def initialize(
     )
 
     log.debug(
-        "Probe Configuration initialized. [%s]",
-        json_prettify(_config.__dict__)
+        "Probe Configuration initialized. [%s]", json_prettify(config.__dict__)
     )
 
-    _probe = Probe(_config)
+    # new probe instance generated in initialize(). User might call multiple
+    # enable/disable calls and it should not change the underlying probe
+    probe = Probe(config)
+
+    _ctx.set('config', config)
+    _ctx.set('probe', probe)
 
 
 def is_enabled():
@@ -339,9 +338,9 @@ def is_enabled():
 
 
 def enable(end_at_exit=False):
-    global _config, _probe
+    config = _ctx.get('config')
 
-    if not _config:
+    if not config:
         raise BlackfireApiException(
             'No configuration set. initialize should be called first.'
         )
@@ -379,7 +378,8 @@ def enable(end_at_exit=False):
         # internal error is detected, or when os._exit() is called.
         atexit.register(_deinitialize)
 
-    _probe.enable()
+    probe = _ctx.get('probe')
+    probe.enable()
 
 
 def disable():
