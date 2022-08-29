@@ -379,7 +379,8 @@ def enable(end_at_exit=False):
         atexit.register(_deinitialize)
 
     probe = _ctx.get('probe')
-    probe.enable()
+    if probe:  # defensive
+        probe.enable()
 
 
 def disable():
@@ -416,6 +417,8 @@ def set_transaction_name(name):
     property. transaction_name is the generic name for the name of the handler 
     function. E.g: In Django terms it is the view_name.
     '''
+    # we get the probe from profiler here because some middlewares not always
+    # use probe.initialize() API.
     curr_probe = profiler.get_current_probe()
     if curr_probe:
         curr_probe.transaction_name = name
@@ -425,5 +428,7 @@ def get_current():
     '''
     Retrieves the current probe for the current session (including the CLI probe)
     '''
+    # we get the probe from profiler here because some middlewares not always
+    # use probe.initialize() API.
     curr_probe = profiler.get_current_probe()
     return _ProbeProxy(curr_probe)
