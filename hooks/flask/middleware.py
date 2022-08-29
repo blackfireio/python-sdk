@@ -41,7 +41,7 @@ class BlackfireFlaskMiddleware(BlackfireWSGIMiddleware):
         """
 
         def _get_view_name(method, url):
-            from werkzeug.routing.exceptions import RequestRedirect
+            from werkzeug.routing import RequestRedirect
             from werkzeug.exceptions import MethodNotAllowed, NotFound
 
             adapter = self.flask_app.url_map.bind('dummy')
