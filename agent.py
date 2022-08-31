@@ -92,7 +92,9 @@ class Connection(object):
             msg = config.challenge_raw
             signature_verified = False
             for key in _blackfire_keys:
-                signature_verified = _bfext._verify_signature(key, sig, msg)
+                signature_verified = _bfext._verify_signature(
+                    key, str(sig), str(msg)
+                )
                 log.debug("_verify_signature(key=%s, sig=%s, msg=%s) returned %s." % \
                     (key, sig, msg, signature_verified))
                 if signature_verified:
