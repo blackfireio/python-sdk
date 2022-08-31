@@ -30,6 +30,13 @@ class Protocol(object):
         MARKER = bytes(MARKER, ENCODING)
 
 
+def _verify_signature(key, sig, msg):
+    r = _bfext._verify_signature(str(key), str(sig), str(msg))
+    log.debug("_verify_signature(key=%s, sig=%s, msg=%s) returned %s." % \
+        (key, sig, msg, r))
+    return r
+
+
 class Connection(object):
 
     def __init__(self, agent_socket, agent_timeout):
@@ -92,9 +99,7 @@ class Connection(object):
             msg = config.challenge_raw
             signature_verified = False
             for key in _blackfire_keys:
-                signature_verified = _bfext._verify_signature(
-                    key, str(sig), str(msg)
-                )
+                signature_verified = _verify_signature(key, sig, msg)
                 log.debug("_verify_signature(key=%s, sig=%s, msg=%s) returned %s." % \
                     (key, sig, msg, signature_verified))
                 if signature_verified:
