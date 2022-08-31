@@ -415,13 +415,21 @@ def generate_config(
 
         # tweak some options for manual profiling
         resp_dict['options']['aggreg_samples'] = 1
-        if title is not None:
-            resp_dict['options']['profile_title'] = title
 
         # generate the query string from the signing req.
         query = resp_dict['query_string'] + '&' + urlencode(
             resp_dict['options']
         )
+
+    if title is not None:
+        # we did not use parse_sql/urlencode here because the order of the query
+        # params should be preserved
+        title = '&profile_title=' + title
+        if 'profile_title' in query:
+            old_title = dict(parse_qsl(query))['profile_title']
+            query = query.replace("&profile_title=%s" % (old_title), title)
+        else:
+            query += title
 
     return BlackfireConfiguration(
         query,
