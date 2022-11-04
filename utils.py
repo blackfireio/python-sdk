@@ -188,9 +188,9 @@ def wrap(
         return result
 
     if orig is not None:
-        wrapper._orig = orig
+        wrapper._bf_wrapper_orig = orig
     else:
-        wrapper._orig = f
+        wrapper._bf_wrapper_orig = f
 
     return wrapper
 
@@ -200,10 +200,10 @@ def unwrap(obj, name):
     f = getattr(obj, name)
 
     # function wrapped?
-    if getattr(f, "_orig", None) is None:
+    if getattr(f, "_bf_wrapper_orig", None) is None:
         return
 
-    setattr(obj, name, f._orig)
+    setattr(obj, name, f._bf_wrapper_orig)
 
 
 def get_probed_runtime():
