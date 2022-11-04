@@ -1,5 +1,6 @@
 from blackfire.utils import import_module, get_logger
 from blackfire.hooks.fastapi.middleware import BlackfireFastAPIMiddleware
+from blackfire.hooks.utils import patch_module
 
 log = get_logger(__name__)
 
@@ -18,30 +19,18 @@ def patch():
     if not module:
         return False
 
-    # already patched?
-    if getattr(module, '_blackfire_patch', False):
-        return
+    fastapi_supported_min_version = '0.51.0'
+    fastapi_version = getattr(module, '__version__', '0.0.0')
+    if fastapi_version < fastapi_supported_min_version:
+        log.warning(
+            'Blackfire FastAPI middleware requires FastAPI %s and up. '
+            'Current version is %s.' %
+            (fastapi_supported_min_version, fastapi_version)
+        )
+        return False
 
-    try:
-        fastapi_supported_min_version = '0.51.0'
-        fastapi_version = getattr(module, '__version__', '0.0.0')
-        if fastapi_version < fastapi_supported_min_version:
-            log.warning(
-                'Blackfire FastAPI middleware requires FastAPI %s and up. '
-                'Current version is %s.' %
-                (fastapi_supported_min_version, fastapi_version)
-            )
-            return False
-
+    def _patch(module):
         _wrap_build_middleware_stack._orig = module.FastAPI.build_middleware_stack
         module.FastAPI.build_middleware_stack = _wrap_build_middleware_stack
 
-        log.debug('FastAPI version %s patched.', (fastapi_version))
-
-        setattr(module, '_blackfire_patch', True)
-
-        return True
-    except Exception as e:
-        log.exception(e)
-
-    return False
+    return patch_module('fastapi', _patch, version=fastapi_version)

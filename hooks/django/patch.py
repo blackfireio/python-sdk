@@ -1,4 +1,5 @@
-from blackfire.utils import wrap, import_module, get_logger
+from blackfire.utils import wrap, get_logger
+from blackfire.hooks.utils import patch_module
 
 log = get_logger(__name__)
 
@@ -37,28 +38,11 @@ def _insert_leading_middleware(*args, **kwargs):
 
 
 def patch():
-    module = import_module('django.core.handlers.base')
-    if not module:
-        return False
 
-    # already patched?
-    if getattr(module, '_blackfire_patch', False):
-        return
-
-    try:
+    def _patch(module):
         module.BaseHandler.load_middleware = wrap(
             module.BaseHandler.load_middleware,
             pre_func=_insert_leading_middleware
         )
 
-        import django
-        django_version = getattr(django, '__version__', None)
-        log.debug('Django version %s patched.', (django_version))
-
-        setattr(module, '_blackfire_patch', True)
-
-        return True
-    except Exception as e:
-        log.exception(e)
-
-    return False
+    return patch_module('django.core.handlers.base', _patch, package='django')

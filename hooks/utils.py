@@ -6,6 +6,8 @@ from blackfire.exceptions import *
 
 log = get_logger(__name__)
 
+_BLACKFIRE_PATCH_KEY = '_blackfire_patch'
+
 
 def format_exc_for_display(e):
     # filename:lineno and exception message
@@ -120,13 +122,13 @@ def add_probe_response_header(http_response, probe_response):
     http_response[probe_response[0]] = probe_response[1]
 
 
-def patch_module(name, patch_fn, version=None):
+def patch_module(name, patch_fn, version=None, package=None):
     module = import_module(name)
     if not module:
         return False
 
     # already patched?
-    if getattr(module, '_blackfire_patch', False):
+    if getattr(module, _BLACKFIRE_PATCH_KEY, False):
         return True
 
     try:
@@ -138,12 +140,28 @@ def patch_module(name, patch_fn, version=None):
         if version is None:
             log.debug('%s patched.', (name))
         else:
-            log.debug('%s version %s patched.', (name, version))
+            log.debug('%s version %s patched.', (package or name, version))
 
-        setattr(module, '_blackfire_patch', True)
+        setattr(module, _BLACKFIRE_PATCH_KEY, True)
 
         return True
     except Exception as e:
         log.exception(e)
 
     return False
+
+
+def unpatch_module(name, unpatch_fn):
+    module = import_module(name)
+    if not module:
+        return
+
+    if not getattr(module, _BLACKFIRE_PATCH_KEY, False):
+        return
+
+    try:
+        unpatch_fn(module)
+    except Exception as e:
+        log.exception(e)
+
+    setattr(module, _BLACKFIRE_PATCH_KEY, False)
