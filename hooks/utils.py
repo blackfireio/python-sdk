@@ -1,7 +1,7 @@
 import os
 import sys
 from blackfire import probe, generate_config, agent, apm
-from blackfire.utils import get_logger, UC, unicode_or_bytes
+from blackfire.utils import get_logger, UC, unicode_or_bytes, import_module
 from blackfire.exceptions import *
 
 log = get_logger(__name__)
@@ -118,3 +118,32 @@ def add_probe_response_header(http_response, probe_response):
     if probe_response is BlackfireInvalidSignatureError:
         return
     http_response[probe_response[0]] = probe_response[1]
+
+
+def patch_module(name, patch_fn, version=None):
+    module = import_module(name)
+    if not module:
+        return False
+
+    # already patched?
+    if getattr(module, '_blackfire_patch', False):
+        return True
+
+    try:
+        patch_fn(module)
+
+        if version is None:
+            version = getattr(module, '__version__', None)
+
+        if version is None:
+            log.debug('%s patched.', (name))
+        else:
+            log.debug('%s version %s patched.', (name, version))
+
+        setattr(module, '_blackfire_patch', True)
+
+        return True
+    except Exception as e:
+        log.exception(e)
+
+    return False

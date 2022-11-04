@@ -158,6 +158,14 @@ def import_module(mod_name):
         pass
 
 
+def wrap2(wrapped, wrapper):
+
+    def _wrapper(*args, **kwargs):
+        return wrapper(wrapped, *args, **kwargs)
+
+    return _wrapper
+
+
 def wrap(
     f,
     pre_func=None,
@@ -181,16 +189,16 @@ def wrap(
             # not accept a keyword argument (e.g: sys.stdout.write case). So
             # we control that with an option
             if call_post_func_with_result:
-                kwargs["_result"] = result
+                kwargs["_blackfire_wrapper_result"] = result
             if post_func:
                 post_func(*args, **kwargs)
 
         return result
 
     if orig is not None:
-        wrapper._bf_wrapper_orig = orig
+        wrapper._blackfire_wrapped = orig
     else:
-        wrapper._bf_wrapper_orig = f
+        wrapper._blackfire_wrapped = f
 
     return wrapper
 
@@ -200,10 +208,10 @@ def unwrap(obj, name):
     f = getattr(obj, name)
 
     # function wrapped?
-    if getattr(f, "_bf_wrapper_orig", None) is None:
+    if getattr(f, "_blackfire_wrapped", None) is None:
         return
 
-    setattr(obj, name, f._bf_wrapper_orig)
+    setattr(obj, name, f._blackfire_wrapped)
 
 
 def get_probed_runtime():

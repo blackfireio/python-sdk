@@ -86,7 +86,7 @@ def _ssl_sock_read(*args, **kwargs):
       So, it is possible that ssl_read returns an integer or a byte/string.
     """
     try:
-        result = kwargs.pop("_result")
+        result = kwargs.pop("_blackfire_wrapper_result")
         if isinstance(result, int):
             nw.get_counters().i += result
         else:
@@ -98,7 +98,7 @@ def _ssl_sock_read(*args, **kwargs):
 def _ssl_sock_write(*args, **kwargs):
     # ssl.SSLSocket.write returns the number of bytes written
     try:
-        nw.get_counters().o += kwargs.pop("_result")
+        nw.get_counters().o += kwargs.pop("_blackfire_wrapper_result")
     except:
         pass
 

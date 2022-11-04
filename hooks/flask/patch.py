@@ -1,4 +1,5 @@
 from blackfire.utils import wrap, import_module, get_logger
+from blackfire.hooks.utils import patch_module
 
 log = get_logger(__name__)
 
@@ -15,6 +16,12 @@ def _wrap_app(instance, *args, **kwargs):
 
 
 def patch():
+
+    def _patch(module):
+        module.Flask.__init__ = wrap(module.Flask.__init__, post_func=_wrap_app)
+
+    return patch_module('flask', _patch)
+
     module = import_module('flask')
     if not module:
         return False
