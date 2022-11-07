@@ -158,7 +158,7 @@ def import_module(mod_name):
         pass
 
 
-def wrap2(wrapped, wrapper):
+def wrapfn(wrapped, wrapper):
 
     def _wrapper(*args, **kwargs):
         return wrapper(wrapped, *args, **kwargs)

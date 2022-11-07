@@ -19,7 +19,7 @@ try:
 except:
     pass
 
-__all__ = ['start', 'stop', 'get_traces', 'clear_traces', 'run']
+__all__ = ['start', 'stop', 'get_traces', 'clear_traces', 'run', 'start_span']
 
 log = get_logger(__name__, include_line_info=False)
 
@@ -555,6 +555,35 @@ def is_session_active():
     user requests manual instrumentation.
     '''
     return _bfext.is_session_active()
+
+
+class Span(object):
+
+    def __init__(self, name, fn_name):
+        self.name = name
+        self.fn_name = fn_name
+        self.attributes = {}
+        self._id = 'aaaabbbb'  # todo: generate id
+
+    def set_attribute(self, key, value):
+        self.attributes[key] = value
+
+    def __repr__(self):
+        return "Span(id=%s, name=%s, fn_name=%s, attr=%s)" % (
+            self._id, self.name, self.fn_name, self.attributes
+        )
+
+    # def __eq__(self, other):
+    #     return self.fn_name == other
+
+    # def __hash__(self):
+    #     return hash(self.fn_name)
+
+
+def add_pending_span(span):
+    ''' todo: comment
+    '''
+    _bfext.add_pending_span(span.fn_name, span)
 
 
 if __name__ != '__main__':

@@ -161,6 +161,7 @@ def unpatch_module(name, unpatch_fn):
 
     try:
         unpatch_fn(module)
+        log.debug('%s unpatched.', (name))
     except Exception as e:
         log.exception(e)
 

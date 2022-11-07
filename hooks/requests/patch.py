@@ -1,4 +1,4 @@
-from blackfire.utils import wrap2, get_logger
+from blackfire.utils import wrapfn, get_logger
 from blackfire.hooks.utils import patch_module
 
 log = get_logger(__name__)
