@@ -7,7 +7,7 @@ import _blackfire_profiler as _bfext
 from contextlib import contextmanager
 from collections import Counter
 from blackfire.utils import urlencode, IS_PY3, get_logger, RuntimeMetrics, \
-    get_time, json_prettify, import_module
+    get_time, json_prettify, import_module, generate_id
 from blackfire.exceptions import *
 from blackfire.hooks import nw
 
@@ -509,7 +509,7 @@ def stop():
 
 def get_traces(omit_sys_path_dirs=True, extended=False):
     t0 = get_time()
-    traces, timeline_traces = _bfext.get_traces()
+    traces, timeline_traces, spans = _bfext.get_traces()
     traces = _BlackfireTracesBase(traces, timeline_traces, omit_sys_path_dirs)
     result = traces.to_traceformat(extended)
 
@@ -559,11 +559,11 @@ def is_session_active():
 
 class Span(object):
 
-    def __init__(self, name, fn_name):
+    def __init__(self, name, fn_name=None):
         self.name = name
         self.fn_name = fn_name
         self.attributes = {}
-        self._id = 'aaaabbbb'  # todo: generate id
+        self._id = generate_id(16)
 
     def set_attribute(self, key, value):
         self.attributes[key] = value
@@ -573,17 +573,11 @@ class Span(object):
             self._id, self.name, self.fn_name, self.attributes
         )
 
-    # def __eq__(self, other):
-    #     return self.fn_name == other
-
-    # def __hash__(self):
-    #     return hash(self.fn_name)
-
 
 def add_pending_span(span):
     ''' todo: comment
     '''
-    _bfext.add_pending_span(span.fn_name, span)
+    _bfext._add_pending_span(span.fn_name, span)
 
 
 if __name__ != '__main__':

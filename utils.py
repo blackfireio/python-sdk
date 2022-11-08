@@ -39,6 +39,7 @@ else:
     CONTEXTVARS_AVAIL = False
 
 _DEFAULT_LOG_LEVEL = 2
+_HEXCONVTAB = "0123456789abcdef"
 
 
 class ContextDict(object):
@@ -416,4 +417,15 @@ def unicode_or_bytes(s):
         result = bytes(s, Protocol.ENCODING)
     else:
         result = s.encode(Protocol.ENCODING)
+    return result
+
+
+def generate_id(len):
+    result = ""
+    rand_bytes = os.urandom((len + 1) / 2)
+    for i, rb in enumerate(rand_bytes):
+        if not IS_PY3:
+            rb = ord(rb)
+        result += _HEXCONVTAB[rb >> 4]
+        result += _HEXCONVTAB[rb & 0x0F]
     return result
