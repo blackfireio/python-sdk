@@ -6,8 +6,6 @@ log = get_logger(__name__)
 
 
 def _wrap_send(fn, self, request, **kwargs):
-    print("_wrap_send called", request.headers)
-
     bf_http_title = request.headers.get('X-Blackfire-HTTP-Query-Title')
 
     if bf_http_title is not None:
@@ -23,8 +21,6 @@ def _wrap_send(fn, self, request, **kwargs):
 def patch():
 
     def _patch(module):
-        requests.Session.send = wrapfn(requests.Session.send, _wrap_send)
-
-    import requests
+        module.Session.send = wrapfn(module.Session.send, _wrap_send)
 
     return patch_module('requests', _patch)

@@ -19,7 +19,9 @@ try:
 except:
     pass
 
-__all__ = ['start', 'stop', 'get_traces', 'clear_traces', 'run', 'start_span']
+__all__ = [
+    'start', 'stop', 'get_traces', 'clear_traces', 'run', 'add_pending_span'
+]
 
 log = get_logger(__name__, include_line_info=False)
 
@@ -597,12 +599,18 @@ class Span(object):
         )
 
 
+def add_pending_span(fn_name, span):
+    _bfext._add_pending_span(fn_name, span)
+
+
 @contextmanager
 def start_pending_span(name, fn_name):
     span = Span(name=name, fn_name=fn_name)
     try:
-        _bfext._add_pending_span(span.fn_name, span)
+        add_pending_span(fn_name, span)
         yield span
+    except Exception as e:
+        log.exception(e)
     finally:
         span.finish()
 
