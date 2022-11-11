@@ -422,7 +422,7 @@ def unicode_or_bytes(s):
 
 def generate_id(len):
     result = ""
-    rand_bytes = os.urandom((len + 1) / 2)
+    rand_bytes = os.urandom((len + 1) // 2)
     for i, rb in enumerate(rand_bytes):
         if not IS_PY3:
             rb = ord(rb)

@@ -584,7 +584,7 @@ class Span(object):
         self.attributes = {}
         self._id = generate_id(16)
         self.start_time_ns = get_time() * 1000
-        self.end_time_ns = None
+        self.end_time_ns = 0
 
     def finish(self):
         self.end_time_ns = get_time() * 1000
