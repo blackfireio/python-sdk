@@ -599,15 +599,15 @@ class Span(object):
         )
 
 
-def add_pending_span(fn_name, span):
-    _bfext._add_pending_span(fn_name, span)
+def add_pending_span(span):
+    _bfext._add_pending_span(span.fn_name, span)
 
 
 @contextmanager
 def start_pending_span(name, fn_name):
     span = Span(name=name, fn_name=fn_name)
     try:
-        add_pending_span(fn_name, span)
+        add_pending_span(span)
         yield span
     except Exception as e:
         log.exception(e)
