@@ -481,6 +481,9 @@ def start(
             os.environ.get('BLACKFIRE_USE_TRACEMALLOC'):
             use_tracemalloc = True
             tracemalloc.start()
+            log.debug(
+                "tracemalloc will be used as the internal memory profiler."
+            )
 
     _bfext.start(
         builtins,
