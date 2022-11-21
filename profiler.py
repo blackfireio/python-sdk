@@ -261,7 +261,7 @@ class BlackfireTraces(dict):
         if len(self._spans):
             result += '\n'
         for span in self._spans:
-            result += "span-%s: start_time_unix_nano=%d&end_time_unix_nano=%d&name=%s" % (
+            result += "span-%s: start_time_unix_nano=%d&end_time_unix_nano=%d&name=%s\n" % (
                 span._id, span.start_time_ns, span.end_time_ns, span.name
             )
         return result
