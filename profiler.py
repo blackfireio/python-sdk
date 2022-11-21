@@ -7,7 +7,7 @@ import _blackfire_profiler as _bfext
 from contextlib import contextmanager
 from collections import Counter
 from blackfire.utils import urlencode, IS_PY3, get_logger, RuntimeMetrics, \
-    get_time, json_prettify, import_module, generate_id
+    get_time, json_prettify, import_module, generate_id, quote
 from blackfire.exceptions import *
 from blackfire.hooks import nw
 
@@ -579,7 +579,7 @@ def is_session_active():
 class Span(object):
 
     def __init__(self, name, fn_name=None):
-        self.name = name
+        self.name = quote(name)
         self.fn_name = fn_name
         self.attributes = {}
         self._id = generate_id(16)
