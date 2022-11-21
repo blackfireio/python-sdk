@@ -20,7 +20,8 @@ except:
     pass
 
 __all__ = [
-    'start', 'stop', 'get_traces', 'clear_traces', 'run', 'add_pending_span'
+    'start', 'stop', 'get_traces', 'clear_traces', 'run', 'add_pending_span', 
+    'start_pending_span'
 ]
 
 log = get_logger(__name__, include_line_info=False)
