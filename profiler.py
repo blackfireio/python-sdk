@@ -7,7 +7,7 @@ import _blackfire_profiler as _bfext
 from contextlib import contextmanager
 from collections import Counter
 from blackfire.utils import urlencode, IS_PY3, get_logger, RuntimeMetrics, \
-    get_time, json_prettify, import_module
+    get_time, json_prettify, import_module, generate_id, quote
 from blackfire.exceptions import *
 from blackfire.hooks import nw
 
@@ -19,7 +19,10 @@ try:
 except:
     pass
 
-__all__ = ['start', 'stop', 'get_traces', 'clear_traces', 'run']
+__all__ = [
+    'start', 'stop', 'get_traces', 'clear_traces', 'run', 'add_pending_span', 
+    'start_pending_span'
+]
 
 log = get_logger(__name__, include_line_info=False)
 
@@ -198,6 +201,7 @@ class BlackfireTraces(dict):
         self.timeline_traces = {}
         self._extended = extended
         self._timespan_key = 'Timespan' if extended else 'Threshold'
+        self._spans = []
 
     def add(self, **kwargs):
         trace = BlackfireTrace(kwargs)
@@ -226,6 +230,9 @@ class BlackfireTraces(dict):
 
         self.timeline_traces[key] = trace
 
+    def add_span(self, span):
+        self._spans.append(span)
+
     def __str__(self):
         result = ''
         for trace_key, trace in self.items():
@@ -251,6 +258,13 @@ class BlackfireTraces(dict):
                         trace.pmu,
                         trace.nw_in,
                         trace.nw_out)
+        # add spans
+        if len(self._spans):
+            result += '\n'
+        for span in self._spans:
+            result += "span-%s: start_time_unix_nano=%d&end_time_unix_nano=%d&name=%s\n" % (
+                span._id, span.start_time_ns, span.end_time_ns, span.name
+            )
         return result
 
     def to_bytes(self):
@@ -282,10 +296,11 @@ class BlackfireTraces(dict):
 
 class _BlackfireTracesBase(dict):
 
-    def __init__(self, traces, timeline_traces, omit_sys_path_dirs):
+    def __init__(self, traces, timeline_traces, spans, omit_sys_path_dirs):
         self._traces = traces
         self._timeline_traces = timeline_traces
         self._omit_sys_path_dirs = omit_sys_path_dirs
+        self._spans = spans
 
         self._add_traces()
 
@@ -430,6 +445,9 @@ class _BlackfireTracesBase(dict):
                 )
             )
             i += 1
+        # add spans
+        for span in self._spans:
+            result.add_span(span)
         return result
 
 
@@ -512,8 +530,10 @@ def stop():
 
 def get_traces(omit_sys_path_dirs=True, extended=False):
     t0 = get_time()
-    traces, timeline_traces = _bfext.get_traces()
-    traces = _BlackfireTracesBase(traces, timeline_traces, omit_sys_path_dirs)
+    traces, timeline_traces, spans = _bfext.get_traces()
+    traces = _BlackfireTracesBase(
+        traces, timeline_traces, spans, omit_sys_path_dirs
+    )
     result = traces.to_traceformat(extended)
 
     if log.isEnabledFor(logging.DEBUG):
@@ -558,6 +578,45 @@ def is_session_active():
     user requests manual instrumentation.
     '''
     return _bfext.is_session_active()
+
+
+class Span(object):
+
+    def __init__(self, name, fn_name=None):
+        self.name = quote(name)
+        self.fn_name = fn_name
+        self.attributes = {}
+        self._id = generate_id(16)
+        self.start_time_ns = get_time() * 1000
+        self.end_time_ns = 0
+
+    def finish(self):
+        self.end_time_ns = get_time() * 1000
+
+    def set_attribute(self, key, value):
+        self.attributes[key] = value
+
+    def __repr__(self):
+        return "Span(id=%s, name=%s, fn_name=%s, attr=%s, start_time_ns=%s, end_time_ns=%s)" % (
+            self._id, self.name, self.fn_name, self.attributes,
+            self.start_time_ns, self.end_time_ns
+        )
+
+
+def add_pending_span(span):
+    _bfext._add_pending_span(span.fn_name, span)
+
+
+@contextmanager
+def start_pending_span(name, fn_name):
+    span = Span(name=name, fn_name=fn_name)
+    try:
+        add_pending_span(span)
+        yield span
+    except Exception as e:
+        log.exception(e)
+    finally:
+        span.finish()
 
 
 if __name__ != '__main__':

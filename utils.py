@@ -39,6 +39,7 @@ else:
     CONTEXTVARS_AVAIL = False
 
 _DEFAULT_LOG_LEVEL = 2
+_HEXCONVTAB = "0123456789abcdef"
 
 
 class ContextDict(object):
@@ -158,6 +159,14 @@ def import_module(mod_name):
         pass
 
 
+def wrapfn(wrapped, wrapper):
+
+    def _wrapper(*args, **kwargs):
+        return wrapper(wrapped, *args, **kwargs)
+
+    return _wrapper
+
+
 def wrap(
     f,
     pre_func=None,
@@ -181,16 +190,16 @@ def wrap(
             # not accept a keyword argument (e.g: sys.stdout.write case). So
             # we control that with an option
             if call_post_func_with_result:
-                kwargs["_result"] = result
+                kwargs["_blackfire_wrapper_result"] = result
             if post_func:
                 post_func(*args, **kwargs)
 
         return result
 
     if orig is not None:
-        wrapper._orig = orig
+        wrapper._blackfire_wrapped = orig
     else:
-        wrapper._orig = f
+        wrapper._blackfire_wrapped = f
 
     return wrapper
 
@@ -200,10 +209,10 @@ def unwrap(obj, name):
     f = getattr(obj, name)
 
     # function wrapped?
-    if getattr(f, "_orig", None) is None:
+    if getattr(f, "_blackfire_wrapped", None) is None:
         return
 
-    setattr(obj, name, f._orig)
+    setattr(obj, name, f._blackfire_wrapped)
 
 
 def get_probed_runtime():
@@ -408,4 +417,15 @@ def unicode_or_bytes(s):
         result = bytes(s, Protocol.ENCODING)
     else:
         result = s.encode(Protocol.ENCODING)
+    return result
+
+
+def generate_id(len):
+    result = ""
+    rand_bytes = os.urandom((len + 1) // 2)
+    for i, rb in enumerate(rand_bytes):
+        if not IS_PY3:
+            rb = ord(rb)
+        result += _HEXCONVTAB[rb >> 4]
+        result += _HEXCONVTAB[rb & 0x0F]
     return result

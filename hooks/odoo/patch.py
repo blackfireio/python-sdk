@@ -1,5 +1,6 @@
 import sys
 from blackfire.utils import import_module, get_logger, get_executable_path
+from blackfire.hooks.utils import patch_module
 
 log = get_logger(__name__)
 
@@ -21,27 +22,15 @@ def patch():
             log.debug("Detected Odoo path: %s", odoo_path)
             sys.path.append(odoo_path)
 
-    module = import_module('odoo')
-    if not module:
-        return False
-
-    # already patched?
-    if getattr(module, '_blackfire_patch', False):
-        return
-
-    try:
+    def _patch(module):
         from blackfire.hooks.odoo.middleware import OdooMiddleware
 
         module.service.wsgi_server.application = OdooMiddleware(
             module.service.wsgi_server.application
         )
 
-        log.debug('Odoo version %s patched.', (module.release.version))
+    module = import_module('odoo')
+    if not module:
+        return False
 
-        setattr(module, '_blackfire_patch', True)
-
-        return True
-    except Exception as e:
-        log.exception(e)
-
-    return False
+    return patch_module('odoo', _patch, version=module.release.version)

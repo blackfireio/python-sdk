@@ -1,16 +1,14 @@
 import sys
 from blackfire.utils import wrap, unwrap, get_logger, IS_PY3
 from blackfire.hooks.sys import SysHooks
+from blackfire.hooks.utils import patch_module, unpatch_module
 
 log = get_logger(__name__)
 
 
 def patch():
-    # already patched?
-    if getattr(sys, '_blackfire_patch', False):
-        return
 
-    try:
+    def _patch(sysmodule):
         sys.exit = wrap(sys.exit, pre_func=SysHooks.sys_exit)
 
         # In Py2, stdout.write is a read-only attribute. To overcome this,
@@ -40,22 +38,15 @@ def patch():
         )
         sys.excepthook = wrap(sys.excepthook, pre_func=SysHooks.sys_excepthook)
 
-        setattr(sys, '_blackfire_patch', True)
-
-        return True
-    except Exception as e:
-        log.exception(e)
-
-    return False
+    return patch_module('sys', _patch)
 
 
 def unpatch():
-    if not getattr(sys, '_blackfire_patch', False):
-        return
 
-    unwrap(sys, "exit")
-    unwrap(sys.stdout, "write")
-    unwrap(sys.stderr, "write")
-    unwrap(sys, "excepthook")
+    def _unpatch(_):
+        unwrap(sys, "exit")
+        unwrap(sys.stdout, "write")
+        unwrap(sys.stderr, "write")
+        unwrap(sys, "excepthook")
 
-    setattr(sys, '_blackfire_patch', False)
+    unpatch_module('sys', _unpatch)

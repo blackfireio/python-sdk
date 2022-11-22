@@ -2,6 +2,7 @@ import ssl
 import socket
 from blackfire.utils import wrap, unwrap, get_logger, IS_PY3
 from blackfire.hooks import nw
+from blackfire.hooks.utils import patch_module, unpatch_module
 
 log = get_logger(__name__)
 
@@ -86,7 +87,7 @@ def _ssl_sock_read(*args, **kwargs):
       So, it is possible that ssl_read returns an integer or a byte/string.
     """
     try:
-        result = kwargs.pop("_result")
+        result = kwargs.pop("_blackfire_wrapper_result")
         if isinstance(result, int):
             nw.get_counters().i += result
         else:
@@ -98,19 +99,16 @@ def _ssl_sock_read(*args, **kwargs):
 def _ssl_sock_write(*args, **kwargs):
     # ssl.SSLSocket.write returns the number of bytes written
     try:
-        nw.get_counters().o += kwargs.pop("_result")
+        nw.get_counters().o += kwargs.pop("_blackfire_wrapper_result")
     except:
         pass
 
 
 def patch():
-    global _orig_socket_class
 
-    # already patched?
-    if getattr(socket, '_blackfire_patch', False):
-        return
+    def _patch(module):
+        global _orig_socket_class
 
-    try:
         # Although we could choose to use wrap() to monkey patch individual
         # socket functions, we did not go that way. Py 2.7 uses a Wrapper class
         # for the socket class which defines socket methods as __slots__. This makes
@@ -137,30 +135,21 @@ def patch():
             call_post_func_with_result=True
         )
 
-        setattr(socket, '_blackfire_patch', True)
-
-        log.debug('nw modules patched.')
-
-        return True
-    except Exception as e:
-        log.exception(e)
-
-    return False
+    return patch_module('socket', _patch)
 
 
 def unpatch():
-    global _orig_socket_class
 
-    if not getattr(socket, '_blackfire_patch', False):
-        return
+    def _unpatch(_):
+        global _orig_socket_class
 
-    unwrap(ssl.SSLSocket, "read")
-    unwrap(ssl.SSLSocket, "write")
+        unwrap(ssl.SSLSocket, "read")
+        unwrap(ssl.SSLSocket, "write")
 
-    if _orig_socket_class:  # defensive
-        if IS_PY3:
-            socket.socket = _orig_socket_class
-        else:
-            socket._realsocket = _orig_socket_class
+        if _orig_socket_class:  # defensive
+            if IS_PY3:
+                socket.socket = _orig_socket_class
+            else:
+                socket._realsocket = _orig_socket_class
 
-    setattr(socket, '_blackfire_patch', False)
+    unpatch_module('socket', _unpatch)
