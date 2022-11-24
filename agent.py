@@ -6,10 +6,13 @@ from blackfire.exceptions import *
 import _blackfire_profiler as _bfext
 from collections import defaultdict
 from blackfire.utils import urlparse, get_logger, IS_PY3, parse_qsl, read_blackfireyml_content, \
-    replace_bad_chars, get_time, unquote, UC, unicode_or_bytes
+    replace_bad_chars, get_time, unquote, UC, unicode_or_bytes, urlencode
 
 log = get_logger(__name__)
 _blackfire_keys = None
+_ALLOWED_ARGS = set(
+    ['sub_profile', 'profile_title', 'aggreg_samples', 'config_yml']
+)
 
 
 def pause_apm(reason):
@@ -35,6 +38,14 @@ def _verify_signature(key, sig, msg):
     log.debug("_verify_signature(key=%s, sig=%s, msg=%s) returned %s." % \
         (key, sig, msg, r))
     return r
+
+
+def _allowed_args(args_raw):
+    result = {}
+    for k, v in parse_qsl(args_raw):
+        if k in _ALLOWED_ARGS:
+            result[k] = v
+    return urlencode(result)
 
 
 class Connection(object):
@@ -209,7 +220,7 @@ class Connection(object):
             '%s&signature=%s&%s' % (
                 config.challenge_raw,
                 config.signature,
-                config.args_raw,
+                _allowed_args(config.args_raw),
             ),
             'Blackfire-Probe':
             bf_probe_header,
