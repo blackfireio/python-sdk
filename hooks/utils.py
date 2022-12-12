@@ -138,9 +138,9 @@ def patch_module(name, patch_fn, version=None, package=None):
             version = getattr(module, '__version__', None)
 
         if version is None:
-            log.debug('%s patched.', (name))
+            log.debug('%s patched.', name)
         else:
-            log.debug('%s version %s patched.', (package or name, version))
+            log.debug('%s version %s patched.', package or name, version)
 
         setattr(module, _BLACKFIRE_PATCH_KEY, True)
 

@@ -1,16 +1,23 @@
-from blackfire.utils import import_module, get_logger
+from blackfire.utils import import_module, get_logger, wrapfn, unwrap
 from blackfire.hooks.fastapi.middleware import BlackfireFastAPIMiddleware
-from blackfire.hooks.utils import patch_module
+from blackfire.hooks.utils import patch_module, unpatch_module
 
 log = get_logger(__name__)
 
 
-def _wrap_build_middleware_stack(self, *args, **kwargs):
-    result = _wrap_build_middleware_stack._orig(self, *args, **kwargs)
+def _wrap_build_middleware_stack(fn, self, *args, **kwargs):
+    result = fn(self, *args, **kwargs)
+    # FastAPI support subapplications where you have multiple independent FastAPI
+    # apps. See https://fastapi.tiangolo.com/advanced/sub-applications/
+    # These subapps are mounted to the main one and when that happens,
+    # build_middleware_stack() adds Blackfire FastAPI middleware more than once.
+    # Check that condition via a flag.
+    if getattr(fn, "_patched", False):
+        return result
     result = BlackfireFastAPIMiddleware(result)
+    fn._patched = True
 
     log.debug("FastAPI middleware enabled.")
-
     return result
 
 
@@ -30,7 +37,17 @@ def patch():
         return False
 
     def _patch(module):
-        _wrap_build_middleware_stack._orig = module.FastAPI.build_middleware_stack
-        module.FastAPI.build_middleware_stack = _wrap_build_middleware_stack
+        module.FastAPI.build_middleware_stack = wrapfn(
+            module.FastAPI.build_middleware_stack, _wrap_build_middleware_stack
+        )
 
     return patch_module('fastapi', _patch, version=fastapi_version)
+
+
+def unpatch():
+
+    def _unpatch(_):
+        import fastapi
+        unwrap(fastapi.FastAPI, "build_middleware_stack")
+
+    unpatch_module('fastapi', _unpatch)

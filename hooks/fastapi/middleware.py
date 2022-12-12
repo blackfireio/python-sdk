@@ -132,7 +132,8 @@ class BlackfireFastAPIMiddleware:
             nonlocal content_length, status_code, endpoint
 
             if 'endpoint' in scope:
-                endpoint = scope['endpoint'].__name__
+                if hasattr(scope['endpoint'], "__name__"):  # defensive
+                    endpoint = scope['endpoint'].__name__
 
             try:
                 if response.get("type") == "http.response.start":
@@ -176,9 +177,9 @@ class BlackfireFastAPIMiddleware:
         try:
             return await self.app(scope, receive, wrapped_send)
         finally:
-            log.debug("FastAPIMiddleware profile request ended.")
-
             if probe and probe_err is None:
+                log.debug("FastAPIMiddleware profile request ended.")
+
                 r = try_end_probe(
                     probe,
                     response_status_code=status_code,
