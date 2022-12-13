@@ -12,10 +12,10 @@ def _wrap_build_middleware_stack(fn, self, *args, **kwargs):
     # These subapps are mounted to the main one and when that happens,
     # build_middleware_stack() adds Blackfire FastAPI middleware more than once.
     # Check that condition via a flag.
-    if getattr(fn, "_patched", False):
+    if getattr(fn, "_blackfire_patch", False):
         return result
     result = BlackfireFastAPIMiddleware(result)
-    fn._patched = True
+    fn._blackfire_patch = True
 
     log.debug("FastAPI middleware enabled.")
     return result
@@ -49,5 +49,6 @@ def unpatch():
     def _unpatch(_):
         import fastapi
         unwrap(fastapi.FastAPI, "build_middleware_stack")
+        fastapi.FastAPI.build_middleware_stack._blackfire_patch = False
 
     unpatch_module('fastapi', _unpatch)
