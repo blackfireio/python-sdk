@@ -28,6 +28,7 @@ def _add_header(response, k, v):
 _FRAMEWORK = 'FastAPI'
 _req_id = 0
 _cv = contextvars.ContextVar('bf_req_id')
+_cv_mw_reentrant = contextvars.ContextVar('bf_reentrant', default=0)
 
 
 def incr_request_id():
@@ -42,10 +43,24 @@ class BlackfireFastAPIMiddleware:
         self.app = app
 
     async def __call__(self, scope, receive, send):
-        global _cv, _req_id
+        global _cv, _req_id, _cv_mw_reentrant
 
         if scope["type"] != "http":
             return await self.app(scope, receive, send)
+
+        # When sub applications are used, the routing middleware at the end of the
+        # middleware stack points to the second middleware stack. This causes the
+        # middleware to be inserted twice in the middleware chain as we hook
+        # build_middleware_stack() API to hook into FastAPI. To address this issue,
+        # we use a ContextVar that ensures that the middleware is triggered only
+        # once for a single HTTP request
+        if _cv_mw_reentrant.get() == 1:
+            log.debug(
+                'Skipping FastAPI Blackfier Middleware as it is already triggered.'
+            )
+            return await self.app(scope, receive, send)
+
+        _cv_mw_reentrant.set(1)
 
         method = scope.get("method")
         path = scope.get('path')
@@ -200,3 +215,4 @@ class BlackfireFastAPIMiddleware:
                     http_header_x_forwarded_port=request_headers
                     .get('x-forwarded-port'),
                 )
+            _cv_mw_reentrant.set(0)

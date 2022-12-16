@@ -7,15 +7,7 @@ log = get_logger(__name__)
 
 def _wrap_build_middleware_stack(fn, self, *args, **kwargs):
     result = fn(self, *args, **kwargs)
-    # FastAPI support subapplications where you have multiple independent FastAPI
-    # apps. See https://fastapi.tiangolo.com/advanced/sub-applications/
-    # These subapps are mounted to the main one and when that happens,
-    # build_middleware_stack() adds Blackfire FastAPI middleware more than once.
-    # Check that condition via a flag.
-    if getattr(fn, "_blackfire_patch", False):
-        return result
     result = BlackfireFastAPIMiddleware(result)
-    fn._blackfire_patch = True
 
     log.debug("FastAPI middleware enabled.")
     return result
