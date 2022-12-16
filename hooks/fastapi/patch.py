@@ -41,6 +41,5 @@ def unpatch():
     def _unpatch(_):
         import fastapi
         unwrap(fastapi.FastAPI, "build_middleware_stack")
-        fastapi.FastAPI.build_middleware_stack._blackfire_patch = False
 
     unpatch_module('fastapi', _unpatch)
