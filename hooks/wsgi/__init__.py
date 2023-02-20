@@ -12,8 +12,7 @@ def _headers_to_dict(headers):
 
 
 def _catch_response_headers(environ, start_response):
-
-    def _wrapper(status, headers):
+    def _wrapper(status, headers, exc_info=None):
         try:
             environ['blackfire.status_code'] = int(status[:3])
             headers_dict = _headers_to_dict(headers)
@@ -22,7 +21,7 @@ def _catch_response_headers(environ, start_response):
             )
         except Exception as e:
             log.exception(e)
-        return start_response(status, headers)
+        return start_response(status, headers, exc_info)
 
     return _wrapper
 
