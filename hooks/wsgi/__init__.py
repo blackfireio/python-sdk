@@ -105,7 +105,7 @@ class BlackfireWSGIMiddleware(object):
 
         probe_err, probe = self.enable_probe(query)
 
-        def _start_response(status, headers):
+        def _start_response(status, headers, exc_info=None):
             try:
                 if probe_err:
                     if probe_err is not BlackfireInvalidSignatureError:
@@ -122,6 +122,7 @@ class BlackfireWSGIMiddleware(object):
 
             return start_response(status, headers)
 
+        response = None
         try:
             response = self.get_app_response(
                 environ,
@@ -135,7 +136,7 @@ class BlackfireWSGIMiddleware(object):
                 "%s profile ended.",
                 self.__class__.__name__,
             )
-
+            
             self.end_probe(response, probe, probe_err, environ)
 
     def _trace(self, environ, start_response, extended=False):
