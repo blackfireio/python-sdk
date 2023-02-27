@@ -151,7 +151,7 @@ class BlackfireWSGIMiddleware(object):
                 try_apm_stop_and_queue_transaction(
                     controller_name=transaction.name
                     or environ.get('blackfire.endpoint'),
-                    uri=environ.get('REQUEST_URI'),
+                    uri=environ.get('PATH_INFO'),
                     framework=self.FRAMEWORK,
                     http_host=environ.get('HTTP_HOST'),
                     method=environ.get('REQUEST_METHOD'),
