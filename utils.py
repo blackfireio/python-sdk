@@ -307,14 +307,15 @@ def get_logger(name, include_line_info=True):
     formatter_info += "%(message).8192s"
     formatter = logging.Formatter(formatter_info)
 
-    if log_file:
-        if log_file == "stderr":
-            log_handler = logging.StreamHandler()
-            log_handler.setFormatter(formatter)
-        else:
-            log_handler = logging.FileHandler(log_file, 'a')
-            log_handler.setFormatter(formatter)
-        logger.addHandler(log_handler)
+    stderr_log_handler = logging.StreamHandler()
+    stderr_log_handler.setFormatter(formatter)
+
+    log_handler = stderr_log_handler # default logger is stderr
+    if log_file and log_file != "stderr":
+        log_handler = logging.FileHandler(log_file, 'a')
+        log_handler.setFormatter(formatter)
+
+    logger.addHandler(log_handler)
 
     return logger
 
