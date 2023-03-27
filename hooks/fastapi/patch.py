@@ -1,6 +1,6 @@
-from blackfire.utils import import_module, get_logger, wrapfn, unwrap
+from blackfire.utils import import_module, get_logger, wrapfn
 from blackfire.hooks.fastapi.middleware import BlackfireFastAPIMiddleware
-from blackfire.hooks.utils import patch_module, unpatch_module
+from blackfire.hooks.utils import patch_module
 
 log = get_logger(__name__)
 
@@ -34,12 +34,3 @@ def patch():
         )
 
     return patch_module('fastapi', _patch, version=fastapi_version)
-
-
-def unpatch():
-
-    def _unpatch(_):
-        import fastapi
-        unwrap(fastapi.FastAPI, "build_middleware_stack")
-
-    unpatch_module('fastapi', _unpatch)

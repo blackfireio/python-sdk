@@ -90,7 +90,6 @@ class Probe(object):
     def enable(self):
         if self._enabled:
             return
-
         self._enabled = True
 
         # connect agent

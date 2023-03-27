@@ -9,9 +9,14 @@ class BlackfirePyramidMiddleware(BlackfireWSGIMiddleware):
 
     FRAMEWORK = 'pyramid'
 
-    def get_view_name(self, request):
+    def get_view_name(self, environ):
         try:
+            from pyramid.request import Request
             from pyramid.scripts.pviews import PViewsCommand
+
+            # convert environ to Request
+            request = Request(environ)
+            request.registry = self.app.registry
 
             pvcomm = PViewsCommand([])
             view = pvcomm._find_view(request)
@@ -28,7 +33,7 @@ class BlackfirePyramidMiddleware(BlackfireWSGIMiddleware):
 
         response = Response()
         if agent_response:  # send response if signature is validated
-            response.body = blackfireyml_content or ''
+            response.text = blackfireyml_content or ''
             add_probe_response_header(response.headers, agent_response)
 
         return response(environ, start_response)

@@ -12,6 +12,7 @@ def _headers_to_dict(headers):
 
 
 def _catch_response_headers(environ, start_response):
+
     def _wrapper(status, headers, exc_info=None):
         try:
             environ['blackfire.status_code'] = int(status[:3])
@@ -136,7 +137,7 @@ class BlackfireWSGIMiddleware(object):
                 "%s profile ended.",
                 self.__class__.__name__,
             )
-            
+
             self.end_probe(response, probe, probe_err, environ)
 
     def _trace(self, environ, start_response, extended=False):
