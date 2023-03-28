@@ -1,5 +1,5 @@
-from blackfire.utils import get_logger, import_module, wrapfn
-from blackfire.hooks.utils import patch_module, check_supported_version
+from blackfire.utils import get_logger, import_module, wrapfn, unwrap
+from blackfire.hooks.utils import patch_module, check_supported_version, unpatch_module
 from blackfire.hooks.pyramid.middleware import BlackfirePyramidMiddleware
 
 log = get_logger(__name__)
@@ -39,3 +39,12 @@ def patch():
     return patch_module(
         'pyramid.config', _patch, package='pyramid', version=pyramid_version
     )
+
+
+def unpatch():
+
+    def _unpatch(_):
+        import pyramid
+        unwrap(pyramid.config.Configurator, "make_wsgi_app")
+
+    unpatch_module('pyramid.config', _unpatch, package='pyramid')

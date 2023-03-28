@@ -493,7 +493,7 @@ def get_autoprofile_query(method, uri, key_page):
     data = """file-format: BlackfireApmRequestProfileQuery
         uri: {}
         method: {}
-        key-page-id: {}\n""".format(method, uri, key_page["id"])
+        key-page-id: {}\n""".format(uri, method, key_page["id"])
     if IS_PY3:
         data = bytes(data, 'ascii')
     data += agent.Protocol.HEADER_MARKER

@@ -152,7 +152,7 @@ def patch_module(name, patch_fn, version=None, package=None):
     return False
 
 
-def unpatch_module(name, unpatch_fn):
+def unpatch_module(name, unpatch_fn, package=None):
     module = import_module(name)
     if not module:
         return
@@ -162,7 +162,7 @@ def unpatch_module(name, unpatch_fn):
 
     try:
         unpatch_fn(module)
-        log.debug('%s unpatched.', (name))
+        log.debug('%s unpatched.', (package or name))
     except Exception as e:
         log.exception(e)
 
