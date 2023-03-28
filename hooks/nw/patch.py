@@ -135,7 +135,7 @@ def patch():
             call_post_func_with_result=True
         )
 
-    return patch_module('socket', _patch)
+    return patch_module('socket', _patch, package='nw')
 
 
 def unpatch():

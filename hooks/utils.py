@@ -1,5 +1,6 @@
 import os
 import sys
+from pkg_resources import parse_version
 from blackfire import probe, generate_config, agent, apm
 from blackfire.utils import get_logger, UC, unicode_or_bytes, import_module
 from blackfire.exceptions import *
@@ -138,7 +139,7 @@ def patch_module(name, patch_fn, version=None, package=None):
             version = getattr(module, '__version__', None)
 
         if version is None:
-            log.debug('%s patched.', name)
+            log.debug('%s patched.', package or name)
         else:
             log.debug('%s version %s patched.', package or name, version)
 
@@ -166,3 +167,24 @@ def unpatch_module(name, unpatch_fn):
         log.exception(e)
 
     setattr(module, _BLACKFIRE_PATCH_KEY, False)
+
+
+def check_supported_version(name, current_version):
+    _MIN_SUPPORTED = {
+        'fastapi': '0.51.0',
+        'pyramid': '1.5.0',
+        'django': '1.11',
+        'flask': '0.12',
+        'odoo': '13'
+    }
+
+    min_supported_version = _MIN_SUPPORTED[name.lower()]
+    if parse_version(current_version) < parse_version(min_supported_version):
+        log.warning(
+            'Blackfire %s middleware requires %s version %s and up. '
+            'Current version is %s.' %
+            (name, name, min_supported_version, current_version)
+        )
+        return False
+
+    return True
