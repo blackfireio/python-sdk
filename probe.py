@@ -10,7 +10,7 @@ from contextlib import contextmanager
 from blackfire import profiler, VERSION, agent, generate_config, DEFAULT_CONFIG_FILE, \
     COST_DIMENSIONS
 from blackfire.utils import IS_PY3, urlencode, get_load_avg, get_logger, json_prettify, \
-    get_probed_runtime, ContextDict
+    get_probed_runtime, ContextDict, generate_id
 from blackfire.exceptions import BlackfireApiException
 from blackfire.constants import BlackfireConstants
 
@@ -275,15 +275,7 @@ def generate_subprofile_query():
         parent_sid = args_copy['sub_profile'].split(':')[1]
     args_copy.pop('aggreg_samples')
 
-    s = ''.join(chr(random.randint(0, 255)) for _ in range(7))
-    if IS_PY3:
-        s = bytes(s, agent.Protocol.ENCODING)
-    sid = base64.b64encode(s)
-    sid = sid.decode("ascii")
-    sid = sid.rstrip('=')
-    sid = sid.replace('+', 'A')
-    sid = sid.replace('/', 'B')
-    sid = sid[:9]
+    sid = generate_id(10)[:9]
     args_copy['sub_profile'] = '%s:%s' % (parent_sid, sid)
 
     result = "%s&signature=%s&%s" % (
