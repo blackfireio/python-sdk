@@ -4,6 +4,8 @@ from blackfire.hooks.pyramid.middleware import BlackfirePyramidMiddleware
 
 log = get_logger(__name__)
 
+MIN_SUPPORTED_VERSION = '1.5.0'
+
 
 def _wrap_make_wsgi_app(fn, self, *args, **kwargs):
     result = fn(self, *args, **kwargs)

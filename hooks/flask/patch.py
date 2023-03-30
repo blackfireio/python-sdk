@@ -3,6 +3,8 @@ from blackfire.hooks.utils import patch_module
 
 log = get_logger(__name__)
 
+MIN_SUPPORTED_VERSION = '0.12'
+
 
 def _wrap_app(instance, *args, **kwargs):
     try:

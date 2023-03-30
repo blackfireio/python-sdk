@@ -4,6 +4,8 @@ from blackfire.hooks.utils import patch_module
 
 log = get_logger(__name__)
 
+MIN_SUPPORTED_VERSION = '13'
+
 
 def patch():
     # this defensive check is necessary since sometimes argv is not present

@@ -170,15 +170,12 @@ def unpatch_module(name, unpatch_fn, package=None):
 
 
 def check_supported_version(name, current_version):
-    _MIN_SUPPORTED = {
-        'fastapi': '0.51.0',
-        'pyramid': '1.5.0',
-        'django': '1.11',
-        'flask': '0.12',
-        'odoo': '13'
-    }
+    m = import_module('blackfire.hooks.%s.patch' % name.lower())
+    if not m:
+        log.error('Unsupported framework: %s' % name)
+        return False
+    min_supported_version = getattr(m, 'MIN_SUPPORTED_VERSION', '0.0.0')
 
-    min_supported_version = _MIN_SUPPORTED[name.lower()]
     if parse_version(current_version) < parse_version(min_supported_version):
         log.warning(
             'Blackfire %s middleware requires %s version %s and up. '

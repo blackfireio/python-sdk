@@ -4,6 +4,8 @@ from blackfire.hooks.utils import patch_module, check_supported_version, unpatch
 
 log = get_logger(__name__)
 
+MIN_SUPPORTED_VERSION = '0.51.0'
+
 
 def _wrap_build_middleware_stack(fn, self, *args, **kwargs):
     result = fn(self, *args, **kwargs)

@@ -3,6 +3,8 @@ from blackfire.hooks.utils import patch_module, check_supported_version
 
 log = get_logger(__name__)
 
+MIN_SUPPORTED_VERSION = '1.11'
+
 
 def _insert_leading_middleware(*args, **kwargs):
     try:
