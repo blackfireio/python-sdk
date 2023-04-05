@@ -12,12 +12,18 @@ from blackfire.exceptions import *
 from blackfire.hooks import nw
 
 TRACEMALLOC_REQUIRED_MODULES = ['numpy']
-TRACEMALLOC_AVAIL = False
+
 try:
     import tracemalloc
     TRACEMALLOC_AVAIL = True
 except:
-    pass
+    TRACEMALLOC_AVAIL = False
+
+try:
+    import faulthandler
+    FAULTHANDLER_AVAIL = True
+except:
+    FAULTHANDLER_AVAIL = False
 
 __all__ = [
     'start', 'stop', 'get_traces', 'clear_traces', 'run', 'add_pending_span',
@@ -503,6 +509,13 @@ def start(
                 "tracemalloc will be used as the internal memory profiler."
             )
 
+    if FAULTHANDLER_AVAIL:
+        try:
+            log_stream = log.handlers[0].stream
+        except:
+            log_stream = sys.stderr  # defensive
+        faulthandler.enable(file=log_stream)
+
     _bfext.start(
         builtins,
         profile_cpu,
@@ -526,6 +539,9 @@ def stop():
     _bfext.stop()
     if TRACEMALLOC_AVAIL:
         tracemalloc.stop()
+
+    if FAULTHANDLER_AVAIL:
+        faulthandler.disable()
 
 
 def get_traces(omit_sys_path_dirs=True, extended=False):
