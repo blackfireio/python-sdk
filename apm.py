@@ -148,9 +148,10 @@ class ApmProbeConfig(object):
             'BLACKFIRE_AGENT_TIMEOUT', DEFAULT_AGENT_TIMEOUT
         )
 
-        # read APM_ENABLED config from env.var.
-        # TODO: Config file initialization will be done later
-        self.apm_enabled = bool(int(os.environ.get('BLACKFIRE_APM_ENABLED', 0)))
+        self.apm_enabled = True
+        force_disable = int(os.environ.get('BLACKFIRE_APM_FORCE_DISABLE', 0))
+        if force_disable:
+            self.apm_enabled = False
 
 
 _apm_config = ApmConfig()
