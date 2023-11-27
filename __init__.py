@@ -167,11 +167,11 @@ Commands:
   run		Enable code instrumentation and start profiling immediately with "blackfire run".
   help		Provide help
 
-For more information on blackfire-python, please visit https://blackfire.io/docs.
+For more information on blackfire-python, please visit https://docs.blackfire.io.
     '''
     if get_executable_path(BLACKFIRE_CLI_EXEC) is None:
         help_string += '\nWarning: The "blackfire" CLI is not installed. It is needed for the "run"' \
-            'command to work properly.\nPlease visit https://blackfire.io/docs/up-and-running/installation ' \
+            'command to work properly.\nPlease visit https://docs.blackfire.io/up-and-running/installation ' \
             'to install it.\n'
     print(help_string)
 
@@ -192,12 +192,12 @@ The "blackfire-python run" command is a proxy for "blackfire run".
 Any options accepted by "blackfire run" are available in this command.
 To learn more, please run "blackfire help run".
 
-For more information on blackfire-python, please visit https://blackfire.io/docs.
+For more information on blackfire-python, please visit https://docs.blackfire.io.
 '''
 
     if get_executable_path(BLACKFIRE_CLI_EXEC) is None:
         help_string += '\nWarning: The "blackfire" CLI is not installed. It is needed for the "run" ' \
-            'command to work properly.\nPlease visit https://blackfire.io/docs/up-and-running/installation ' \
+            'command to work properly.\nPlease visit https://docs.blackfire.io/up-and-running/installation ' \
             'to install it.\n'
 
     print(help_string)
@@ -255,7 +255,7 @@ def bootstrap_python():
         if executable == BLACKFIRE_CLI_EXEC:
             print(
                 'Error: The "blackfire" CLI is not installed. It is needed for the "run" '
-                'command to work properly.\nPlease visit https://blackfire.io/docs/up-and-running/installation '
+                'command to work properly.\nPlease visit https://docs.blackfire.io/up-and-running/installation '
                 'to install it.'
             )
             sys.exit(1)
