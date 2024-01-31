@@ -248,7 +248,7 @@ def get_os_memory_usage():
     plat_sys = platform.system()
     pid = os.getpid()
     if plat_sys == "Linux":
-        with open("/proc/%s/statm" % (os.getpid(), ), "rb") as f:
+        with open("/proc/%s/statm" % (pid, ), "rb") as f:
             _, rss, _, _, _, _, _ = \
                 [int(x) * os.sysconf("SC_PAGE_SIZE") for x in f.readline().split()[:7]]
         peak_usage = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss * 1024
