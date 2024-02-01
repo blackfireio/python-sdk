@@ -158,6 +158,12 @@ _apm_config = ApmConfig()
 _apm_probe_config = ApmProbeConfig()
 _apm_worker = _ApmWorker()
 
+def _wait_pending_transactions():
+    _apm_worker.close()
+    _apm_worker.join()
+
+atexit.register(_wait_pending_transactions)
+
 # _state is a per-context resource. An example use: it holds current executing APM transaction
 _state = ContextDict('bf_apm_state')
 
@@ -311,12 +317,6 @@ def _start_transaction(extended=False, ctx_var=None, name=None):
 
 def start_transaction(name=None):
     result = _start_transaction(name=name)
-
-    def _wait_pending_transactions():
-        _apm_worker.close()
-        _apm_worker.join()
-
-    atexit.register(_wait_pending_transactions)
     return result
 
 
