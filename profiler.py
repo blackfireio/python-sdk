@@ -6,7 +6,7 @@ import logging
 import _blackfire_profiler as _bfext
 from contextlib import contextmanager
 from collections import Counter
-from blackfire.utils import urlencode, IS_PY3, get_logger, RuntimeMetrics, \
+from blackfire.utils import urlencode, IS_PY3, get_logger, \
     get_time, json_prettify, import_module, generate_id, quote
 from blackfire.exceptions import *
 from blackfire.hooks import nw
@@ -34,7 +34,6 @@ log = get_logger(__name__, include_line_info=False)
 
 _max_prefix_cache = {}
 MAX_TIMESPAN_THRESHOLD = 1000000000
-runtime_metrics = RuntimeMetrics()
 
 
 def _fn_matches_timespan_selector(names, timespan_selectors):
@@ -129,7 +128,6 @@ def reset():
 def initialize(
     f=_format_funcname,
     s=_fn_matches_timespan_selector,
-    m=runtime_metrics.memory,
     t=_set_threading_profile,
     tm=_get_tracemalloc_traced_memory,
 ):

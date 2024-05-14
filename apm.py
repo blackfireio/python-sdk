@@ -343,7 +343,7 @@ def stop_transaction():
 
 
 def _get_traced_memory():
-    return profiler.runtime_metrics.memory()
+    return _bfext.get_memory_usage_from_os()
 
 
 def reset():
@@ -352,7 +352,6 @@ def reset():
     _apm_config = ApmConfig()
     # init config for the APM for communicating with the Agent
     _apm_probe_config = ApmProbeConfig()
-    profiler.runtime_metrics.reset()
     _set_current_transaction(None)
 
 

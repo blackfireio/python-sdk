@@ -85,32 +85,6 @@ class ContextDict(object):
             setattr(self._state, key, value)
 
 
-class RuntimeMetrics(object):
-
-    CACHE_INTERVAL = 1.0
-
-    def __init__(self):
-        self.reset()
-
-    def reset(self):
-        self._last_collected = 0
-        self._cache = {}
-        self._nhits = 0
-        self._nmisses = 0
-
-    def memory(self, *args, **kwargs):
-        now = time.time()
-        if now - self._last_collected <= self.CACHE_INTERVAL:
-            self._nhits += 1
-            return self._cache["memory"]
-
-        self._nmisses += 1
-        result = get_os_memory_usage()
-        self._cache["memory"] = result
-        self._last_collected = now
-        return result
-
-
 def get_time():
     return int(_bfext.now())
 
@@ -242,24 +216,6 @@ def get_cpu_count():
         return ncpus
 
     return _bfext.get_cpu_count_logical()
-
-
-def get_os_memory_usage():
-    plat_sys = platform.system()
-    pid = os.getpid()
-    if plat_sys == "Linux":
-        with open("/proc/%s/statm" % (pid, ), "rb") as f:
-            _, rss, _, _, _, _, _ = \
-                [int(x) * os.sysconf("SC_PAGE_SIZE") for x in f.readline().split()[:7]]
-        peak_usage = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss * 1024
-        return rss, peak_usage
-    elif plat_sys == "Darwin":
-        usage, _ = _bfext.get_os_memory_usage(pid)
-        peak_usage = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
-        return usage, peak_usage
-    elif plat_sys == "Windows":
-        return _bfext.get_os_memory_usage(pid)
-
 
 def get_load_avg():
     try:
