@@ -186,6 +186,17 @@ class BlackfireWSGIMiddleware(object):
             query = apm.get_autoprofile_query(method, path_info, key_page)
             if query:
                 return self._profile(query, environ, start_response)
+        
+        # for monitoring, we need to check if uwsgi is running with threads-enabled
+        # otherwise, the monitoring thread will not work properly. Note that import uwsgi
+        # is only valid in uWSGI's request context
+        try:
+            import uwsgi
+            if not uwsgi.opt.get("enable-threads"):
+                log.warn("enable-threads option must be set to true for Blackfire Monitoring to work")
+                return self.get_app_response(environ, start_response)
+        except ImportError:
+            pass
 
         # monitoring
         if apm.trigger_trace():
