@@ -158,6 +158,16 @@ _apm_config = ApmConfig()
 _apm_probe_config = ApmProbeConfig()
 _apm_worker = _ApmWorker()
 
+# we delay connection initialization because we patch the agent.Connection in the 
+# tests. We do not want to initialize the connection at import time.
+_agent_conn = None
+
+def _new_agent_conn():
+    global _apm_probe_config
+
+    return agent.Connection(
+        _apm_probe_config.agent_socket, _apm_probe_config.agent_timeout)
+
 def _wait_pending_transactions():
     _apm_worker.close()
     _apm_worker.join()
@@ -419,11 +429,7 @@ def trigger_auto_profile(method, uri, controller_name):
 
 @contextmanager
 def _get_agent_connection():
-    global _apm_probe_config
-
-    agent_conn = agent.Connection(
-        _apm_probe_config.agent_socket, _apm_probe_config.agent_timeout
-    )
+    agent_conn = _new_agent_conn()
     try:
         agent_conn.connect()
         yield agent_conn
@@ -499,6 +505,8 @@ def get_autoprofile_query(method, uri, key_page):
     data += agent.Protocol.HEADER_MARKER
 
     try:
+        # do not use the cached Agent connection as then we will need to use 
+        # locks to make it thread-safe
         with _get_agent_connection() as agent_conn:
             agent_conn.send(data)
 
@@ -515,27 +523,41 @@ def get_autoprofile_query(method, uri, key_page):
 
 
 def _send_trace(req):
+    global _agent_conn
+
+    if _agent_conn is None:
+        _agent_conn = _new_agent_conn()
+        _agent_conn.connect()
+
     try:
-        with _get_agent_connection() as agent_conn:
-            agent_conn.send(req.to_bytes())
+        # try to reconnect once if the connection send fails
+        try:
+            _agent_conn.send(req.to_bytes(), apm_pause=False)
+        except Exception as e:
+            log.debug("Reconnect attempt for [error:%s]", e)
 
-            response_raw = agent_conn.recv()
-            agent_resp = agent.BlackfireAPMResponse().from_bytes(response_raw)
+            _agent_conn = _new_agent_conn()
+            _agent_conn.connect()
 
-            if log.isEnabledFor(logging.DEBUG):
-                log.debug(
-                    "Agent APM response received. [%s]",
-                    agent_resp,
+        _agent_conn.send(req.to_bytes())
+        response_raw = _agent_conn.recv()
+
+        agent_resp = agent.BlackfireAPMResponse().from_bytes(response_raw)
+
+        if log.isEnabledFor(logging.DEBUG):
+            log.debug(
+                "Agent APM response received. [%s]",
+                agent_resp,
                 )
 
-            if agent_resp.update_config:
-                _update_apm_config(agent_resp)
+        if agent_resp.update_config:
+            _update_apm_config(agent_resp)
 
-            if log.isEnabledFor(logging.DEBUG):
-                log.debug(
-                    "APM trace sent. [%s]",
-                    req,
-                )
+        if log.isEnabledFor(logging.DEBUG):
+            log.debug(
+                "APM trace sent. [%s]",
+                req,
+            )
     except Exception as e:
         if is_testing():
             raise e

@@ -143,14 +143,15 @@ class Connection(object):
 
         log.debug("Agent connection closed.")
 
-    def send(self, data):
-        # Agent expects data is written in chunks
+    def send(self, data, apm_pause=True):
         try:
+            # Agent expects data is written in chunks
             while (data):
                 self._socket.sendall(data[:Protocol.MAX_SEND_SIZE])
                 data = data[Protocol.MAX_SEND_SIZE:]
         except Exception as e:
-            pause_apm(reason=e)
+            if apm_pause:
+                pause_apm(reason=e)
             raise BlackfireApiException(
                 'Agent send data failed.[%s][%s]' % (e, data)
             )
