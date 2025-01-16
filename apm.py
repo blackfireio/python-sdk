@@ -534,7 +534,11 @@ def _send_trace(req):
         try:
             _agent_conn.send(req.to_bytes(), apm_pause=False)
         except Exception as e:
-            log.debug("Reconnect attempt for [error:%s]", e)
+            try:
+                _agent_conn.close()
+            except:
+                pass
+            log.warning("Reconnect attempt for [error:%s]", e)
 
             _agent_conn = _new_agent_conn()
             _agent_conn.connect()
