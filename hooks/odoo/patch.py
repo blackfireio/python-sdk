@@ -27,9 +27,13 @@ def patch():
     def _patch(module):
         from blackfire.hooks.odoo.middleware import OdooMiddleware
 
-        module.service.wsgi_server.application = OdooMiddleware(
-            module.service.wsgi_server.application
-        )
+        if module.release.version_info[0] >= 15:
+            module.http.root = OdooMiddleware(module.http.root)
+            log.debug("Patched Odoo.HTTP.root")
+        else:
+            module.service.wsgi_server.application = OdooMiddleware(
+                module.service.wsgi_server.application
+            )
 
     module = import_module('odoo')
     if not module:

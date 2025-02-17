@@ -22,3 +22,6 @@ class OdooMiddleware(BlackfireWSGIMiddleware):
 
     def get_view_name(self, environ):
         return None
+
+    def __getattr__(self, name):
+        return getattr(self.app, name)
