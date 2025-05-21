@@ -1,6 +1,7 @@
+import os
 from blackfire.exceptions import *
 from blackfire import apm, generate_config
-from blackfire.utils import get_logger, read_blackfireyml_content
+from blackfire.utils import get_logger, read_blackfireyml_content, html_escape
 from blackfire.hooks.utils import try_enable_probe, try_end_probe, \
     try_validate_send_blackfireyml, try_apm_start_transaction, try_apm_stop_and_queue_transaction
 
@@ -12,7 +13,6 @@ def _headers_to_dict(headers):
 
 
 def _catch_response_headers(environ, start_response):
-
     def _wrapper(status, headers, exc_info=None):
         try:
             environ['blackfire.status_code'] = int(status[:3])
@@ -26,6 +26,148 @@ def _catch_response_headers(environ, start_response):
 
     return _wrapper
 
+class _BlackfireJSProbeMiddleware(object):
+    def __init__(self, app):
+        self.app = app
+
+    def _generate_snippet(self, environ):
+        _JSTAG = (
+            '<script async="true" data-browser-key="%s" '
+            'data-sample-rate="%.6f" data-parent-trace-id="%s" '
+            'data-transaction-name="%s" data-collector="%s" '
+            'src="%s"></script>'
+        )
+        _JSTAG_NOSCRIPT = (
+            '<noscript><img src="%s?k=%s" referrerpolicy="no-referrer-when-downgrade" alt=""/></noscript>'
+        )
+
+        try:
+            browser_config = apm.get_browser_config()
+            browser_probe_url = browser_config.get('browser-probe-url')
+            if not browser_probe_url:
+                return b""
+            def _escape_config_val(name):
+                val = browser_config.get(name, "")
+                return html_escape(val)
+
+            browser_key = _escape_config_val("browser-key")
+            browser_sample_rate = _escape_config_val('browser-sample-rate')
+            if browser_sample_rate != "":
+                browser_sample_rate = int(browser_sample_rate)
+            else:
+                browser_sample_rate = 0
+            trace_id = "" # TODO
+
+            # _JSProbeMiddleware is the outermost, so we can try getting endpoint name
+            view_name = environ.get('blackfire.endpoint', "")
+            browser_collector_endpoint = _escape_config_val("browser-collector-endpoint")
+            browser_pixel_url = _escape_config_val("browser-pixel-url")
+
+            js_script = _JSTAG % (
+                browser_key,
+                browser_sample_rate,
+                trace_id,
+                view_name,
+                browser_collector_endpoint,
+                browser_probe_url
+            )
+            js_noscript = ''
+            if browser_pixel_url:
+                js_noscript = _JSTAG_NOSCRIPT % (browser_pixel_url, browser_key)
+            return (js_script + js_noscript).encode("utf-8")
+        except Exception as e:
+            log.exception(e) # defensive
+            return b""
+    
+    def __call__(self, environ, start_response):
+        state = [None, None, None]
+        def _capture(s, h, e=None):
+            state[0], state[1], state[2] = s, h[:], e
+            return lambda _=None: None # dummy write()
+
+        app_iter = self.app(environ, _capture)
+
+        status, headers, exc = state
+
+        if headers is None:
+            start_response(status, headers, exc)
+            return app_iter
+        
+        hdict = {k.lower(): (i, v.lower()) for i, (k, v) in enumerate(headers)}
+        ce = hdict.get("content-encoding", (None, ""))[1]
+        if "html" not in hdict.get("content-type", (None, ""))[1] or \
+            "chunked" in hdict.get("transfer-encoding", (None, ""))[1] or \
+            ce not in ("", "identity"):
+            start_response(status, headers, exc)
+            return app_iter
+
+        def _findTags(buf):
+            buf = buf.lower()
+            pos = buf.find(b"</head>")
+            if pos == -1:
+                pos = buf.find(b"</body>")
+            return pos
+
+        snippet = self._generate_snippet(environ)
+
+        # this case is: there is no content-length header, and the body *MIGHT* be chunked
+        # meaning user yielded the Response, so the content-length can be added by the 
+        # WSGI server there will be no content-length header mutation so we can call
+        # start_response early
+        def _inject_chunked(app_iter):
+            start_response(status, headers, exc)
+            try:
+                for chunk in app_iter:
+                    # Note: We don't care the case where Chunks can separate the tags.
+                    # Example: '<he' happens in Chunk1 and 'ad>' in Chunk2. This is 
+                    # to reduce complexity as that case requires its own 
+                    # buffering mechanism. Because: once we send Chunk1 back, we 
+                    # can't add the snippet after the tag.
+                    pos = _findTags(chunk)
+                    if pos == -1: # no tag found, pass chunk
+                        yield chunk
+                    else:
+                        chunk = chunk[:pos] + snippet + chunk[pos:]
+                        yield chunk
+
+                        # normally, we can use `yield from` here, but it will not 
+                        # work with 2.7, so the only way is to iterate the rest 
+                        # of the iterator, it has a bit perf. cost but same result
+                        for remaining_chunk in app_iter:
+                            yield remaining_chunk
+                        # break, as we already sent the chunked response
+                        break
+            finally:
+                if hasattr(app_iter, "close"):
+                    app_iter.close()
+
+        # if there is a content-length header, this means that the body is not chunked
+        # and we can read whole body at once
+        content_length_idx, content_length_val = hdict.get("content-length", (None, None))
+        streaming_response = content_length_idx is None
+        if not streaming_response:
+            log.debug("Non-streaming response.")
+            content_length_idx = int(content_length_idx)
+            body = b"".join(app_iter)
+            if hasattr(app_iter, "close"):
+                app_iter.close()
+
+            pos = _findTags(body)
+            if pos != -1:
+                body = body[:pos] + snippet + body[pos:]
+                headers[content_length_idx] = (
+                    "Content-Length",
+                    str(int(content_length_val) + len(snippet)),
+                )
+            start_response(status, headers, exc)
+            return [body]
+        else:
+            log.debug("Streaming response.")
+            # we cannot yield here as yield+return is not valid in python 2.7 in 
+            # same function and when we return like this, the app_iter will be 
+            # consumed after a finally block
+            return _inject_chunked(app_iter)
+
 
 class BlackfireWSGIMiddleware(object):
 
@@ -33,7 +175,14 @@ class BlackfireWSGIMiddleware(object):
     FRAMEWORK = 'Generic-WSGI'
 
     def __init__(self, app):
-        self.app = app
+        # _app wraps the original app if browser monitoring is enabled. We need
+        # this because there are middlewares that uses self.app (e.g: Odoo and Pyramid) 
+        # for internal purposes. This way, we can keep the original app reference
+        # and still use the wrapped app for browser monitoring.
+        self._app = self.app = app
+        if os.environ.get('BLACKFIRE_DISABLE_BROWSER_MONITORING') != '1':
+            self._app = _BlackfireJSProbeMiddleware(self.app)
+            log.debug("_BlackfireJSProbeMiddleware enabled.")
 
     def build_blackfire_yml_response(self, *args):
         '''This function is called to handle Blackfire builds. When a special build
@@ -51,7 +200,7 @@ class BlackfireWSGIMiddleware(object):
         raise NotImplemented('')
 
     def get_app_response(self, *args, **kwargs):
-        return self.app(*args, **kwargs)
+        return self._app(*args, **kwargs)
 
     def enable_probe(self, query):
         return try_enable_probe(query)

@@ -99,6 +99,8 @@ class BlackfireDjangoMiddleware(BlackfireWSGIMiddleware):
     def __init__(self, get_response):
         self.get_response = get_response
 
+        super(BlackfireDjangoMiddleware, self).__init__(get_response)
+
     def build_blackfire_yml_response(
         self, blackfireyml_content, agent_response, *args
     ):

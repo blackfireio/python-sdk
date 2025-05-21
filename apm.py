@@ -111,6 +111,8 @@ class ApmConfig(object):
         self.timespan_limit_per_rule = _DEFAULT_TIMESPAN_LIMIT_PER_RULE
         self.timespan_limit_global = _DEFAULT_TIMESPAN_LIMIT_GLOBAL
 
+        self.browser_config = {}
+
         # some env. vars used in testing
         self.sample_rate = float(
             os.environ.get('BLACKFIRE_APM_SAMPLE_RATE_TEST', self.sample_rate)
@@ -477,13 +479,20 @@ def _update_apm_config(response):
     except:
         pass
 
+    browser_config = {}
+    for arg_name, val in response.args.items():
+        if arg_name.startswith('browser-'):
+            browser_config[arg_name] = val[0]
+    new_apm_config.browser_config = browser_config
+
     new_apm_config.key_pages = tuple(response.key_pages)
     new_apm_config.instrumented_funcs = response.get_instrumented_funcs()
     new_apm_config.timespan_selectors = response.get_timespan_selectors()
 
-    # update the process-wise global apm configuration. Once this is set
-    # the new HTTP requests making initialize() will get this new config
-    # No need to make this thread-safe
+    # update the process-wise global apm configuration. This is a typical read from multiple
+    # threads and write from one thread issue. The only thing that is possible is that the readers
+    # can see a value from previous config plus one from the new config. We accept that trade-off
+    # instead of using locks. So, no need to make this thread-safe
     _apm_config = new_apm_config
 
     if log.isEnabledFor(logging.DEBUG):
@@ -493,6 +502,9 @@ def _update_apm_config(response):
             os.getpid(),
         )
 
+def get_browser_config():
+    global _apm_config
+    return _apm_config.browser_config
 
 def get_autoprofile_query(method, uri, key_page):
     # TODO: blackfire-auth header?

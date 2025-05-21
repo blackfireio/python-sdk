@@ -10,8 +10,9 @@ class BlackfireFlaskMiddleware(BlackfireWSGIMiddleware):
     FRAMEWORK = 'flask'
 
     def __init__(self, flask_app):
-        self.app = flask_app.wsgi_app
         self.flask_app = flask_app
+
+        super(BlackfireFlaskMiddleware, self).__init__(flask_app.wsgi_app)
 
     def build_blackfire_yml_response(
         self, blackfireyml_content, agent_response, environ, start_response,

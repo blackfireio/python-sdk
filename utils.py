@@ -38,6 +38,17 @@ if sys.version_info >= (3, 7):
 else:
     CONTEXTVARS_AVAIL = False
 
+try:
+    # Python ≥ 3.2
+    from html import escape as html_escape
+except ImportError:
+    # Python 2.x fallback
+    import cgi
+    def html_escape(s):
+        s = cgi.escape(s, quote=True)
+        # cgi.escape doesn't handle single quotes, so patch manually
+        return s.replace("'", "&#x27;")
+
 _DEFAULT_LOG_LEVEL = 2
 _HEXCONVTAB = "0123456789abcdef"
 
