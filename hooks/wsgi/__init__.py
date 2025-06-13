@@ -38,7 +38,7 @@ class _BlackfireJSProbeMiddleware(object):
             'src="%s"></script>'
         )
         _JSTAG_NOSCRIPT = (
-            '<noscript><img src="%s?k=%s" referrerpolicy="no-referrer-when-downgrade" alt=""/></noscript>'
+            '<noscript><img src="%s?k=%s" referrerpolicy="no-referrer-when-downgrade" style="display:none"/></noscript>'
         )
 
         try:
