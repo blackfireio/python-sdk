@@ -1,6 +1,6 @@
 import os
 import sys
-from pkg_resources import parse_version
+import re
 from blackfire import probe, generate_config, agent, apm
 from blackfire.utils import get_logger, UC, unicode_or_bytes, import_module
 from blackfire.exceptions import *
@@ -168,6 +168,15 @@ def unpatch_module(name, unpatch_fn, package=None):
 
     setattr(module, _BLACKFIRE_PATCH_KEY, False)
 
+# similar to deprecated pkg_resources.parse_version, we avoid using a dependency
+# like https://packaging.pypa.io/
+def _parse_version(v, width=3):
+    nums = [int(m.group(0))
+            for m in (re.match(r'\d+', part) for part in v.split('.'))
+            if m]
+    # pad to fixed length to avoid cases like: 1.2 < 1.2.0
+    nums.extend([0] * (width - len(nums)))
+    return tuple(nums[:width])
 
 def check_supported_version(name, current_version):
     m = import_module('blackfire.hooks.%s.patch' % name.lower())
@@ -176,7 +185,7 @@ def check_supported_version(name, current_version):
         return False
     min_supported_version = getattr(m, 'MIN_SUPPORTED_VERSION', '0.0.0')
 
-    if parse_version(current_version) < parse_version(min_supported_version):
+    if _parse_version(current_version) < _parse_version(min_supported_version):
         log.warning(
             'Blackfire %s middleware requires %s version %s and up. '
             'Current version is %s.' %

@@ -17,8 +17,8 @@ def _wrap_make_wsgi_app(fn, self, *args, **kwargs):
 
 def _get_pyramid_version():
     try:
-        import pkg_resources
-        return pkg_resources.get_distribution("pyramid").version
+        from importlib.metadata import version
+        return version("pyramid")
     except Exception as e:
         log.exception(e)
         return '0.0.0'
