@@ -22,6 +22,18 @@ def format_exc_for_display(e):
         # simply use the exception object
         return str(e)
 
+def try_send_pong(config):
+    try:
+        agent_conn = agent.Connection(config.agent_socket, config.agent_timeout)
+        # signature validated at this point, otherwise we get BlackfireInvalidSignatureError
+        agent_conn.connect(config=config)
+        agent_conn.close()
+
+        return True
+    except Exception as e:
+        log.exception(e)
+    
+    return False
 
 def try_validate_send_blackfireyml(config, blackfireyml_content):
     try:

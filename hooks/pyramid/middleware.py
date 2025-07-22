@@ -37,3 +37,10 @@ class BlackfirePyramidMiddleware(BlackfireWSGIMiddleware):
             add_probe_response_header(response.headers, agent_response)
 
         return response(environ, start_response)
+
+    def build_ping_response(self, environ, start_response):
+        from pyramid.response import Response
+        
+        response = Response()
+        response.headers['X-Blackfire-Response'] = 'pong'
+        return response(environ, start_response)

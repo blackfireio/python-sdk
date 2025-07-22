@@ -20,6 +20,13 @@ class OdooMiddleware(BlackfireWSGIMiddleware):
 
         return Response()(environ, start_response)
 
+    def build_ping_response(self, environ, start_response):
+        from werkzeug.wrappers import Response
+
+        response = Response()
+        response.headers['X-Blackfire-Response'] = 'pong'
+        return response(environ, start_response)
+
     def get_view_name(self, environ):
         return None
 

@@ -112,6 +112,13 @@ class BlackfireDjangoMiddleware(BlackfireWSGIMiddleware):
             add_probe_response_header(response, agent_response)
         return response
 
+    def build_ping_response(self, environ, start_response):
+        from django.http import HttpResponse
+        
+        response = HttpResponse()
+        response['X-Blackfire-Response'] = 'pong'
+        return response
+
     def get_view_name(self, environ):
         return get_current_view_name(environ['PATH'])
 

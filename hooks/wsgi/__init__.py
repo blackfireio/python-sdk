@@ -3,7 +3,8 @@ from blackfire.exceptions import *
 from blackfire import apm, generate_config
 from blackfire.utils import get_logger, read_blackfireyml_content, html_escape
 from blackfire.hooks.utils import try_enable_probe, try_end_probe, \
-    try_validate_send_blackfireyml, try_apm_start_transaction, try_apm_stop_and_queue_transaction
+    try_validate_send_blackfireyml, try_apm_start_transaction, try_apm_stop_and_queue_transaction, \
+    try_send_pong
 
 log = get_logger(__name__)
 
@@ -191,6 +192,18 @@ class BlackfireWSGIMiddleware(object):
         '''
         raise NotImplemented('')
 
+    def build_ping_response(self, environ, start_response):
+        '''This function is called to handle ping requests. When a ping request is
+        received, this function gets called to build framework specific response.
+
+        start_response is called if the framework supports it, otherwise frameworks
+        should override this method to return a proper response. As an example:
+        start_response(200 OK, ...) is not working on Django
+        '''
+        if start_response:
+            start_response("200 OK", [('X-Blackfire-Response', 'pong')])
+            return [b'']
+
     def get_view_name(self, environ):
         '''This function is called at the start of wsgi.__call__ to retrieve the
         actual view function name. Usually, the view function is not retrieved by 
@@ -235,23 +248,35 @@ class BlackfireWSGIMiddleware(object):
             "%s profile called. [query=%s]", self.__class__.__name__, query
         )
 
-        # bf yaml asked?
-        if environ['REQUEST_METHOD'] == 'POST':
+        try:
             config = generate_config(query=query)
-            if config.is_blackfireyml_asked():
+            if config.ping_asked():
                 log.debug(
-                    '%s autobuild triggered. Sending `.blackfire.yml` file.',
-                    self.__class__.__name__,
-                )
-                blackfireyml_content = read_blackfireyml_content()
-                agent_response = try_validate_send_blackfireyml(
-                    config, blackfireyml_content
-                )
+                        '%s ping asked. Sending pong...',
+                        self.__class__.__name__,
+                    )
+                # this starts Agent connection and validates the signature
+                if try_send_pong(config):
+                    return self.build_ping_response(environ, start_response)
 
-                return self.build_blackfire_yml_response(
-                    blackfireyml_content, agent_response, environ,
-                    start_response
-                )
+            # bf yaml asked?
+            if environ['REQUEST_METHOD'] == 'POST':
+                if config.is_blackfireyml_asked():
+                    log.debug(
+                        '%s autobuild triggered. Sending `.blackfire.yml` file.',
+                        self.__class__.__name__,
+                    )
+                    blackfireyml_content = read_blackfireyml_content()
+                    agent_response = try_validate_send_blackfireyml(
+                        config, blackfireyml_content
+                    )
+
+                    return self.build_blackfire_yml_response(
+                        blackfireyml_content, agent_response, environ,
+                        start_response
+                    )
+        except Exception as e:
+            log.exception(e) # defensive & and used in tests
 
         probe_err, probe = self.enable_probe(query)
 
@@ -315,7 +340,7 @@ class BlackfireWSGIMiddleware(object):
         path_info = environ.get('PATH_INFO', '')  # defensive
         view_name = environ['blackfire.endpoint'] = self.get_view_name(environ)
 
-        # profile
+        # profile or ping
         query = environ.get('HTTP_X_BLACKFIRE_QUERY')
         if query:
             return self._profile(query, environ, start_response)

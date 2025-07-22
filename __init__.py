@@ -77,6 +77,9 @@ class BlackfireConfiguration(object):
 
     def is_blackfireyml_asked(self):
         return 'request-id-blackfire-yml' in self.challenge['agentIds']
+    
+    def ping_asked(self):
+        return 'ping' in self.args and self.args['ping'] == '1'
 
     def __getattribute__(self, name):
         value = None
