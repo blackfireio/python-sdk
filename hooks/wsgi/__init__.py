@@ -184,6 +184,7 @@ class BlackfireWSGIMiddleware(object):
         if os.environ.get('BLACKFIRE_DISABLE_BROWSER_MONITORING') != '1':
             self._app = _BlackfireJSProbeMiddleware(self.app)
             log.debug("_BlackfireJSProbeMiddleware enabled.")
+        self._skip_uwsgi_warning = False
 
     def build_blackfire_yml_response(self, *args):
         '''This function is called to handle Blackfire builds. When a special build
@@ -366,8 +367,9 @@ class BlackfireWSGIMiddleware(object):
         # is only valid in uWSGI's request context
         try:
             import uwsgi
-            if not uwsgi.opt.get("enable-threads"):
+            if not uwsgi.opt.get("enable-threads") and not self._skip_uwsgi_warning:
                 log.warn("enable-threads option must be set to true for Blackfire Monitoring to work")
+                self._skip_uwsgi_warning = True
                 return self.get_app_response(environ, start_response)
         except ImportError:
             pass

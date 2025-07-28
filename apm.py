@@ -48,6 +48,7 @@ class _ApmWorker(Thread):
         # but it might not be started in that process at all, so we make sure
         # we start the thread in the same context from where we send the trace.
         if not self.started:
+            log.debug("ApmWorker thread starting for pid:%s", os.getpid())
             self.start()
             self.started = True
 
@@ -163,6 +164,10 @@ _apm_worker = _ApmWorker()
 # we delay connection initialization because we patch the agent.Connection in the 
 # tests. We do not want to initialize the connection at import time.
 _agent_conn = None
+
+# TODO: Currently this is False, but when we implement the persistent connection
+# support in the Agent, we will set this value to True based on the version of the Agent.
+_REUSE_AGENT_CONN = False
 
 def _new_agent_conn():
     global _apm_probe_config
@@ -534,14 +539,35 @@ def get_autoprofile_query(method, uri, key_page):
         log.exception(e)
 
 
-def _send_trace(req):
+def _recv_apm_response(agent_conn, req):
+    response_raw = agent_conn.recv()
+
+    agent_resp = agent.BlackfireAPMResponse().from_bytes(response_raw)
+
+    if log.isEnabledFor(logging.DEBUG):
+        log.debug(
+            "Agent APM response received. [%s]",
+            agent_resp,
+            )
+
+    if agent_resp.update_config:
+        _update_apm_config(agent_resp)
+
+    if log.isEnabledFor(logging.DEBUG):
+        log.debug(
+            "APM trace sent. [%s]",
+            req,
+        )
+
+def _send_trace_reuse_conn(req):
     global _agent_conn
 
-    if _agent_conn is None:
-        _agent_conn = _new_agent_conn()
-        _agent_conn.connect()
-
     try:
+        # no-cached connection?
+        if _agent_conn is None:
+            _agent_conn = _new_agent_conn()
+            _agent_conn.connect()
+
         # try to reconnect once if the connection send fails
         try:
             _agent_conn.send(req.to_bytes(), apm_pause=False)
@@ -555,30 +581,25 @@ def _send_trace(req):
             _agent_conn = _new_agent_conn()
             _agent_conn.connect()
 
-        _agent_conn.send(req.to_bytes())
-        response_raw = _agent_conn.recv()
+            _agent_conn.send(req.to_bytes())
 
-        agent_resp = agent.BlackfireAPMResponse().from_bytes(response_raw)
+        # continue to receive the response
+        _recv_apm_response(_agent_conn, req)
+    except Exception as e:
+        if is_testing():
+            raise e
+        log.error("APM message could not be sent(conn reused). [reason:%s]" % (e))
 
-        if log.isEnabledFor(logging.DEBUG):
-            log.debug(
-                "Agent APM response received. [%s]",
-                agent_resp,
-                )
+def _send_trace(req):
+    try:
+        with _get_agent_connection() as _agent_conn:
+            _agent_conn.send(req.to_bytes())
 
-        if agent_resp.update_config:
-            _update_apm_config(agent_resp)
-
-        if log.isEnabledFor(logging.DEBUG):
-            log.debug(
-                "APM trace sent. [%s]",
-                req,
-            )
+            _recv_apm_response(_agent_conn, req)
     except Exception as e:
         if is_testing():
             raise e
         log.error("APM message could not be sent. [reason:%s]" % (e))
-
 
 def _queue_trace(transaction, **kwargs):
     global _apm_config, _apm_worker
@@ -641,4 +662,7 @@ def _queue_trace(transaction, **kwargs):
 
     # We should not have a blocking call in APM path. Do agent connection setup
     # socket send in a separate thread.
-    _apm_worker.add_task(_send_trace, args=(apm_trace_req, ))
+    if _REUSE_AGENT_CONN:
+        _apm_worker.add_task(_send_trace_reuse_conn, args=(apm_trace_req, ))
+    else:
+        _apm_worker.add_task(_send_trace, args=(apm_trace_req, ))
