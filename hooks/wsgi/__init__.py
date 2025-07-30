@@ -189,7 +189,8 @@ class BlackfireWSGIMiddleware(object):
         # defensively call apm.reset on any post_fork hook to reset the APM state
         # uwsgi do not use os.fork so we try uwsgidecorators.postfork, it should
         # not hurt if postfork is called multiple times from the same process
-        os.register_at_fork(after_in_child=apm.reset)
+        if hasattr(os, 'register_at_fork'): # not available on win 
+            os.register_at_fork(after_in_child=apm.reset)
         try:
             # for monitoring, we need to check if uwsgi is running with threads-enabled
             # otherwise, the monitoring thread will not work properly. Note that import uwsgi
