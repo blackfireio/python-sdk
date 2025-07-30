@@ -184,7 +184,26 @@ class BlackfireWSGIMiddleware(object):
         if os.environ.get('BLACKFIRE_DISABLE_BROWSER_MONITORING') != '1':
             self._app = _BlackfireJSProbeMiddleware(self.app)
             log.debug("_BlackfireJSProbeMiddleware enabled.")
-        self._skip_uwsgi_warning = False
+        self._skip_monitoring = False
+
+        # defensively call apm.reset on any post_fork hook to reset the APM state
+        # uwsgi do not use os.fork so we try uwsgidecorators.postfork, it should
+        # not hurt if postfork is called multiple times from the same process
+        os.register_at_fork(after_in_child=apm.reset)
+        try:
+            # for monitoring, we need to check if uwsgi is running with threads-enabled
+            # otherwise, the monitoring thread will not work properly. Note that import uwsgi
+            # is only valid in uWSGI's request context
+            import uwsgi
+            if not (uwsgi.opt.get("enable-threads") or int(uwsgi.opt.get("threads") or 0)):
+                log.warn("enable-threads option must be set to true or a positive number "
+                         "of threads must be set for Blackfire Monitoring to work")
+                self._skip_monitoring = True
+
+            import uwsgidecorators
+            uwsgidecorators.postfork(apm.reset)
+        except:
+            pass
 
     def build_blackfire_yml_response(self, *args):
         '''This function is called to handle Blackfire builds. When a special build
@@ -362,17 +381,10 @@ class BlackfireWSGIMiddleware(object):
             if query:
                 return self._profile(query, environ, start_response)
         
-        # for monitoring, we need to check if uwsgi is running with threads-enabled
-        # otherwise, the monitoring thread will not work properly. Note that import uwsgi
-        # is only valid in uWSGI's request context
-        try:
-            import uwsgi
-            if not uwsgi.opt.get("enable-threads") and not self._skip_uwsgi_warning:
-                log.warn("enable-threads option must be set to true for Blackfire Monitoring to work")
-                self._skip_uwsgi_warning = True
-                return self.get_app_response(environ, start_response)
-        except ImportError:
-            pass
+        # there might be some errors that we want to skip monitoring. e.g: --enable-threads
+        # is not available in uwsgi
+        if self._skip_monitoring:
+            return self.get_app_response(environ, start_response)
 
         # monitoring
         if apm.trigger_trace():

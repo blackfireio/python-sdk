@@ -156,7 +156,6 @@ class ApmProbeConfig(object):
         if force_disable:
             self.apm_enabled = False
 
-
 _apm_config = ApmConfig()
 _apm_probe_config = ApmProbeConfig()
 _apm_worker = _ApmWorker()
@@ -193,7 +192,6 @@ if _apm_probe_config.apm_enabled:
         json_prettify(_apm_probe_config.__dict__),
         os.getpid(),
     )
-
 
 class ApmTransaction(object):
     '''
@@ -364,13 +362,17 @@ def _get_traced_memory():
 
 
 def reset():
-    global _apm_config, _apm_probe_config
+    global _apm_config, _apm_probe_config, _apm_worker
 
     _apm_config = ApmConfig()
     # init config for the APM for communicating with the Agent
     _apm_probe_config = ApmProbeConfig()
     _set_current_transaction(None)
 
+    # called from post_fork handler and unit tests. We don't want to re-generate
+    # thread from unit tests
+    if not is_testing():
+        _apm_worker.started = False
 
 def trigger_trace():
     global _apm_config, _apm_probe_config
