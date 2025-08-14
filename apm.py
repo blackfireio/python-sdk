@@ -6,6 +6,7 @@ import platform
 import re
 import atexit
 
+import blackfire.dyn_sampler as dyn_sampler
 import _blackfire_profiler as _bfext
 from threading import Thread
 from blackfire.exceptions import *
@@ -29,7 +30,6 @@ __all__ = [
     'set_transaction_name', 'set_tag', 'ignore_transaction',
     'start_transaction', 'stop_transaction'
 ]
-
 
 class _ApmWorker(Thread):
 
@@ -97,12 +97,17 @@ class _ApmWorker(Thread):
             return
         super(_ApmWorker, self).join()
 
+def _use_dynamic_sampling():
+    # The core idea of dynamic sampling is to prioritize errors over successes
+    # with respecting the overall sampling rate and without starving successes
+    # TODO: maybe comes from ApmConfig?
+    return os.environ.get('BLACKFIRE_APM_USE_DYNAMIC_SAMPLING', '0') == '1'
 
 class ApmConfig(object):
 
     def __init__(self):
         self.sample_rate = 1.0
-        self.extended_sample_rate = 0.0
+        self._extended_sample_rate = 0.0
         self.disable_config_update = 0
         self.key_pages = ()
         self.timespan_selectors = {}
@@ -140,6 +145,16 @@ class ApmConfig(object):
             )
         )
 
+    @property
+    def extended_sample_rate(self):
+        return self._extended_sample_rate
+
+    @extended_sample_rate.setter
+    def extended_sample_rate(self, value):
+        if _use_dynamic_sampling():
+            self._extended_sample_rate = self.sample_rate * value
+        else:
+            self._extended_sample_rate = value
 
 class ApmProbeConfig(object):
 
@@ -377,11 +392,18 @@ def reset():
 def trigger_trace():
     global _apm_config, _apm_probe_config
 
+    # we always to tail-based sampling if the dynamic sampling is enabled
+    if _use_dynamic_sampling():
+        return True
+
     return _apm_probe_config.apm_enabled and \
         _apm_config.sample_rate >= random.random()
 
 
 def trigger_extended_trace():
+    # pls note that is dynamic sampling is enabled, extended_trace_rate 
+    # will respect sample_rate accordingly. See how it is set in ApmConfig via 
+    # property setter
     global _apm_config, _apm_probe_config
 
     return _apm_probe_config.apm_enabled and \
@@ -661,6 +683,18 @@ def _queue_trace(transaction, **kwargs):
     apm_trace_req = agent.BlackfireAPMRequest(
         headers=headers, data=str(extended_traces).strip()
     )
+
+    # extended traces are always sampled, if it comes this far. As they respect 
+    # sample_rate already, we don't need to change sample-rate or extended-sample-rate header.
+    if not transaction.extended and _use_dynamic_sampling():
+        is_error = apm_trace_req.headers.get('response-code', 200) >= 400
+        keep, new_rate = dyn_sampler.should_keep(is_error, _apm_config.sample_rate)
+        if not keep:
+            log.debug("APM trace skipped by dynamic sampling. [%s]", apm_trace_req)
+            return
+        # update the sample-rate in the request as we prioritize errors/outliers
+        # over successes, so we need to update the sample-rate accordingly
+        apm_trace_req.headers['sample-rate'] = new_rate
 
     # We should not have a blocking call in APM path. Do agent connection setup
     # socket send in a separate thread.
