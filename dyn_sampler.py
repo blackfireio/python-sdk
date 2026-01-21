@@ -8,6 +8,7 @@ sampling rate and ensuring no success starvation happens.
 """
 
 import random
+
 from blackfire.utils import get_logger
 
 log = get_logger(__name__)
@@ -72,7 +73,7 @@ class _EWMASampler(_BaseSampler):
         # Update EWMA of error fraction
         # This might be a bit counterintuitive, but in fact all we do is to get 
         # weighted average of the old error fraction(self._PE) and the new one(beta * is_error)
-        # beta controls how fast we adapt to changes, lower means faster adaptation.
+        # beta controls how fast we adapt to changes, higher means faster adaptation.
         # This way, newer errors will have more weight, but we still keep some history.
         self._pE = (1 - self._beta) * self._pE + self._beta * (1 if is_error else 0)
 
