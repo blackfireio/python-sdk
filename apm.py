@@ -625,6 +625,34 @@ def _send_trace(req):
             raise e
         log.error("APM message could not be sent. [reason:%s]" % (e))
 
+def _strip_protocol_newlines(value):
+    # Folds CR/LF into spaces so a stray newline in an operator-controlled value cannot inject
+    # additional headers downstream (the wire format is line-oriented `key: value\n`).
+    return value.replace('\r', ' ').replace('\n', ' ')
+
+
+def _resolve_application():
+    """Server-monitoring application name. Precedence:
+    BLACKFIRE_APP_NAME > PLATFORM_APPLICATION_NAME > empty string. Empty values are treated as unset.
+    """
+    value = os.environ.get('BLACKFIRE_APP_NAME') \
+        or os.environ.get('PLATFORM_APPLICATION_NAME') \
+        or ''
+    return _strip_protocol_newlines(value)
+
+
+def _resolve_host():
+    """Server-monitoring host identifier. Precedence:
+    BLACKFIRE_HOSTNAME > platform.node() (kernel hostname) > empty string. Empty values are treated as unset.
+    `platform.node()` is preferred over `os.environ['HOSTNAME']` because long-running workers
+    (gunicorn/uwsgi/etc.) often do not inherit shell exports, and over `socket.gethostbyname()` /
+    `socket.gethostname()` because the former can trigger a DNS resolution on Linux and the latter
+    can raise OSError on platforms where `platform.node()` already swallows it.
+    """
+    value = os.environ.get('BLACKFIRE_HOSTNAME') or platform.node() or ''
+    return _strip_protocol_newlines(value)
+
+
 def _queue_trace(transaction, **kwargs):
     global _apm_config, _apm_worker
 
@@ -644,7 +672,8 @@ def _queue_trace(transaction, **kwargs):
         kwargs['config-version'] = _apm_config.config_version
     kwargs['capabilities'] = "trace, profile"
     kwargs['os'] = platform.system()
-    kwargs['host'] = platform.node()  # faster than socket.gethostbyname (Linux)
+    kwargs['host'] = _resolve_host()
+    kwargs['application'] = _resolve_application()
     kwargs['language'] = "python"
     kwargs['runtime'] = get_probed_runtime()
     kwargs['version'] = VERSION
