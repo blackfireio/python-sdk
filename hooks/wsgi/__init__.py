@@ -33,7 +33,7 @@ class _BlackfireJSProbeMiddleware(object):
 
     def _generate_snippet(self, environ):
         _JSTAG = (
-            '<script async="true" data-browser-key="%s" '
+            '<script async data-browser-key="%s" '
             'data-sample-rate="%.6f" data-parent-trace-id="%s" '
             'data-transaction-name="%s" data-collector="%s" '
             'src="%s"></script>'
